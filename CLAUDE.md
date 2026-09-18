@@ -1,6 +1,6 @@
 # CLAUDE.md — KEEPER: Evidence-First Organizational Memory Auditor
 
-> **Status:** Architecture v1.0 FROZEN  
+> **Status:** Architecture v1.3 FROZEN — Phase 0 checkpoint and GitHub-connected workflow added; Phase 1 must complete and be reviewed before Phase 2
 > **Challenge:** RELEX Solutions — “Memory With a Receipt”  
 > **Project:** KEEPER  
 > **Build model:** 1 developer, ~40 total working hours, AI-assisted implementation  
@@ -34,6 +34,154 @@ The central invariant is:
 Raw evidence is authoritative. LLM annotations, summaries, stances, conclusions, and receipts are derived interpretations and may be wrong.
 
 ---
+
+
+# 0.1 CURRENT IMPLEMENTATION CHECKPOINT
+
+This section reflects the verified repository state after the first implementation session.
+
+## Completed / mostly completed
+
+- Repository inspected against the real challenge corpus.
+- Corpus confirmed as 45 evidence documents:
+  - 20 email threads,
+  - 2 report threads,
+  - 23 transcripts.
+- Frontend scaffold exists and has been verified with a successful Vite/TypeScript build.
+- FastAPI health/config scaffold exists.
+- `.gitignore`, `.env.example`, and README scaffolding exist.
+- Python is now installed and available.
+- `data/source/` contains the **application-owned canonical working copy** of the 45 challenge evidence documents.
+- `data/ARCHIVE_README.md` and `data/PRACTICE_QUESTIONS.md` exist as non-evidence reference material.
+- Git repository has been initialized.
+- GitHub is now connected through the user-authorized connector.
+
+## Important corpus discoveries already verified
+
+### Anonymous INTERNAL transcripts
+
+Three transcript files use an anonymous `Me:` / `Them:` dialogue format instead of normal named Teams-style speaker exports.
+
+Rules:
+
+- do not infer real identities for `Me` or `Them`,
+- preserve the literal anonymous speaker label or an explicit anonymous-speaker identifier,
+- do not map those turns to roster people merely because a likely identity seems plausible,
+- people named inside the content may still be recorded as `MENTIONED`.
+
+### Teams transcript formatting
+
+Normal transcript exports may contain:
+
+- duplicated timestamp/UI text,
+- initials as UI chrome,
+- consecutive caption fragments from the same speaker belonging to one semantic turn.
+
+Parsers should remove known UI chrome deterministically and merge consecutive fragments only when the source structure clearly indicates they belong to the same uninterrupted turn.
+
+Never “repair” meaning while normalizing.
+
+### Truncated source statements
+
+The corpus intentionally contains cut-off statements, including partial numeric statements.
+
+A parser must preserve truncation rather than complete or infer missing text.
+
+Add an Evidence Unit field such as:
+
+```text
+is_truncated: boolean
+```
+
+Reasoning prompts must treat a truncated unit as incomplete evidence and must never complete the missing sentence/number.
+
+### Email image placeholders
+
+Image placeholders are not represented by one universal string. Known examples include multiple English forms, `cid:` references, bare `Image`, and a Swedish placeholder.
+
+Do not make parsing dependent on one exact placeholder token.
+
+## Phase state
+
+**Phase 1 substantive implementation has NOT yet started.**
+
+The following are still to be built:
+
+- SQLite schema,
+- repository/data-access layer,
+- transcript parser,
+- email parser,
+- report parser,
+- stable Evidence ID generation,
+- people/alias model,
+- FTS5 population,
+- embedding generation,
+- Phase 1 parser/data tests.
+
+This is intentional.
+
+Do not jump to Phase 2 until Phase 1 exit criteria pass and the ingestion output has been reviewed.
+
+---
+
+# 0.2 GITHUB-CONNECTED WORKFLOW
+
+GitHub is connected through a user-authorized connector.
+
+Use it where it reduces manual friction, but first verify what actions are actually available in the current environment.
+
+## Required first checks
+
+Before making repository-history changes:
+
+1. inspect the local git status,
+2. inspect configured remotes,
+3. use the GitHub connection to verify the intended remote repository/branch,
+4. compare local staged/uncommitted work with the remote before pushing,
+5. do not overwrite unrelated remote changes.
+
+## Commit/push behavior
+
+Prefer milestone commits after tests pass.
+
+If the GitHub connector permits repository write operations, it may be used for the authorized repo/branch.
+
+If local `git commit` is used and identity is missing:
+
+- do not invent an email/name,
+- do not change global git identity,
+- use a verified connector/account identity only if it is explicitly exposed and appropriate,
+- otherwise leave the changes staged/uncommitted and report the commit blocker,
+- **missing git identity must never block Phase 1 implementation, testing, or local progress.**
+
+Never force-push unless the user explicitly requests it.
+
+Never rewrite existing remote history for convenience.
+
+## Current desired history
+
+Before substantive Phase 1 work, create a clean Phase 0 baseline commit **if possible without fabricating identity or overwriting remote work**.
+
+Suggested commit:
+
+```text
+chore(scaffold): establish keeper phase 0 baseline
+```
+
+After Phase 1 passes its exit criteria:
+
+```text
+feat(ingestion): build evidence locker and stable source parsing
+```
+
+Use the GitHub connector primarily for:
+
+- verifying remote repository state,
+- inspecting branch/history,
+- publishing tested milestone commits when permitted,
+- reviewing diffs.
+
+Do not let GitHub integration change the architecture or source-of-truth rules.
 
 # 1. PRODUCT MISSION
 
@@ -479,11 +627,15 @@ Preferred boundaries:
 
 - transcript → one speaker turn,
 - email thread → one individual email/message,
-- report → one paragraph or coherent section.
+- report → one bullet point, short sub-paragraph, or the smallest coherent factual section.
 
-Long units may be split, but they must retain the same source relationship and sequence.
+**Deletion-radius rule:** For KEEPER's chosen whole-unit deletion strategy, Evidence Units should be as small as practical without destroying meaning. This is especially important for reports. Do not store an entire multi-bullet engineering/status section as one Evidence Unit if the bullets can stand independently.
+
+Long units may be split, but they must retain the same source relationship, parent document, sequence, and neighbor relationships.
 
 Do not default to blind fixed-token chunking.
+
+The reason for this granularity is privacy as well as retrieval quality: deleting one person should not unnecessarily erase unrelated facts that happened to share a large coarse chunk.
 
 ## 7.2 Required tables
 
@@ -576,19 +728,94 @@ Exact DDL may be adjusted for SQLite constraints, but preserve these relationshi
 
 ## 7.3 Stable evidence IDs
 
-Evidence IDs must be deterministic or stable across normal re-ingestion whenever the corresponding source unit survives.
+### Persistent source-locator manifest
 
-Example:
+For plain-text sources that do not provide a naturally stable message/turn identifier, KEEPER should maintain a lightweight persistent source-locator manifest during first canonical ingestion.
+
+Recommended concept:
 
 ```text
-EV-<document slug>-<unit index>
+document_id
+source_locator
+source_fingerprint
+original_order
 ```
 
-Do not let routine rebuilds randomly change all evidence IDs unless unavoidable.
+Rules:
 
-Deletion/rebuild must not resurrect deleted evidence.
+- `source_locator` is assigned once and preserved for the life of that surviving source unit,
+- deleting an earlier unit must not renumber later locators,
+- mutable line numbers or `bullet_0`, `bullet_1`, `bullet_2` are not sufficient identities by themselves,
+- a content hash/fingerprint may help match units during sanitation/rebuild, but **content hash alone is not a safe identity** because duplicate/near-duplicate text may occur,
+- if a natural stable identifier exists (email message ID, transcript timestamp/turn locator), prefer it over a generated manifest locator,
+- sanitation/rebuild must preserve locators for unaffected surviving units.
+
+A practical implementation may use a small sidecar JSON/SQLite manifest tied to the canonical `data/source/` representation.
+
+Add tests proving that:
+
+```text
+initial ingest
+→ delete one earlier unit
+→ rebuild
+→ unaffected surviving units keep the same evidence_id
+```
+
+
+Evidence IDs must remain stable across normal re-ingestion and deletion/rebuild whenever the underlying surviving source unit is the same.
+
+Do **not** derive IDs only from the current ordinal position of a unit, because deleting an earlier unit could renumber every later unit.
+
+Preferred strategy:
+
+```text
+evidence_id = stable(document_id + source_locator)
+```
+
+Where `source_locator` is a persistent locator captured from the original parsed source structure, for example:
+
+- transcript turn locator,
+- email message locator,
+- report bullet/sub-paragraph locator,
+- source line/range locator when appropriate.
+
+A deterministic hash of `document_id + source_locator` is acceptable.
+
+The key invariant is:
+
+> deleting one Evidence Unit must not cause unrelated surviving Evidence IDs to change.
+
+If exact source locators are not naturally present, assign them once during canonical ingestion and persist them in the sanitized app-owned source/manifest used for rebuilds.
+
+Do not regenerate locators by compacting surviving units after deletion.
 
 ---
+
+
+## Canonical source boundary for this hackathon
+
+`data/source/` is KEEPER's **application-owned canonical working source** for ingestion, rebuild, and deletion behavior.
+
+The untouched challenge extraction outside `data/source/` is a **development fixture/reference input**, not application memory.
+
+Rules:
+
+- runtime ingestion and rebuild commands must read from `data/source/`,
+- deletion must sanitize the relevant content in `data/source/`,
+- a normal KEEPER rebuild must never silently re-import from the untouched fixture,
+- the untouched fixture must remain gitignored and outside application persistence,
+- tests may use isolated fixture copies, but production/runtime code must not use the untouched archive as a fallback source.
+
+This distinction is required so:
+
+```text
+purge person
+→ verify
+→ rebuild
+→ verify again
+```
+
+cannot resurrect deleted evidence.
 
 # 8. INGESTION RULES
 
@@ -616,7 +843,7 @@ The entire query pipeline must work with **zero ingestion-time AI annotations**.
 
 Never store an ingestion-time `AGREEMENT` as organizational truth.
 
-## People detection
+## People detection and alias discovery
 
 Prefer deterministic identity extraction from:
 
@@ -630,11 +857,53 @@ Aliases may include:
 
 - full name,
 - email,
-- safe unique name variants.
+- safe unique first/last-name variants,
+- initials or nicknames only when corpus evidence strongly ties them to one person.
+
+Before finalizing the `people` / `person_aliases` tables, run a **corpus-wide alias discovery pass**:
+
+1. collect all explicit speaker/sender identities,
+2. collect email addresses and display names,
+3. scan for recurring short forms, initials, nicknames, and obvious spelling variants,
+4. resolve only high-confidence aliases to an existing person,
+5. leave ambiguous aliases unmerged.
+
+This pass may use an LLM as a **candidate generator only**. Any alias mapping used for deletion must be stored explicitly and should be reviewable/debuggable.
 
 Avoid broad fuzzy aliases that risk deleting unrelated text.
 
+The deletion verifier is the final backstop for **tracked identifiers**: if a canonical name, known alias, known email, or deleted evidence ID survives anywhere in application-owned storage, deletion must fail rather than report success. This verifies all identifiers the system knows about; it does not prove that an undiscovered nickname never existed.
+
 ---
+
+
+# 8.1 EMBEDDING INGESTION RESILIENCE
+
+Embedding generation must not make Phase 1 unusable when credentials are absent or an API temporarily rate-limits/fails.
+
+Requirements:
+
+- batch embedding requests where the SDK supports batching,
+- use bounded retries with exponential/backoff behavior for transient failures,
+- provide an ingestion flag such as:
+
+```text
+--skip-embeddings
+```
+
+for parser/schema/FTS development without API access,
+
+- unit tests must use a deterministic/mock embedding provider,
+- run at least one real embedding integration smoke test when credentials are available,
+- partial embedding failure must produce a clear ingestion warning/report rather than silently corrupting the Evidence Locker,
+- do not claim semantic retrieval is ready until embedding rows exist for the intended corpus.
+
+If `--skip-embeddings` is used:
+
+- documents, Evidence Units, people/aliases, FTS, and all deterministic ingestion outputs must still succeed,
+- Phase 1 can be structurally validated,
+- Phase 2 semantic retrieval remains blocked until real embeddings are generated.
+
 
 # 9. RETRIEVAL V1
 
@@ -675,9 +944,29 @@ Choose a constant once and test retrieval quality; do not tune endlessly.
 
 For each high-ranked unit, include appropriate neighboring evidence from the same document/thread.
 
-Purpose: the LLM must not interpret isolated lines like “yes” without the preceding proposal.
+Default transcript behavior:
+
+- include the cited/high-ranked turn,
+- include at least the immediately previous and next turn where available,
+- dynamically expand to the smallest coherent conversational exchange when the cited turn is context-dependent.
+
+Purpose: the LLM must not interpret isolated lines like “yes”, “sounds good”, or “let’s do that” without the proposal being accepted.
 
 Do not over-expand until the context is the whole archive.
+
+### Citation-context invariant
+
+A technically valid evidence ID can still be semantically useless if its meaning depends on nearby turns.
+
+Therefore:
+
+- the **reasoner** receives neighbor-expanded context,
+- the **validator** ensures the cited evidence ID is real and visible,
+- the **UI evidence drawer** automatically renders the cited Evidence Unit plus nearby contextual units from the same thread/document, expanding beyond ±1 when needed to make the cited utterance understandable,
+- the cited unit is visually highlighted,
+- nearby context is clearly marked as context rather than as independently cited support.
+
+Do **not** require the LLM to perfectly cite both sides of every conversational exchange. The backend/UI must make context inspectable deterministically.
 
 ## 9.5 Temporal sweep
 
@@ -859,22 +1148,73 @@ Its task is:
 Process:
 
 1. identify the weakest/highest-impact claim,
-2. generate 1–3 adversarial retrieval intentions,
-3. run them through the same retrieval service,
-4. inspect returned counterevidence,
-5. output objections and counterevidence IDs.
+2. generate a small number of targeted counter-search bundles; **default maximum: 2** for MVP latency control,
+3. each bundle should cover more than simple lexical negation,
+4. run them through the same retrieval service,
+5. inspect returned counterevidence,
+6. output objections and counterevidence IDs.
 
-Examples of adversarial intentions:
+For each important claim, the Skeptic should think across three counter-retrieval strategies:
 
-- later reversal,
-- explicit disagreement,
+### A. Direct contradiction
+Search for explicit rejection, disagreement, cancellation, reversal, or non-approval.
+
+### B. Alternative/replacement state
+Search for later adoption of a competing technology, scope, plan, owner, or implementation state that would indirectly falsify the candidate.
+
+Example:
+
+Candidate:
+`Kafka was chosen.`
+
+Do not search only:
+`Kafka rejected`.
+
+Also search the same domain/topic for later architecture choices such as:
+`RabbitMQ`, `streaming platform`, `message broker`, `replacement`, `migration`, or later implementation evidence.
+
+### C. Later implementation / operational evidence
+Search for what the organization actually implemented, shipped, escalated, deferred, or worked around after the supposed decision.
+
+This catches cases where nobody says “X was reversed,” but later operational evidence shows Y became reality.
+
+Additional adversarial intentions include:
+
 - lack of confirmation,
 - proposal-only language,
 - operational behavior contradicting a status report,
 - later implementation inconsistent with stated agreement,
-- evidence that the supposed commitment applied only to a narrower scope.
+- narrower scope than the candidate claim,
+- superseding decisions expressed with different vocabulary.
 
 The Skeptic must perform actual counter-retrieval. A prompt-only critique without new retrieval is insufficient.
+
+Do not rely on naive string negation as the primary adversarial search method.
+
+The two-bundle cap is an MVP default, not a proven optimum. Increase it only if evaluation shows a material recall improvement without unacceptable live-demo latency.
+
+---
+
+# 13.1 LATENCY BUDGET FOR HIGH-RISK QUERIES
+
+High-risk reasoning is allowed to be slower than a trivial lookup, but it must remain demo-friendly.
+
+Implementation guidance:
+
+- default to at most **2** Skeptic counter-search bundles; increase only if evaluation shows materially better recall without unacceptable latency,
+- keep each retrieval result set small,
+- run independent retrieval work in parallel where straightforward,
+- do not resend the entire archive,
+- reuse embeddings / loaded matrices,
+- avoid additional “polish” LLM calls,
+- stream or expose coarse progress states in the UI such as:
+  - `Analyzing evidence`
+  - `Checking for contradictions`
+  - `Reconciling current state`
+
+Do not sacrifice attribution/currency correctness merely to achieve vanilla-RAG latency.
+
+The performance target is not a hard SLA, but the architecture should aim for a high-risk response that feels like a deliberate audit rather than a stalled application.
 
 ---
 
@@ -1048,7 +1388,13 @@ Find every Evidence Unit where P is:
 - SPEAKER,
 - MENTIONED.
 
-For this challenge, prefer deleting the entire evidence unit containing the target person rather than attempting fragile sentence-level redaction.
+For this challenge, prefer deleting the entire **small, well-formed Evidence Unit** containing the target person rather than attempting fragile sentence-level redaction.
+
+For KEEPER's chosen whole-unit purge strategy, fine ingestion granularity is necessary to minimize collateral deletion:
+
+- transcript unit → normally one speaker turn,
+- email unit → one message,
+- report unit → one bullet / short factual sub-paragraph where possible.
 
 This means a statement such as:
 
@@ -1057,6 +1403,27 @@ This means a statement such as:
 is deleted even if someone else said it.
 
 That is intentional: the target person remains part of the informational trace.
+
+However, the parser must avoid coarse units that bundle unrelated facts, because whole-unit deletion should not create unnecessary organizational amnesia.
+
+## 18.1.1 Canonical source and rebuild safety
+
+A purge is incomplete if a later rebuild can silently resurrect deleted data.
+
+Therefore:
+
+- the app-owned canonical source used for rebuilds must itself be sanitized during deletion,
+- any app-owned normalized manifests/copies must be sanitized too,
+- rebuild scripts must read only from the sanitized canonical source or sanitized manifest,
+- no hidden unsanitized backup may remain inside application-owned runtime/storage directories.
+
+If the original hackathon corpus is treated as external/read-only input outside KEEPER's owned persistent state, keep that boundary explicit in code and documentation. Do not copy an untouched version into app-owned storage and later rebuild from it after deletion.
+
+A successful purge must preserve this invariant:
+
+> running the normal rebuild command after deletion must not resurrect the deleted person's data.
+
+---
 
 ## 18.2 Dependency invalidation
 
@@ -1068,7 +1435,20 @@ Before deleting evidence, identify dependent:
 
 Use the relational reference tables, not a graph database.
 
-## 18.3 Physical purge sequence
+## 18.3 Canonical rebuild source invariant
+
+A purge is incomplete if an untouched app-owned source copy can later recreate the deleted person during `rebuild`.
+
+Therefore:
+
+- the canonical source representation used by KEEPER rebuilds must itself be sanitized,
+- rebuild scripts must never read from an unsanitized retained copy inside application-owned storage,
+- no hidden backup of the imported corpus may remain under `data/`, cache directories, temp export folders, or debug artifacts,
+- if the original hackathon corpus is treated as external/read-only input outside KEEPER’s owned persistent state, document that trust boundary explicitly and ensure production rebuilds use only the sanitized application-owned canonical source.
+
+A successful deletion must remain deleted after a full rebuild.
+
+## 18.4 Physical purge sequence
 
 Implement a transactional/safe sequence:
 
@@ -1093,7 +1473,11 @@ DELETE dependent Pulse findings
     ↓
 clear relevant runtime caches/artifacts
     ↓
+checkpoint/truncate SQLite WAL or journal state as applicable
+    ↓
 VACUUM SQLite
+    ↓
+close/reopen database and verify auxiliary DB files
     ↓
 rebuild retrieval representations as needed
     ↓
@@ -1105,6 +1489,33 @@ run deletion verifier
 Do not keep a hidden personal-data backup inside `data/`.
 
 If an external original file outside application control exists, document that it is external input, not retained internal state. All application-owned copies must be purged.
+
+## 18.3.1 SQLite physical-cleanup details
+
+Row deletion alone is not enough to claim application-level physical purge.
+
+SQLite may retain recently deleted bytes in:
+
+- the main database file,
+- `-wal`,
+- `-shm`,
+- rollback journal/temp files,
+- application caches.
+
+Implementation must account for the configured journal mode.
+
+At purge time:
+
+1. complete transactional deletes,
+2. checkpoint/truncate WAL if WAL mode is enabled,
+3. remove/clear stale auxiliary DB artifacts when safe and appropriate,
+4. run `VACUUM`,
+5. close and reopen the database,
+6. verify the main DB and relevant auxiliary/cache artifacts for tracked identifiers and deleted evidence IDs.
+
+Do not report deletion success while a stale WAL/journal/cache still contains tracked deleted data.
+
+---
 
 ## 18.4 Logging
 
@@ -1144,13 +1555,16 @@ for:
 - aliases/emails,
 - deleted evidence IDs.
 
-Expected result:
+Expected result for all **tracked identifiers and references**:
 
 ```text
-0 surviving textual traces
+0 surviving matches for canonical name / known aliases / known emails
 0 deleted evidence references
 0 surviving embedding rows for deleted evidence
+0 stale references in Cases / timelines / Pulse / caches
 ```
+
+This is a strong application-level verification over what the system knows and owns. Do not describe it as a mathematical proof that no unknown alias or indirect reference could exist.
 
 Then rerun an affected Case and show the new result.
 
@@ -1186,6 +1600,15 @@ Display:
 - missing information,
 - Decision Evolution,
 - source receipts.
+
+For transcript/email evidence, opening a receipt must show:
+
+- the cited Evidence Unit highlighted,
+- at least ±1 adjacent conversational units when available,
+- the surrounding meeting/email/thread identity,
+- a visual distinction between the cited unit and contextual neighbors.
+
+A receipt must be understandable to a judge without requiring them to infer what an isolated “yes” or “sounds good” referred to.
 
 ## C. Decision Evolution
 
@@ -1270,7 +1693,8 @@ Examples:
 - fabricated evidence ID → drop/reject claim.
 - retrieval returns no meaningful evidence → `INSUFFICIENT_EVIDENCE`.
 - deletion partial failure → transaction/recovery path; do not report success.
-- deletion verification nonzero → failure state with counts, not success.
+- SQLite WAL/journal cleanup failure → deletion failure; do not report success.
+- deletion verification finds any tracked identifier/reference → failure state with counts, not success.
 - malformed source file → ingestion report identifies file and continues/halts according to severity.
 
 No silent exception swallowing.
@@ -1288,17 +1712,22 @@ At minimum:
 - transcript parser,
 - email parser,
 - report parser,
+- report bullet/sub-paragraph granularity,
 - Evidence ID stability,
 - alias detection,
+- corpus-wide alias candidate discovery,
 - FTS retrieval,
 - vector similarity,
 - rank fusion,
 - neighbor expansion,
+- context-window rendering data,
 - validator rejecting nonexistent IDs,
 - validator hydrating DB metadata,
 - risk rules,
 - deletion dependency lookup,
-- deletion verifier.
+- deletion verifier,
+- rebuild-after-delete does not resurrect deleted data,
+- SQLite WAL/journal cleanup behavior when the configured journal mode uses auxiliary files.
 
 ## Integration tests
 
@@ -1306,10 +1735,14 @@ At minimum:
 
 - ingest → query,
 - high-risk query → Skeptic path,
+- Skeptic can find an indirect replacement/reversal expressed with different vocabulary,
 - query → receipt → UI schema,
+- context-dependent citation renders neighbor context,
 - delete person → query again,
 - evidence deletion invalidates Cases,
-- deleted evidence cannot be retrieved.
+- deleted evidence cannot be retrieved,
+- delete person → full rebuild → deleted evidence remains absent,
+- deletion verification covers DB auxiliary/cache artifacts owned by the app.
 
 ## Evaluation tests
 
@@ -1363,19 +1796,55 @@ Exit:
 
 Tasks:
 
+- implement SQLite schema and repository layer,
 - parse all source types,
-- Evidence Units,
-- stable IDs,
-- people/aliases,
-- SQLite,
-- FTS,
-- embeddings.
+- handle both named Teams-style transcripts and anonymous `Me:` / `Them:` INTERNAL transcripts,
+- preserve/flag truncated statements without completing them,
+- normalize known transcript UI chrome without changing meaning,
+- create fine-grained Evidence Units,
+- create stable source locators and stable Evidence IDs that do not shift after deletion,
+- seed people from deterministic roster/header data,
+- run corpus-wide alias candidate discovery with explicit stored mappings,
+- populate `evidence_people`,
+- populate FTS5,
+- generate/store embeddings using batching/retry support,
+- support `--skip-embeddings` for offline/local ingestion validation,
+- create an ingestion report with counts and parsing warnings.
 
 Exit:
 
-- every source passage is inspectable by stable Evidence ID,
+- all 45 evidence documents ingest from `data/source/`,
+- every Evidence Unit is inspectable by stable Evidence ID,
+- anonymous transcript turns remain anonymous,
+- truncated units are marked and preserved verbatim,
+- deleting/rebuilding an earlier unit does not renumber unaffected surviving Evidence IDs,
 - record-count ingestion report exists,
-- metadata spot checks pass.
+- metadata spot checks pass,
+- parser/unit tests pass,
+- no Phase 2 retrieval code is required yet.
+
+
+## Phase 1 review gate
+
+After Phase 1 completes, STOP substantive feature expansion and report the ingestion result before implementing Phase 2.
+
+The report must include:
+
+- files changed,
+- total documents parsed by type,
+- Evidence Unit counts by document type,
+- parse warnings/failures,
+- examples of stable source locators/IDs,
+- anonymous transcript handling,
+- truncation handling,
+- people/alias counts,
+- unresolved/ambiguous alias candidates,
+- FTS row count,
+- embedding row count,
+- test results,
+- any corpus structures that do not fit the current model.
+
+Phase 2 should begin only after Phase 1 output is coherent and the Evidence Locker foundation is trustworthy.
 
 ## Phase 2 — Retrieval (target ~5h)
 
@@ -1435,8 +1904,10 @@ Tasks:
 
 Exit:
 
-- target aliases/data/evidence IDs have zero surviving application-owned traces,
+- all tracked identifiers, aliases, emails, deleted evidence IDs, and known dependent references have zero surviving matches in application-owned persistence,
 - deleted evidence cannot be retrieved,
+- a full rebuild does not resurrect deleted evidence,
+- SQLite auxiliary persistence (WAL/journal/temp state as applicable) is cleaned/verified,
 - affected Case changes appropriately.
 
 ## Phase 6 — UI + Decision Evolution (target ~6h)
@@ -1607,11 +2078,11 @@ KEEPER MVP is done when all of the following are true:
 8. Decision Evolution displays only evidence-backed events.
 9. A person can be physically purged from application-owned raw/normalized/search/derived storage.
 10. Dependent Cases/artifacts are invalidated.
-11. Post-deletion verification returns zero traces.
+11. Post-deletion verification returns zero surviving matches for all tracked identifiers, deleted evidence IDs, and known dependent artifacts.
 12. Affected Case is recomputed from surviving evidence.
-13. Judges can ask unseen questions through the UI.
-14. The live demo works without editing code.
-15. The core is tested before optional Project Pulse work begins.
+14. Judges can ask unseen questions through the UI.
+15. The live demo works without editing code.
+16. The core is tested before optional Project Pulse work begins.
 
 ---
 
@@ -1637,7 +2108,15 @@ Never let “newer” automatically mean “true.”
 
 Never hardcode named decision authorities.
 
-Never report deletion success until verification passes.
+Never report deletion success until verification passes for all tracked identifiers, deleted evidence IDs, and known dependent artifacts.
+
+Never let coarse Evidence Units create avoidable deletion collateral damage.
+
+Never show a context-dependent conversational citation without nearby context.
+
+Never treat alias discovery as complete until corpus-wide candidate discovery and post-delete verification both pass.
+
+Never let the Skeptic rely only on literal negation; it must search for replacements, later state, and implementation evidence.
 
 Never add architectural complexity merely to make the system look less like RAG.
 

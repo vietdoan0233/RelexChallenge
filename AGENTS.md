@@ -1,4 +1,4 @@
-# CLAUDE.md — KEEPER: Evidence-First Organizational Memory Auditor
+# AGENTS.md — KEEPER: Evidence-First Organizational Memory Auditor
 
 > **Status:** Architecture v1.3 FROZEN — Phase 1 implementation checkpoint recorded; identity hardening, real embeddings, and review are required before Phase 2
 > **Challenge:** RELEX Solutions — “Memory With a Receipt”
@@ -454,7 +454,7 @@ Use this layout unless the existing repository already has a sensible equivalent
 
 ```text
 relex-keeper/
-├── CLAUDE.md
+├── AGENTS.md
 ├── README.md
 ├── .env.example
 ├── .gitignore

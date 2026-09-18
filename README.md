@@ -8,9 +8,11 @@ Skeptic role, and validating every citation against the database before it
 reaches the UI. The full architecture and implementation contract lives in
 [CLAUDE.md](CLAUDE.md); this file only covers running the project.
 
-**Status:** Phase 0 (repository bootstrap). Ingestion, retrieval, and
-reasoning are not implemented yet — see CLAUDE.md section 24 for the phase
-plan.
+**Status:** Phase 1 Evidence Locker implemented and paused at its mandatory
+hardening/review gate. Identity extraction must be tightened and real Gemini
+embeddings must be generated before Phase 2 retrieval begins. See
+`docs/HANDOFF_2026-09-19.md` for the current checkpoint and `CLAUDE.md`
+section 24 for the frozen phase plan.
 
 ## Archive
 
@@ -68,4 +70,18 @@ npm run build
 
 ## Ingestion
 
-Documented once the ingestion CLI lands in Phase 1.
+From the repository root, deterministic ingestion can run without API access:
+
+```bash
+backend/.venv/Scripts/python.exe scripts/ingest.py --skip-embeddings
+```
+
+After configuring `GOOGLE_API_KEY` and `GEMINI_EMBEDDING_MODEL` in the
+gitignored root `.env`, omit `--skip-embeddings` to generate real vectors:
+
+```bash
+backend/.venv/Scripts/python.exe scripts/ingest.py
+```
+
+Do not treat semantic retrieval as ready until the ingestion report confirms
+real embedding rows for the intended corpus.

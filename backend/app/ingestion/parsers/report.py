@@ -71,7 +71,6 @@ def _split_into_units(body: str) -> list[tuple[str, str | None]]:
     for paragraph in paragraphs:
         lines = paragraph.splitlines()
         header_match = _SECTION_HEADER.match(lines[0].strip())
-        bullet_lines = [line for line in lines[1:] if _BULLET_LINE.match(line.strip())]
 
         if not header_match:
             text = " ".join(line.strip() for line in lines if line.strip())
@@ -82,16 +81,32 @@ def _split_into_units(body: str) -> list[tuple[str, str | None]]:
         label = header_match.group(1)
         inline_status = header_match.group(2).strip()
 
-        if len(bullet_lines) >= 2:
+        # Bullet numbering must be stripped whether there are many bullets
+        # or just one -- a section with a single "1. ..." line is still a
+        # bullet line, not prose, and must not keep its "1." prefix.
+        bullet_texts: list[str] = []
+        plain_lines: list[str] = []
+        for line in lines[1:]:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            bullet_match = _BULLET_LINE.match(stripped)
+            if bullet_match:
+                text = bullet_match.group(1).strip()
+                if text:
+                    bullet_texts.append(text)
+            else:
+                plain_lines.append(stripped)
+
+        if len(bullet_texts) >= 2:
             if inline_status:
                 units.append((inline_status, label))
-            for bullet in bullet_lines:
-                bullet_text = _BULLET_LINE.match(bullet.strip()).group(1).strip()
-                if bullet_text:
-                    units.append((bullet_text, label))
+            for bullet_text in bullet_texts:
+                units.append((bullet_text, label))
+            for plain in plain_lines:
+                units.append((plain, label))
         else:
-            rest_text = " ".join(line.strip() for line in lines[1:] if line.strip())
-            combined = " ".join(filter(None, [inline_status, rest_text])).strip()
+            combined = " ".join(p for p in [inline_status, *bullet_texts, *plain_lines] if p)
             if combined:
                 units.append((combined, label))
 

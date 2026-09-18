@@ -60,6 +60,23 @@ def test_single_line_section_is_kept_as_one_unit():
     assert timeline_units[0].raw_text == "On plan."
 
 
+def test_single_bullet_section_still_strips_the_numbering_prefix():
+    # A section with exactly one "1. ..." line is still a bullet, not
+    # prose -- its numbering must be stripped just like a multi-bullet
+    # section's, not left in raw_text as "1.        Q1 results compiled".
+    text = DISCLAIMER + (
+        "Subject: Weekly update\nFrom: Ana Duarte <ana.duarte@relexsolutions.example>\n"
+        "Date: Monday, April 6, 2026 17:30\nTo: Lena Fischer <lena.fischer@acme-org.example>\n"
+        "Messages in thread: 1\n\n"
+        "Topics worked on last week\n"
+        "1.                  Q1 results compiled\n"
+    )
+    doc = report.parse(text, "doc1", "doc1.txt")
+    matching = [u for u in doc.units if u.thread_context and "Topics worked" in u.thread_context]
+    assert len(matching) == 1
+    assert matching[0].raw_text == "Q1 results compiled"
+
+
 def test_free_paragraph_before_any_section_header_becomes_its_own_unit():
     text = DISCLAIMER + (
         "Subject: Weekly update\nFrom: Ana Duarte <ana.duarte@relexsolutions.example>\n"

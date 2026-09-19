@@ -97,10 +97,17 @@ def all_evidence_units(
     return conn.execute("SELECT * FROM evidence_units ORDER BY document_id, unit_index").fetchall()
 
 
-def insert_fts_row(conn: sqlite3.Connection, evidence_id: str, raw_text: str) -> None:
+def insert_fts_row(
+    conn: sqlite3.Connection,
+    evidence_id: str,
+    raw_text: str,
+    thread_context: str | None = None,
+    speaker_sender: str | None = None,
+) -> None:
     conn.execute(
-        "INSERT INTO evidence_fts (evidence_id, raw_text) VALUES (?, ?)",
-        (evidence_id, raw_text),
+        "INSERT INTO evidence_fts (evidence_id, raw_text, thread_context, speaker_sender) "
+        "VALUES (?, ?, ?, ?)",
+        (evidence_id, raw_text, thread_context or "", speaker_sender or ""),
     )
 
 

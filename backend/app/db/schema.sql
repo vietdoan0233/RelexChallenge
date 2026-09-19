@@ -96,9 +96,16 @@ CREATE TABLE IF NOT EXISTS evidence_embeddings (
     vector_json TEXT NOT NULL
 );
 
+-- thread_context and speaker_sender are indexed beside the text so a short
+-- unit ("Received, thank you.") stays findable through its thread title or
+-- sender. Retrieval weights them below raw_text (retrieval/lexical.py).
+-- Anything that scrubs a person from application storage must scrub these
+-- two columns as well as raw_text (CLAUDE.md 18.5).
 CREATE VIRTUAL TABLE IF NOT EXISTS evidence_fts USING fts5(
     evidence_id UNINDEXED,
-    raw_text
+    raw_text,
+    thread_context,
+    speaker_sender
 );
 
 CREATE TABLE IF NOT EXISTS cases (

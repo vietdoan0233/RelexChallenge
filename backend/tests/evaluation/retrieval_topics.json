@@ -1,0 +1,152 @@
+[
+  {
+    "id": "op-id-removal",
+    "query": "Who proposed removing the operator ID field from the data extract, and had it already been sent anywhere?",
+    "relevant": [
+      {
+        "document": "07_op-id-field-exclusion",
+        "pattern": "OP_ID"
+      },
+      {
+        "document": "06_2024-09-24_master-data-workshop",
+        "pattern": "column I did not expect"
+      }
+    ]
+  },
+  {
+    "id": "shelf-life-population",
+    "query": "What proportion of articles had shelf-life data populated?",
+    "relevant": [
+      {
+        "document": "06_2024-09-24_master-data-workshop",
+        "pattern": "shelf life is populated on forty-eight percent"
+      }
+    ]
+  },
+  {
+    "id": "ordering-service-levels",
+    "query": "What service levels were agreed for ordering?",
+    "relevant": [
+      {
+        "document": "07_2024-11-12_ordering-logic-design",
+        "pattern": "[Ss]ervice level|Ninety-nine"
+      }
+    ]
+  },
+  {
+    "id": "uat-signoff-scope",
+    "query": "Did Acme sign off UAT, and what was the scope of what was signed?",
+    "relevant": [
+      {
+        "document": "15_uat-signoff",
+        "pattern": "does not extend to fresh|Signed and attached"
+      }
+    ]
+  },
+  {
+    "id": "nightly-extract-status",
+    "query": "The weekly status reports say the nightly article extract completed with no errors. Is that true?",
+    "relevant": [
+      {
+        "document": "01_weekly-status-thread",
+        "pattern": "Nightly article extract completed"
+      }
+    ]
+  },
+  {
+    "id": "bakery-scope",
+    "query": "Is bakery inside the fresh workstream?",
+    "temporal": true,
+    "relevant": [
+      {
+        "document": "18_2025-12-11_fresh-cutover-call",
+        "pattern": "Bakery.*out of scope"
+      },
+      {
+        "document": "03_phase2-sequencing-proposal",
+        "pattern": "bakery separately"
+      },
+      {
+        "document": "19_2026-01-28_bakery-scoping-PARTNER",
+        "pattern": "Bakery came out of"
+      },
+      {
+        "document": "17_2025-11-17_fresh-phase2-go-no-go",
+        "pattern": "Bakery comes later as its own"
+      }
+    ]
+  },
+  {
+    "id": "dc2-failure-cadence",
+    "query": "How often were the DC-2 feed failures, and how often were they expected to occur?",
+    "relevant": [
+      {
+        "document": "05_dc2-incident-log",
+        "pattern": "fortnightly failures"
+      },
+      {
+        "document": "01_weekly-status-thread",
+        "pattern": "DC-2 feed failed"
+      },
+      {
+        "document": "19_2026-01-28_bakery-scoping-PARTNER",
+        "pattern": "DC-2 feed still fails"
+      }
+    ]
+  },
+  {
+    "id": "phase2-go-no-go",
+    "query": "What was decided at the Fresh Phase 2 go/no-go?",
+    "temporal": true,
+    "relevant": [
+      {
+        "document": "17_2025-11-17_fresh-phase2-go-no-go",
+        "pattern": "that is my decision. Go live on produce"
+      },
+      {
+        "document": "17_2025-11-17_fresh-phase2-go-no-go",
+        "pattern": "Go-live on the fifteenth of December"
+      }
+    ]
+  },
+  {
+    "id": "chain-wide-rollout",
+    "query": "What were the indicative numbers for the chain wide rollout?",
+    "relevant": [
+      {
+        "document": "20_chain-wide-proposal",
+        "pattern": "[Cc]hain"
+      }
+    ]
+  },
+  {
+    "id": "renewal-risk-dpo",
+    "query": "Why did the DPO review change the view of the renewal risk?",
+    "relevant": [
+      {
+        "document": "23_2026-07-02_INTERNAL-renewal-resourcing",
+        "pattern": "DPO review changed"
+      }
+    ]
+  },
+  {
+    "id": "cutover-runbook",
+    "query": "Who has been quoting the fresh cutover runbook, and from which thread?",
+    "relevant": [
+      {
+        "document": "18_fresh-cutover-runbook",
+        "pattern": "runbook"
+      }
+    ]
+  },
+  {
+    "id": "dpa-processor-actions",
+    "query": "What actions came out of the data processor review?",
+    "relevant": [
+      {
+        "document": "08_dpa-review-actions",
+        "pattern": null
+      }
+    ]
+  }
+]

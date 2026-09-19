@@ -41,3 +41,38 @@ def test_non_person_labels_is_exactly_anonymous_labels_union_redaction_markers()
         anonymous_labels.ANONYMOUS_SPEAKER_LABELS | anonymous_labels.REDACTION_MARKERS
     )
     assert len(anonymous_labels.NON_PERSON_LABELS) == 6
+
+
+@pytest.mark.parametrize("label", ["+358 40 5512 097", "+1 555 010 0199", "  +44 20 7946 0000 "])
+def test_phone_number_speaker_labels_are_non_person(label):
+    assert anonymous_labels.is_phone_number_label(label) is True
+    assert anonymous_labels.is_non_person_label(label) is True
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "358 40 5512 097",  # no leading plus
+        "+",
+        "+358 call me",
+        "Call +358 40 5512 097",
+        "Marco Rossi",
+    ],
+)
+def test_near_miss_text_is_not_a_phone_number_label(value):
+    assert anonymous_labels.is_phone_number_label(value) is False
+
+
+@pytest.mark.parametrize("label", ["Guest 1", "Guest 12", "  Guest 2 "])
+def test_guest_speaker_labels_are_non_person(label):
+    assert anonymous_labels.is_guest_label(label) is True
+    assert anonymous_labels.is_unlisted_participant_label(label) is True
+    assert anonymous_labels.is_non_person_label(label) is True
+
+
+@pytest.mark.parametrize(
+    "value", [None, "Guest", "Guest one", "guest 1", "Guest 1 said", "The Guest 1", "Guest Speaker"]
+)
+def test_near_miss_text_is_not_a_guest_label(value):
+    assert anonymous_labels.is_guest_label(value) is False

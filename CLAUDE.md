@@ -1,6 +1,6 @@
 # CLAUDE.md — KEEPER: Evidence-First Organizational Memory Auditor
 
-> **Status:** Architecture v1.4 FROZEN — Phase 1 implementation checkpoint recorded; identity hardening, organizer GPT integration, real embeddings, and review are required before Phase 2
+> **Status:** Architecture v1.5 FROZEN — Phase 1 implementation checkpoint recorded; identity hardening is complete. Remaining before Phase 2: the organizer GPT transport/contract, a real embedding smoke test and corpus embedding generation, and a final Phase 1 review once those checks pass. v1.5 corrects the deletion strategy from default whole-Evidence-Unit removal to granular, irreversible redaction/anonymization with whole-unit deletion as the fallback; this is a documentation correction only — Phase 5 deletion/anonymization remains unimplemented.
 > **Challenge:** RELEX Solutions — “Memory With a Receipt”
 > **Project:** KEEPER
 > **Build model:** 1 developer, ~40 total working hours, AI-assisted implementation
@@ -135,6 +135,8 @@ The corrected offline ingestion produces 25 people and 39 aliases (25 FULL_NAME 
 
 Do not jump to Phase 2 until the remaining Phase 1 exit criteria (real embeddings, organizer GPT contract) pass.
 
+Architecture v1.5 (section 0.3) corrects the Phase 5 deletion/anonymization target design in response to a judge-confirmed clarification. As of this checkpoint, **Phase 5 has not been implemented**: there is no `app/privacy/` module, no purge/redaction code, no `source_locators.revoked_at` column or migration, no reserved-marker handling in the parsers, and no deletion/anonymization tests. Section 18 (and its new subsections 18.6–18.12) records the corrected target design for that future implementation; it is a contract correction, not a report of new code.
+
 ---
 
 # 0.2 GITHUB WORKFLOW
@@ -173,14 +175,24 @@ Never rewrite existing remote history for convenience.
 
 ## Current history and next milestone
 
-Verified local history at the 2026-09-19 checkpoint:
+Verified local history at this checkpoint:
 
 1. `5886ab5 chore(scaffold): establish keeper phase 0 baseline`
 2. `1c6f3d7 feat(ingestion): build evidence locker and stable source parsing`
 3. `1bb96b1 fix(ingestion): strip bullet numbering in single-bullet report sections`
 4. `c56c252 docs: record phase 1 checkpoint and handoff`
+5. `0260ef9 chore(config): prepare organizer GPT provider`
+6. `8c6b79b fix(ingestion): harden identities and make branding configurable`
 
-The next milestone is focused Phase 1 hardening for high-confidence identity extraction and, once the organizers supply the API contract, the GPT adapter and real embedding verification. Do not label Phase 2 complete or semantic retrieval ready until real embedding rows exist.
+At this checkpoint, `8c6b79b` is committed locally and currently unpushed. This is a point-in-time observation about repository state, not a standing architectural rule about where local history must sit relative to `origin/main`.
+
+Identity hardening is complete (section 0.1). The next Phase 1 work is:
+
+- the organizer GPT adapter, once the organizers supply the endpoint/SDK contract,
+- real embedding verification,
+- a corrected final Phase 1 review once those checks pass.
+
+Do not label Phase 2 complete or semantic retrieval ready until real embedding rows exist. The Architecture v1.5 deletion/anonymization documentation (section 0.3, section 18) is a separate contract correction for future Phase 5 work — it is not part of the remaining Phase 1 milestone above.
 
 Use an available GitHub connection only for read-only work such as:
 
@@ -194,8 +206,9 @@ Do not let GitHub integration change the architecture or source-of-truth rules.
 
 The architecture version changes only when the frozen product or technical architecture changes. Updating implementation progress, repository state, test counts, or handoff notes does **not** create a new architecture version.
 
-- **v1.4 — current, frozen.** Replaced the Google/Gemini provider choice with an organizer-provided GPT service. The API key, base URL, reasoning model, and embedding model remain environment placeholders until the organizers supply the exact contract. The provider-neutral offline ingestion path remains mandatory.
-- **v1.3 — previous frozen architecture.** Audited architecture contract covering the Phase 0 checkpoint, GitHub workflow, stable source-locator manifest, canonical-source rebuild invariant, embedding resilience, citation-context invariant, Skeptic counter-retrieval behavior, deletion cleanup, and mandatory Phase 1 review gate.
+- **v1.5 — current, frozen.** Judge-confirmed clarification of the deletion requirement, replacing v1.4's default of deleting every whole Evidence Unit associated with the target person. The corrected invariant: a deletion request permanently removes or irreversibly anonymizes the requested person's personal data from every application-owned storage surface while preserving non-personal organizational evidence wherever reasonably possible; a unit is deleted in full only when it cannot be adequately anonymized without leaving the person reasonably identifiable. This changes only the deletion/anonymization strategy in sections 2.4 and 18 (and adds sections 18.6–18.12); retrieval, reasoning, risk, Skeptic, the tech stack, and every other frozen decision are unchanged. This is the project's own judge-confirmed deletion/anonymization requirement — it is not a claim of universal legal or GDPR compliance, and scalability is explicitly out of scope for it. This version bump records a **design correction only**: Phase 5 deletion/anonymization has not been implemented, so no code, schema migration, or test in the repository yet reflects it.
+- **v1.4 — previous frozen architecture.** Replaced the Google/Gemini provider choice with an organizer-provided GPT service. The API key, base URL, reasoning model, and embedding model remain environment placeholders until the organizers supply the exact contract. The provider-neutral offline ingestion path remains mandatory.
+- **v1.3 — earlier frozen architecture.** Audited architecture contract covering the Phase 0 checkpoint, GitHub workflow, stable source-locator manifest, canonical-source rebuild invariant, embedding resilience, citation-context invariant, Skeptic counter-retrieval behavior, deletion cleanup, and mandatory Phase 1 review gate.
 - **2026-09-19 implementation checkpoint — no architecture version change.** Recorded the implemented Phase 1 Evidence Locker, verified offline ingestion/test counts, known identity-discovery false positives, missing real embeddings, and the decision to stop before Phase 2.
 - **2026-09-19 identity/documentation correction pass — no architecture version change.** Fixed a short-alias independence check that only looked backward from a candidate's match position (so a first name at the start of its own full name was wrongly treated as independently observed, while the corresponding last-name case was already correct); replaced heuristic short-alias promotion with an explicit reviewed-alias mechanism (uniqueness and independent corpus usage are review signals, not promotion criteria on their own); restructured the reviewed identity manifest to avoid duplicating raw quotations or naming unrelated people, so deleting one person's entry never requires editing another; reordered ingestion to validate parsed source files and the reviewed identity manifest before the destructive rebuildable-table reset, so a malformed manifest fails loudly instead of emptying the database first; corrected documentation that overstated the rebuild reset as covering "every table except source_locators" when Cases/Pulse tables are untouched and not yet implemented; removed a remaining hardcoded codename from backend package metadata; and corrected stale checkpoint numbers below. See section 0.5 for the destructive-test isolation contract added in this pass.
 
@@ -203,7 +216,7 @@ Earlier architecture iterations are not reconstructed here because their authori
 
 # 0.4 BRANDING NEUTRALITY
 
-“KEEPER” is a temporary project codename, not a frozen brand. The final product will use a different name. This clarification does not change Architecture v1.4.
+“KEEPER” is a temporary project codename, not a frozen brand. The final product will use a different name. This branding clarification does not itself change the architecture version and remains unchanged under Architecture v1.5.
 
 Rules:
 
@@ -239,7 +252,7 @@ Three distinct concepts:
 
 A destructive test must never write to `<repository>/data/source/`, `<repository>/data/app.db`, or `<repository>/data/keeper.db`.
 
-Existing read-only integration tests may inspect the canonical corpus directly if they never modify it and use an isolated/in-memory database; there is no need to copy the full archive for a purely read-only test. `backend/tests/conftest.py`'s `isolated_instance` fixture provides a ready-made temporary on-disk instance (source directory, database, artifacts directory, and cache directory, all under `tmp_path`) for destructive tests that need real on-disk behavior — for example, the eventual Phase 5 WAL/VACUUM purge tests (section 18.3.1) — rather than the in-memory `conn` fixture used for pure logic tests.
+Existing read-only integration tests may inspect the canonical corpus directly if they never modify it and use an isolated/in-memory database; there is no need to copy the full archive for a purely read-only test. `backend/tests/conftest.py`'s `isolated_instance` fixture provides a ready-made temporary on-disk instance (source directory, database, artifacts directory, and cache directory, all under `tmp_path`) for destructive tests that need real on-disk behavior — for example, the eventual Phase 5 WAL/VACUUM purge tests (section 18.4.1) — rather than the in-memory `conn` fixture used for pure logic tests.
 
 This section does not implement Phase 5 deletion. It only fixes the isolation contract destructive tests must follow once that phase begins.
 
@@ -338,31 +351,27 @@ When evidence conflicts:
 
 ## 2.4 Deletion
 
-Judge requirement: every application-owned trace of the deleted person must disappear.
+Judge-confirmed requirement (Architecture v1.5): a deletion request permanently removes or irreversibly anonymizes the requested person's personal data from every application-owned storage surface, while preserving non-personal organizational evidence wherever reasonably possible. An Evidence Unit is deleted in full only when it cannot be adequately anonymized without leaving the person reasonably identifiable. See section 18 (especially 18.6) for the full relation-symmetric policy and escalation sequence. This is the project's own judge-confirmed deletion/anonymization requirement, not a claim of universal legal or GDPR compliance.
 
-Do not implement deletion as:
+Do not implement deletion/anonymization as:
 
 - prompt filtering,
 - blacklist,
 - query-time hiding,
 - `is_deleted = TRUE`,
-- name masking.
+- UI-only masking,
+- a reversible pseudonym,
+- retaining the original identifier in canonical source, database text, metadata, FTS, cached receipts, artifacts, or any other application-owned storage,
+- assuming a name-only text replacement is necessarily sufficient (identifying metadata and structure must be handled too — section 18.7/18.8).
 
-Deletion must cover, where applicable:
+Required, where applicable:
 
-- source/raw text under application control,
-- normalized text,
-- evidence units,
-- people/alias mappings,
-- FTS records,
-- embeddings,
-- derived annotations,
-- receipts,
-- cached Cases,
-- timeline events,
-- Project Pulse findings,
-- caches and persisted generated artifacts,
-- debug artifacts containing the person or deleted evidence IDs.
+- sanitize the application-owned canonical source (not only `evidence_units.raw_text` — section 18.1.1 lists the fuller structural scope),
+- remove direct and tracked identifiers,
+- remove identifying structured metadata (headers, speaker/sender fields, attendee lists, signatures),
+- regenerate or invalidate derived representations (FTS, embeddings, cached Cases, timeline events, Project Pulse findings, other persisted artifacts),
+- preserve organizational facts that no longer identify the person,
+- escalate from targeted span redaction to broader redaction and finally whole-unit deletion only as required (section 18.6).
 
 Affected conclusions must be recalculated from surviving evidence.
 
@@ -692,7 +701,7 @@ Preferred boundaries:
 - email thread → one individual email/message,
 - report → one bullet point, short sub-paragraph, or the smallest coherent factual section.
 
-**Deletion-radius rule:** For KEEPER's chosen whole-unit deletion strategy, Evidence Units should be as small as practical without destroying meaning. This is especially important for reports. Do not store an entire multi-bullet engineering/status section as one Evidence Unit if the bullets can stand independently.
+**Deletion-radius rule:** Evidence Units should be as small as practical without destroying meaning, for both targeted redaction precision and to minimize collateral loss on the whole-unit-deletion fallback (section 18.6). This is especially important for reports. Do not store an entire multi-bullet engineering/status section as one Evidence Unit if the bullets can stand independently.
 
 Long units may be split, but they must retain the same source relationship, parent document, sequence, and neighbor relationships.
 
@@ -851,6 +860,8 @@ The key invariant is:
 If exact source locators are not naturally present, assign them once during canonical ingestion and persist them in the sanitized app-owned source/manifest used for rebuilds.
 
 Do not regenerate locators by compacting surviving units after deletion.
+
+A unit that survives deletion because it was adequately anonymized keeps its existing Evidence ID; only the identifying content changes, never the locator. A unit that is deleted in full must have its locator **revoked**, not removed — see section 18.8 for the tombstone mechanism and the reason a plain `DELETE FROM source_locators` row is unsafe.
 
 ---
 
@@ -1431,60 +1442,81 @@ Precompute Pulse findings. Do not run expensive full-archive audit on every page
 
 ---
 
-# 18. TRUE DELETION
+# 18. PERSONAL DATA DELETION AND ANONYMIZATION
 
 Deletion is a core scoring requirement.
 
 ## 18.1 Deletion target expansion
 
-When deleting person P:
-
-resolve:
+When deleting person P, resolve the full deletion target, where applicable:
 
 - canonical name,
-- known email(s),
-- stored safe aliases.
+- verified full-name variants,
+- reviewed aliases (section 0.1's identity-hardening manifest),
+- email addresses,
+- explicitly reviewed initials or nicknames,
+- employee/account/operator identifiers,
+- identifying speaker/sender metadata,
+- identifying source headers (From/Von/Från, Attendees, Subject/Meeting context — section 18.1.1),
+- unique identifying contextual phrases when explicitly recognized.
 
-Find every Evidence Unit where P is:
+Do not authorize fuzzy deletion based solely on capitalization, substring matching, uniqueness, or an LLM guess. The hardened identity/alias rules (section 0.1: a capitalized free-text span is never auto-promoted to `people`; short-form aliases require an explicit reviewed manifest entry) are a prerequisite for safe deletion and must not be weakened to make deletion easier.
 
-- AUTHOR,
-- SPEAKER,
-- MENTIONED.
+Find every Evidence Unit where P is AUTHOR, SPEAKER, or MENTIONED. For each one (section 18.6 has the full sequence):
 
-For this challenge, prefer deleting the entire **small, well-formed Evidence Unit** containing the target person rather than attempting fragile sentence-level redaction.
+1. attempt targeted redaction of P's verified identifying spans and metadata,
+2. evaluate whether P remains reasonably identifiable from what's left,
+3. if necessary, redact a larger span,
+4. delete the full unit only when adequate anonymization cannot otherwise be achieved.
 
-For KEEPER's chosen whole-unit purge strategy, fine ingestion granularity is necessary to minimize collateral deletion:
+There is no unconditional rule that every authored/spoken unit is deleted, that every mentioned-only unit is preserved, or that every occurrence of an ambiguous first name is redacted — each is evaluated by the same identifiability test. A statement such as “Kwame told me the extraction succeeded” is, by default, **redacted** (P's name replaced with the reserved `[REDACTED PERSON]` marker — section 18.7) rather than deleted outright, because the fact that an extraction succeeded is non-personal organizational evidence that does not depend on knowing who was told. Whole-unit deletion remains available, and is used, whenever redaction would leave P reasonably identifiable or would not adequately protect P's data.
+
+Fine ingestion granularity remains necessary — now for two reasons instead of one: it keeps redaction spans small and precise, and it minimizes collateral loss on the escalation path when whole-unit deletion is still required:
 
 - transcript unit → normally one speaker turn,
 - email unit → one message,
 - report unit → one bullet / short factual sub-paragraph where possible.
 
-This means a statement such as:
-
-> “Kwame told me the extraction succeeded.”
-
-is deleted even if someone else said it.
-
-That is intentional: the target person remains part of the informational trace.
-
-However, the parser must avoid coarse units that bundle unrelated facts, because whole-unit deletion should not create unnecessary organizational amnesia.
+The parser must avoid coarse units that bundle unrelated facts, because both redaction and the whole-unit-deletion fallback should not create unnecessary organizational amnesia.
 
 ## 18.1.1 Canonical source and rebuild safety
 
-A purge is incomplete if a later rebuild can silently resurrect deleted data.
+A purge/anonymization is incomplete if a later rebuild can silently resurrect deleted or de-anonymized data.
+
+Sanitization of the app-owned canonical source (`data/source/`) covers more than `evidence_units.raw_text`. Where applicable it must also cover:
+
+- email/report `From`, `Von`, or `Från` header values,
+- sender email addresses,
+- transcript speaker-marker lines,
+- bare speaker-name and initials UI chrome,
+- transcript `Attendees` headers,
+- `Subject`, `Meeting`, and other document-level context fields,
+- signatures,
+- inline mentions,
+- the reviewed identity manifest (`data/source/reviewed_identities.json`) entry for the deleted/anonymized person,
+- any other structural value that ingestion discards while parsing but that still physically exists in `data/source/`.
+
+Note that `speaker_email` is a transient `ParsedUnit` field produced by the email/report parsers, not an `evidence_units` database column; its normal persistent representation is the person's EMAIL alias, while the literal address can still remain in canonical-source headers or body text and must be sanitized there directly.
 
 Therefore:
 
-- the app-owned canonical source used for rebuilds must itself be sanitized during deletion,
+- the app-owned canonical source used for rebuilds must itself be sanitized during deletion, across the full scope above,
 - any app-owned normalized manifests/copies must be sanitized too,
 - rebuild scripts must read only from the sanitized canonical source or sanitized manifest,
 - no hidden unsanitized backup may remain inside application-owned runtime/storage directories.
 
 If the original hackathon corpus is treated as external/read-only input outside KEEPER's owned persistent state, keep that boundary explicit in code and documentation. Do not copy an untouched version into app-owned storage and later rebuild from it after deletion.
 
-A successful purge must preserve this invariant:
+A successful purge/anonymization must preserve this invariant:
 
-> running the normal rebuild command after deletion must not resurrect the deleted person's data.
+> running the normal rebuild command after deletion must not resurrect the deleted person's data, and a sanitized surviving unit must re-ingest as sanitized, not fail to parse or silently drop its content (section 18.7).
+
+**Git-history boundary.** `data/source/` is tracked by Git, so sanitizing the working tree does not erase the pre-sanitization content from `.git`'s object history. Therefore:
+
+- the running application and the normal rebuild process use only the current sanitized `data/source/` working tree — they never read from `.git` history,
+- `.git` object history and the remote challenge repository are development/distribution records, not runtime application persistence, and are never a runtime rebuild source,
+- this challenge implementation does not claim to erase remote Git history or provide universal legal erasure from third-party/version-control systems,
+- do not create new runtime backups from Git history after a deletion/anonymization operation.
 
 ---
 
@@ -1511,28 +1543,47 @@ Therefore:
 
 A successful deletion must remain deleted after a full rebuild.
 
-## 18.4 Physical purge sequence
+## 18.4 Physical purge/anonymization sequence
 
-Implement a transactional/safe sequence:
+Implement a transactional/safe sequence. Per section 18.6, each affected Evidence Unit is independently classified as ANONYMIZE (redact and keep) or DELETE (remove in full); the sequence below applies to both, substituting "sanitize source span(s) + update surviving fingerprint(s)" for ANONYMIZE units and "scrub source span(s) + revoke locator(s)" for DELETE units at the marked step. Sections 18.10–18.12 give the full staged/locked/crash-safe version of this sequence; this is the logical shape it follows:
 
 ```text
-resolve person + aliases
+resolve person + full deletion target (section 18.1)
     ↓
-identify target evidence IDs
+identify target evidence IDs and classify each ANONYMIZE or DELETE (section 18.6)
     ↓
 identify dependent Cases/findings
     ↓
-physically scrub/remove corresponding source content under app control
+physically scrub (DELETE units) or sanitize (ANONYMIZE units) corresponding source
+content under app control, including structural metadata (section 18.1.1) and the
+person's reviewed-identity manifest entry — `data/source/reviewed_identities.json`
+is a source JSON file, not a database row, so it is sanitized here alongside the
+other source-file edits, never inside the SQLite transaction below
     ↓
-DELETE evidence rows
-    ↓
-DELETE embedding rows
-    ↓
-DELETE/refresh FTS rows
-    ↓
-DELETE dependent Cases
-    ↓
-DELETE dependent Pulse findings
+one SQLite transaction (no filesystem mutation and no external API/model call
+inside it):
+    UPDATE evidence_units.raw_text for sanitized surviving (ANONYMIZE) units
+    UPDATE evidence_units.speaker_sender to the reserved marker where the
+        target's own attribution is cleared/replaced (section 18.7)
+    UPDATE evidence_units.thread_context for sanitized surviving units where
+        it identified the target
+    UPDATE documents.title / documents.thread_context where they identified
+        the target
+    DELETE evidence_units rows for DELETE units
+    DELETE the target's people / person_aliases / evidence_people rows, using
+        verified cascade behavior where the schema's ON DELETE CASCADE
+        already covers it
+    UPDATE source_locators.content_fingerprint for surviving constituents
+        (section 18.8)
+    revoke (never delete) source_locators rows for every constituent locator
+        of a fully deleted unit, including every constituent of a merged
+        transcript unit (section 18.8)
+    DELETE old FTS rows and insert sanitized FTS rows for survivors
+    DELETE old embedding rows for every touched evidence_id (ANONYMIZE and
+        DELETE alike)
+    DELETE/invalidate dependent Cases, receipts, timeline events, and Pulse
+        findings, and their reference rows (case_evidence, finding_evidence)
+commit
     ↓
 clear relevant runtime caches/artifacts
     ↓
@@ -1542,45 +1593,54 @@ VACUUM SQLite
     ↓
 close/reopen database and verify auxiliary DB files
     ↓
+regenerate embeddings for sanitized survivors, only now and only while the
+privacy lock still blocks queries (section 18.12) — never inside the
+transaction above, and never by calling an external provider while holding
+a database transaction open
+    ↓
 rebuild retrieval representations as needed
     ↓
 recompute active affected Case from surviving evidence
     ↓
-run deletion verifier
+run deletion/anonymization verifier (section 18.5)
 ```
 
 Do not keep a hidden personal-data backup inside `data/`.
 
-If an external original file outside application control exists, document that it is external input, not retained internal state. All application-owned copies must be purged.
+If an external original file outside application control exists, document that it is external input, not retained internal state. All application-owned copies must be purged or sanitized.
 
-## 18.3.1 SQLite physical-cleanup details
+Embedding regeneration for sanitized survivors requires the organizer GPT embedding provider. If it is unavailable or regeneration fails, leave the affected embedding rows absent and report semantic retrieval as degraded/pending for those units — privacy completion must not depend on network availability, and an old embedding for changed or deleted text must never be retained. The same applies to recomputing dependent Cases/receipts/timelines/Pulse findings that require the external reasoning model: invalidate or remove the obsolete persisted output inside the local transaction; recomputation that needs the external model happens afterward, while still locked; if it fails, the obsolete result stays absent — it is never left in place or silently restored.
 
-Row deletion alone is not enough to claim application-level physical purge.
+## 18.4.1 SQLite physical-cleanup details
 
-SQLite may retain recently deleted bytes in:
+Row deletion or update alone is not enough to claim application-level physical purge: a logical `UPDATE`/`DELETE` does not guarantee the prior bytes are absent from auxiliary pages. SQLite may retain recently changed/deleted bytes in:
 
-- the main database file,
+- the main database file (freed B-tree pages until compacted),
 - `-wal`,
 - `-shm`,
 - rollback journal/temp files,
 - application caches.
 
-Implementation must account for the configured journal mode.
+Implementation must account for the configured journal mode (WAL is currently enabled — `backend/app/db/connection.py`).
 
-At purge time:
+At purge/anonymization time, for every operation that changes or removes personal data (this applies equally to whole-unit deletion and to in-place redaction of a surviving unit):
 
-1. complete transactional deletes,
-2. checkpoint/truncate WAL if WAL mode is enabled,
-3. remove/clear stale auxiliary DB artifacts when safe and appropriate,
-4. run `VACUUM`,
+1. enable appropriate SQLite secure-deletion behavior before the sensitive UPDATE/DELETE,
+2. complete the transactional logical mutation (commit),
+3. checkpoint/truncate WAL if WAL mode is enabled,
+4. run `VACUUM` when required by the chosen approach,
 5. close and reopen the database,
 6. verify the main DB and relevant auxiliary/cache artifacts for tracked identifiers and deleted evidence IDs.
 
-Do not report deletion success while a stale WAL/journal/cache still contains tracked deleted data.
+Do not report deletion/anonymization success while a stale WAL/journal/cache still contains tracked deleted data, or while verification (step 6) has not passed — fail closed instead.
+
+Do not persist a redacted row's prior content fingerprint anywhere (including a recovery/staging plan) merely to have something to byte-scan for later — storing the old fingerprint would itself preserve the derived value the operation is supposed to remove. Overwrite it as part of step 2, perform the physical cleanup above, and verify by checking the current logical/tombstone state plus tracked direct identifiers (canonical name, aliases, emails, deleted evidence IDs), not by re-deriving and searching for a value that should no longer exist anywhere.
+
+This sequence verifies tracked identifiers and known application-owned representations. It is a strong application-level check over what the system knows and owns, not a generic byte-scan proof that anonymization is universally complete against every conceivable indirect encoding.
 
 ---
 
-## 18.4 Logging
+## 18.4.2 Logging
 
 Deletion logs may contain:
 
@@ -1601,9 +1661,9 @@ Avoid persisted raw LLM prompts/responses globally. They complicate deletion.
 
 ## 18.5 Verification
 
-Deletion is not “successful” until a verifier checks:
+Deletion/anonymization is not “successful” until a verifier checks:
 
-- source files under app control,
+- source files under app control (including the structural scope in section 18.1.1, not only unit body text),
 - database text fields,
 - aliases,
 - FTS,
@@ -1611,31 +1671,167 @@ Deletion is not “successful” until a verifier checks:
 - Case JSON,
 - Pulse JSON,
 - runtime artifacts,
+- `data/privacy_ops/` (section 18.10's operation-plan directory),
 
 for:
 
 - target canonical name,
 - aliases/emails,
-- deleted evidence IDs.
+- deleted evidence IDs (for units that were fully deleted).
 
-Expected result for all **tracked identifiers and references**:
+Expected result for all **tracked identifiers and references, on every permanent application surface**:
 
 ```text
 0 surviving matches for canonical name / known aliases / known emails
 0 deleted evidence references
 0 surviving embedding rows for deleted evidence
 0 stale references in Cases / timelines / Pulse / caches
+0 leftover data/privacy_ops/ staging artifacts for a completed operation
 ```
 
-This is a strong application-level verification over what the system knows and owns. Do not describe it as a mathematical proof that no unknown alias or indirect reference could exist.
+This is a strong application-level verification over what the system knows and owns. Do not describe it as a mathematical proof that no unknown alias or indirect reference could exist, and do not describe the SQLite-level check (section 18.4.1) as a generic byte-scan proof of universal anonymization.
+
+**Revoked-locator tombstones are not evidence resurrection.** The zero-surviving-matches result above — "0 deleted evidence references" and the rest — applies to application evidence: `evidence_units`, FTS, embeddings, Cases, receipts, timelines, Pulse findings, caches, and other persisted artifacts. A revoked `source_locators` row (section 18.8) is intentionally retained; its whole purpose is to prevent the deleted locator/position from ever being reassigned. Its continued presence is not evidence resurrection and must not, by itself, cause the verifier to fail. What the verifier does require of that row is that it contain neither the original content fingerprint nor any direct identifier — only `revoked_at` set and the sentinel value in place of the fingerprint (section 18.8).
+
+**Sequencing while an operation is still active (sections 18.10–18.11).** The zero-surviving-matches rule above applies to every *permanent* application surface. It does not apply, for the brief in-flight window of a single operation, to the operation's own temporary plan file, which is allowed to contain a small, explicitly bounded set of fields (section 18.11) and is itself schema-validated rather than scanned for zero matches. The verifier runs in two passes:
+
+1. **Pre-finalization verification** checks every permanent surface above (excluding the plan file itself) for zero tracked matches.
+2. Once pre-finalization verification passes, transition the operation's lock state to `FINALIZING`, delete the staging plan file, and run a **final scan** confirming `data/privacy_ops/` itself now contains no target-bearing artifact at all. Only then release the privacy-operation lock (section 18.10).
+
+If the process crashes after the plan file is removed but before the lock is released, startup recognizes the `FINALIZING` state from the lock record, repeats the final scan/cleanup, and releases the lock — a missing plan file is the expected shape of that state, not corruption to fail on.
 
 Then rerun an affected Case and show the new result.
 
 Use accurate wording:
 
-> application-level physical purge with dependency invalidation and post-deletion verification
+> application-level physical purge/anonymization with dependency invalidation and post-deletion verification
 
-Do **not** claim cryptographic erasure.
+Do **not** claim cryptographic erasure, and do not claim universal legal or GDPR compliance — this is the project's own judge-confirmed deletion/anonymization requirement.
+
+## 18.6 Relation-symmetric redaction policy
+
+For every Evidence Unit where the target person P is AUTHOR, SPEAKER, or MENTIONED, apply the same sequence — there is no relation-based shortcut:
+
+1. attempt targeted redaction of P's verified identifying spans and metadata within the unit,
+2. evaluate whether P remains reasonably identifiable from the unit as redacted (considering the redacted unit's own content plus any structural metadata that survived — e.g. an unredacted seat/attendee count, a still-present unique role description),
+3. if P remains identifiable, redact a larger span (up to the whole unit's text),
+4. delete the full unit only when adequate anonymization cannot otherwise be achieved.
+
+Forbidden unconditional rules:
+
+- every unit where P is AUTHOR or SPEAKER is deleted by default,
+- every unit where P is only MENTIONED is preserved by default,
+- every occurrence of an ambiguous first name is redacted by default (an ambiguous name may belong to someone other than P; redacting it without the identity-hardening manifest's confirmation risks over-redaction of an unrelated person's evidence).
+
+For mentioned-only evidence in particular: preserve the other participant's own attribution and unrelated content in the same unit unless the unit as a whole must be removed as the final fallback. Reasoning over a marker-containing unit must not automatically discount every fact in it equally — only the attribution or claims that actually depended on the redacted portion are weakened; unrelated facts in the same unit keep their original evidentiary weight.
+
+## 18.7 Reserved redaction markers
+
+Three role-aware markers stand in for a redacted person's identity in sanitized canonical-source content:
+
+- `[REDACTED PERSON]` — inline text redaction (a mention, a name inside body text),
+- `[REDACTED SPEAKER]` — a transcript speaker-marker/attribution replacement,
+- `[REDACTED SENDER]` — an email/report `From`/`Von`/`Från` display-name replacement.
+
+Contract:
+
+- these markers are irreversible and generic — nothing in application-owned storage maps a marker back to the specific person it replaced,
+- markers are not people, not aliases, and not deletion targets; they must never be written to `people.canonical_name` or `person_aliases.alias`,
+- parsers, people/identity discovery, relation linking, and mention detection must treat a reserved marker as a reserved anonymous value — never as a new structural person, never as a candidate full-name/alias match, and never as a mentionable identity. This extends the same treatment the parsers already give the existing anonymous labels (`Me`, `Them`, `Unknown Speaker`); a reserved marker must be added to that same exclusion set everywhere it is checked, not introduced as a second, differently-handled case,
+- a Teams-format `[REDACTED SPEAKER]` marker line, and a redacted `From`/`Von`/`Från` header, must both remain parseable by the normal parser after a rebuild — a redacted turn or message must still be recognized as its own attributable (if anonymous) unit, not silently dropped as unparseable chrome or merged into a neighboring unit,
+- `is_anonymized` is **not** added to the contract as a required schema field. `evidence_units` is a rebuildable table (rebuilt from `data/source/` on every ingest), so a bare boolean column cannot be a durable signal by itself; the marker string baked into the sanitized canonical source is itself the durable signal and survives rebuild for free.
+
+## 18.8 Stable Evidence IDs under redaction, and locator revocation
+
+A unit that is redacted rather than deleted keeps its existing Evidence ID; only its content changes.
+
+A unit that is deleted in full must have its locator identity permanently retired, never reassigned or silently resurrected:
+
+- `source_locators` rows for a fully deleted unit are never removed with `DELETE`. They are **revoked in place**: a future nullable `revoked_at` timestamp is set, and the prior `content_fingerprint` is overwritten with a fixed non-fingerprint sentinel value,
+- revoked rows are excluded from normal fingerprint matching during ingestion,
+- a collision between a freshly computed natural locator (e.g. a transcript timestamp or a date-slug) and an existing **revoked** row must fail loudly rather than silently reuse or resurrect it,
+- before revocation, a `source_locators` row legitimately contains a fingerprint *derived from* the original unit's content — do not claim the row "never contained personal data." The accurate statement is: after the fingerprint is overwritten with the sentinel and the SQLite physical-cleanup sequence (section 18.4.1) completes, the row retains no original fingerprint or direct personal identifier.
+
+**Migration note (design only, not implemented in this pass):** `source_locators` is a persistent table (section 7.3), never dropped/recreated by rebuild. Adding `revoked_at` to it will require an explicit guarded schema migration (e.g. checking `PRAGMA table_info` before an `ALTER TABLE ... ADD COLUMN`) for databases created before this field existed — `CREATE TABLE IF NOT EXISTS` does not add a column to a table that already exists. This migration is future work; it is not implemented by this documentation pass.
+
+**Merged transcript constituents.** A final transcript Evidence Unit may be the result of merging several consecutive same-speaker pre-merge fragments (section 8's transcript merge behavior), and its evidence_id exposes only the **first** constituent fragment's locator — the other constituent fragments were each independently assigned their own locator during parsing, but only the first is ever surfaced. Do not describe an Evidence Unit as if it always maps to exactly one source locator or one contiguous source line. A future deletion/redaction implementation acting on a merged unit must:
+
+- replay-resolve every fragment in the document (section 18.9),
+- reconstruct the exact merge group the original ingestion would have formed,
+- sanitize every constituent fragment's own source range, not only the first,
+- update every surviving constituent's own fingerprint when the merged unit is anonymized,
+- revoke every constituent's locator, not only the first, when the merged unit is fully deleted.
+
+## 18.9 Pure replay and the source-span model
+
+Locating exactly which bytes in `data/source/` correspond to a given evidence_id requires re-deriving the mapping from the current file, because the mapping from merge groups and report sub-line spans to locators is recomputed at ingestion time and is not separately persisted (section 18.8). Privacy planning must do this **without** mutating anything:
+
+- the ordinary ingestion-time locator-assignment functions may create new `source_locators` rows when nothing matches; they must not be called for privacy planning, because planning must never mint a locator,
+- a privacy-planning replay resolver returns an existing assignment or fails — it never mints one,
+- an unmatched live fragment encountered during replay (the current file doesn't produce the assignment the manifest expects) is an integrity error requiring operator review, not a reason to invent a new locator or silently skip the fragment.
+
+**Source-span model.** Do not assume every unit corresponds to one contiguous line or one numbered bullet. A unit's source footprint must be represented generally enough to cover:
+
+- multiple whole lines (a plain multiline paragraph in a report, or a transcript fragment's chrome plus content lines),
+- a column range within a single line (a report section header's inline trailing text, which shares its line with the header label),
+- multiple constituent fragments belonging to one merged transcript unit (section 18.8).
+
+Report units in particular may take any of these shapes, not only "one bullet = one line": a multiline plain paragraph with no recognized section header; inline status text embedded in a section-header line; a header paragraph with zero or one bullets, whose content is combined with other lines into one unit; or one standalone bullet line in a section with two or more bullets. The replay/span model must handle all of these, not only the last.
+
+## 18.10 Privacy-operation safety
+
+A deletion/anonymization request is a staged, exclusive operation, not an in-request side effect:
+
+1. acquire one exclusive privacy-operation lock before any mutation,
+2. while the lock is held, block normal query serving and ingestion — source and the database may temporarily disagree mid-operation, and nothing should read that inconsistent state,
+3. compute and durably write the full operation plan before touching source or database content,
+4. update the plan file and the lock's own state through atomic same-directory file replacement (write a new temp file, then rename over the old one) — never append to it, since an append that's interrupted mid-write can corrupt the file's structure,
+5. atomically replace each touched source file the same way,
+6. commit the logical SQLite changes in the transaction described in section 18.4,
+7. perform the SQLite physical cleanup (section 18.4.1),
+8. verify (section 18.5),
+9. remove the operation's plan/state,
+10. release the lock last, only after verification has fully passed.
+
+Application startup must check for an unfinished privacy operation (the lock present) and resolve it — resuming from wherever it left off, per its recorded state — **before** serving any normal request or ingestion.
+
+**Recovery by recorded state.** Startup resolves an unfinished operation according to its recorded lock/plan state, not by guessing:
+
+- `PLANNING` with no plan file, and verification confirming no source or database mutation actually began: the orphan lock may be cleared safely, without running the rest of the recovery sequence,
+- any resumable state with a valid, readable plan (from `SOURCE_IN_PROGRESS` through `SQLITE_CLEANUP_DONE`/`VERIFIED`): resume automatically from the earliest recorded incomplete step forward,
+- `FINALIZING` with no plan file (the plan was already removed but the lock was not yet released): repeat the final cleanup/verification scan, and release the lock if it succeeds,
+- any other combination — a lock without a plan outside the two cases above, or a plan/lock that is unreadable, malformed, or otherwise inconsistent — fails closed for operator review rather than guessing how to resume.
+
+A privacy operation that fails at any stage must leave the application locked, not silently unlocked, and must never report deletion/anonymization success.
+
+## 18.11 Staging-data accuracy
+
+Do not claim the active operation plan (section 18.10) contains no personal data — that claim would be false and must not be made without proving it.
+
+The plan **may** temporarily contain:
+
+- the name-derived `person_id` (the existing `people.person_id` is a slugified canonical name, e.g. `ahmed-nasser` — this is a minimal, lightly-encoded personal identifier, not an opaque token, and the plan legitimately needs it to make the database step resumable after a crash),
+- Evidence IDs,
+- document IDs,
+- locators,
+- already-sanitized replacement content.
+
+The plan **must not** contain:
+
+- the canonical name as a separate field, unless strictly required,
+- aliases or email values,
+- original unsanitized raw text,
+- a reversible mapping from a redaction marker back to the target person.
+
+Treat the plan as temporary protected personal data with a minimal lifetime: it lives only for the duration of one operation, it is stored under the same access restrictions as any other application-owned personal-data surface, and its removal is a required step (section 18.10, step 9) verified by the final scan (section 18.5) before the lock is released.
+
+## 18.12 Embeddings and dependent results under privacy operations
+
+Deleting the old embedding rows for every touched evidence_id happens inside the local database transaction (section 18.4) — this is a local DELETE, not a network call, and must not be skipped or deferred.
+
+Regenerating an embedding for a sanitized survivor is a separate, later, optional step: it happens only after the privacy-sensitive transaction has committed, only while the privacy lock (section 18.10) still blocks normal queries, and it must never run inside that transaction or hold it open while waiting on an external provider. If the organizer GPT embedding provider is unavailable or regeneration fails, the affected rows are left absent and reported as degraded/pending semantic retrieval — privacy completion must never depend on network availability, and an old embedding for changed or deleted text must never be left in place.
+
+The same pattern applies to dependent Cases, receipts, timeline events, and Pulse findings: invalidate or remove the obsolete persisted output inside the local transaction; any recomputation that requires the external reasoning model happens afterward, while still locked. If that recomputation fails, the obsolete result stays removed — it is never restored just because recomputation didn't succeed.
 
 ---
 
@@ -1807,6 +2003,31 @@ At minimum:
 - delete person → full rebuild → deleted evidence remains absent,
 - deletion verification covers DB auxiliary/cache artifacts owned by the app.
 
+## Privacy/anonymization tests (required once Phase 5 is implemented; none exist yet)
+
+Phase 5 has not been implemented, so none of the following tests exist yet. This list is the required future coverage once redaction/deletion code lands, reflecting the Architecture v1.5 policy in section 18:
+
+- authored evidence is preserved (redacted, not deleted) after adequate anonymization,
+- mentioned-only evidence is preserved where possible, including the other participant's own attribution and unrelated content in the same unit,
+- irreducibly identifying evidence is removed (whole-unit deletion) only when redaction cannot adequately anonymize it,
+- direct identifiers are gone from canonical source and every storage surface after the operation,
+- structural headers/chrome (From/Von/Från, Attendees, Subject/Meeting, signatures, speaker-marker lines) are sanitized, not only unit body text,
+- reserved redaction markers never become people, aliases, or mention-detection matches,
+- a marker-bearing file remains parseable after rebuild, without silently dropping or merging the redacted unit,
+- surviving Evidence IDs remain stable across the operation and a subsequent rebuild,
+- all constituent locators of a merged transcript unit are handled, not only the first/exposed one,
+- a revoked locator is never reassigned, and a collision with a revoked natural locator fails loudly,
+- the privacy-planning replay resolver never mutates the manifest (no new `source_locators` rows are created during planning),
+- report multiline/sub-line source spans (plain paragraph, inline header status, combined low-bullet-count units) are correctly located and sanitized,
+- an interrupted operation recovers correctly from every recorded state,
+- an orphan `PLANNING`-state lock with no plan and no mutation is cleared safely,
+- a `FINALIZING`-state recovery with the plan already removed is treated as expected, not as corruption,
+- normal query/ingestion is blocked while a privacy operation is active, and resumes only after it completes or is safely resolved,
+- stale FTS rows and old embeddings for touched evidence are gone, and no old embedding survives for changed or deleted text,
+- a full rebuild after the operation does not resurrect the target,
+- an ambiguous alias is not over-redacted (unrelated people sharing an ambiguous first name keep their evidence intact),
+- every destructive test in this list uses only a temporary source copy and a temporary database (section 0.5) — never the repository's real `data/source/` or `data/app.db`.
+
 ## Evaluation tests
 
 Build tests around provided practice questions, but do not hardcode answers into reasoning.
@@ -1953,25 +2174,34 @@ Exit:
 - decision/agreement/current-state questions force deep checking,
 - Skeptic introduces actual newly retrieved counterevidence when available.
 
-## Phase 5 — Deletion (target ~5h)
+## Phase 5 — Deletion and irreversible anonymization (target ~5h)
 
 Tasks:
 
-- preview dependencies,
-- purge,
-- source scrub,
-- DB/index/cache purge,
-- `VACUUM`,
-- verification,
-- affected Case recalculation.
+- deletion preview / dependency discovery,
+- targeted canonical-source redaction (section 18.1, 18.1.1),
+- reserved-marker handling (section 18.7),
+- whole-unit deletion as the fallback when redaction is inadequate (section 18.6),
+- stable-ID preservation for anonymized survivors (section 18.8),
+- locator revocation for fully deleted units, including merged-transcript constituents (section 18.8),
+- source/DB/FTS/embedding invalidation (section 18.4),
+- physical SQLite cleanup (section 18.4.1),
+- recovery-safe staged operation state (sections 18.10–18.11),
+- verification (section 18.5),
+- affected Case invalidation/recalculation.
 
 Exit:
 
-- all tracked identifiers, aliases, emails, deleted evidence IDs, and known dependent references have zero surviving matches in application-owned persistence,
-- deleted evidence cannot be retrieved,
-- a full rebuild does not resurrect deleted evidence,
-- SQLite auxiliary persistence (WAL/journal/temp state as applicable) is cleaned/verified,
-- affected Case changes appropriately.
+- adequately anonymized organizational evidence remains retrievable,
+- sanitized survivors retain stable Evidence IDs,
+- reserved markers never become people or aliases,
+- fully deleted evidence is absent and revoked locators are never reassigned,
+- all tracked identifiers disappear from permanent application-owned storage,
+- a full rebuild cannot restore the target,
+- affected conclusions no longer retain deleted attribution,
+- operation recovery and verification succeed.
+
+None of this is implemented yet (section 0.1).
 
 ## Phase 6 — UI + Decision Evolution (target ~6h)
 
@@ -2139,13 +2369,13 @@ KEEPER MVP is done when all of the following are true:
 6. Every displayed citation is hydrated from the DB.
 7. Fabricated evidence IDs cannot render.
 8. Decision Evolution displays only evidence-backed events.
-9. A person can be physically purged from application-owned raw/normalized/search/derived storage.
+9. A person's personal data can be permanently removed or irreversibly anonymized across application-owned raw/normalized/search/derived storage, preserving non-personal organizational evidence wherever reasonably possible, with whole-unit deletion as the fallback when adequate anonymization is not possible.
 10. Dependent Cases/artifacts are invalidated.
 11. Post-deletion verification returns zero surviving matches for all tracked identifiers, deleted evidence IDs, and known dependent artifacts.
 12. Affected Case is recomputed from surviving evidence.
-14. Judges can ask unseen questions through the UI.
-15. The live demo works without editing code.
-16. The core is tested before optional Project Pulse work begins.
+13. Judges can ask unseen questions through the UI.
+14. The live demo works without editing code.
+15. The core is tested before optional Project Pulse work begins.
 
 ---
 

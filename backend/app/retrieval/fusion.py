@@ -24,13 +24,18 @@ class FusedHit:
 
 
 def reciprocal_rank_fusion(
-    ranked_lists: dict[str, list[Hit]], *, k: int = RRF_K, limit: int | None = None
+    ranked_lists: dict[str, list[Hit]],
+    *,
+    k: int = RRF_K,
+    limit: int | None = None,
+    weights: dict[str, float] | None = None,
 ) -> list[FusedHit]:
     scores: dict[str, float] = {}
     sources: dict[str, dict[str, int]] = {}
     for name, hits in ranked_lists.items():
         for hit in hits:
-            scores[hit.evidence_id] = scores.get(hit.evidence_id, 0.0) + 1.0 / (k + hit.rank)
+            weight = (weights or {}).get(name, 1.0)
+            scores[hit.evidence_id] = scores.get(hit.evidence_id, 0.0) + weight / (k + hit.rank)
             sources.setdefault(hit.evidence_id, {})[name] = hit.rank
 
     ordered = sorted(scores, key=lambda evidence_id: (-scores[evidence_id], evidence_id))

@@ -158,5 +158,15 @@
         "pattern": "percent"
       }
     ]
+  },
+  {
+    "id": "uat-signed-return",
+    "query": "Did Acme sign off UAT for the programme, and what was the scope?",
+    "relevant": [
+      {
+        "document": "15_uat-signoff",
+        "pattern": "Signed and attached"
+      }
+    ]
   }
 ]

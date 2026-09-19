@@ -217,7 +217,7 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` at the repository root. The real `.env` is ignored by Git and is the only place for credentials. Leave the GPT fields empty until the organizers provide the API key, endpoint, and model details.
+Copy `.env.example` to `.env` at the repository root. The real `.env` is ignored by Git and is the only place for credentials. The GPT fields (`GPT_API_KEY`, `GPT_BASE_URL`, `GPT_MODEL`, `GPT_EMBEDDING_MODEL`) are needed for asking questions, semantic search and the Radar; ingestion and the tests work without them.
 
 Start the backend with:
 
@@ -225,7 +225,17 @@ Start the backend with:
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend setup
+### Run the whole app (one process)
+
+```bash
+cd frontend && npm install && npm run build      # once
+cd ../backend && source .venv/bin/activate       # Windows: .venv\Scripts\Activate.ps1
+uvicorn app.main:app --port 8000
+```
+
+Open <http://localhost:8000>. When `frontend/dist` exists, the API server serves the UI too. It works on the repository's own `data/app.db` and `data/source/`. **The Privacy console's removal is real and permanent for that data** (restore the source with `git checkout data/source`; the database then needs a re-ingest). To rehearse deletion safely, copy `data/` somewhere and start the server with `DATABASE_PATH=<copy>/app.db SOURCE_DATA_DIR=<copy>/source`.
+
+### Frontend setup (development, with hot reload)
 
 ```bash
 cd frontend
@@ -238,15 +248,17 @@ npm run dev -- --port 3000
 From the repository root, the parser and Evidence Locker can be rebuilt without network access:
 
 ```bash
-backend/.venv/Scripts/python.exe scripts/ingest.py --skip-embeddings
+python scripts/ingest.py --skip-embeddings --db-path /tmp/scratch.db
 ```
+
+> Ingestion rebuilds every derived table, **including the embeddings**. Run it against the runtime `data/app.db` only when you intend to regenerate them (that re-sends the archive to the embedding provider); use `--db-path` for scratch work.
 
 The command parses the archive, rebuilds the evidence tables, creates the full-text search index, links people to evidence, and prints an ingestion report. The `--skip-embeddings` option is for offline development without credentials.
 
 The organizer service is verified as OpenAI-compatible at `/v1/embeddings` (bearer authentication, `{model, input}` requests, numeric vectors in the response). With `GPT_API_KEY`, `GPT_BASE_URL`, and `GPT_EMBEDDING_MODEL` configured in the gitignored root `.env`, real vectors can be generated with:
 
 ```bash
-backend/.venv/Scripts/python.exe scripts/ingest.py
+python scripts/ingest.py
 ```
 
 Do not claim semantic retrieval is ready until the ingestion report confirms real embedding rows for the intended corpus.
@@ -298,7 +310,7 @@ it cannot establish. Findings are precomputed (never per page load), each linked
 a validated Case and to Evidence Units.
 
 ```bash
-backend/.venv/bin/python scripts/radar.py --limit 5
+python scripts/radar.py --limit 5
 ```
 
 This sends retrieved evidence excerpts to the configured organizer reasoning

@@ -58,3 +58,19 @@ def split_top_level(text: str, sep: str = ",") -> list[str]:
 
 def strip_parenthetical(text: str) -> str:
     return re.sub(r"\s*\([^)]*\)\s*", " ", text).strip()
+
+
+# The mail gateway prepends the same warning to every external message. Indexed
+# as-is it dilutes BM25 for short replies ("Signed and attached." becomes one of
+# ~35 words), so it is removed from the *search index* only. raw_text, the
+# evidence shown to a reader, is never altered.
+_MAIL_BANNER = re.compile(
+    r"This email originated from outside of RELEX\..*?using the report button\.",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def search_text(raw_text: str) -> str:
+    """The text FTS indexes: raw text minus gateway boilerplate and image
+    placeholders. Purely a ranking aid; citations always show raw_text."""
+    return strip_image_placeholders(_MAIL_BANNER.sub(" ", raw_text))

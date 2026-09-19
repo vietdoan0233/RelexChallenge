@@ -36,7 +36,7 @@ from pathlib import Path
 from app.core import anonymous_labels
 from app.core.enums import DocumentType, PersonRelation
 from app.db import migrations, repository
-from app.ingestion import locator_manifest, people
+from app.ingestion import locator_manifest, people, text_utils
 from app.ingestion.embeddings import EmbeddingProvider, EmbeddingRunReport, generate_embeddings
 from app.ingestion.models import ParsedDocument, ParsedUnit
 from app.ingestion.parsers import email as email_parser
@@ -165,7 +165,7 @@ def ingest(
             repository.insert_fts_row(
                 conn,
                 evidence_id,
-                unit.raw_text,
+                text_utils.search_text(unit.raw_text),
                 thread_context=unit.thread_context or doc.thread_context,
                 speaker_sender=unit.speaker_sender,
             )
@@ -185,6 +185,7 @@ def ingest(
     _link_relations(conn, unit_records)
 
     report.fts_row_count = repository.fts_row_count(conn)
+    migrations.mark_fts_current(conn)
     report.embeddings = generate_embeddings(conn, evidence_rows_for_embedding, embedding_provider)
 
     conn.commit()

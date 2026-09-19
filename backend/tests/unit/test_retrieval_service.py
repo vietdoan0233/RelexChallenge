@@ -57,7 +57,7 @@ def test_hybrid_uses_both_sources(conn, corpus):
     result = RetrievalService(conn, provider).retrieve("bakery fresh workstream")
     assert result.semantic_used is True
     assert result.warnings == []
-    assert any(len(h.sources) == 2 for h in result.fused)
+    assert any({"lexical", "semantic"} <= set(h.sources) for h in result.fused)
 
 
 def test_provider_failure_degrades_without_leaking_detail(conn, corpus):
@@ -174,3 +174,51 @@ def test_a_named_month_adds_a_period_restricted_list(conn, seed_units):
     assert in_window and result.ranked_ids.index(in_window[0]) < result.ranked_ids.index(other[0])
     # The month/year words are a filter, not terms to match in the text.
     assert "september" not in result.terms and "2024" not in result.terms
+
+
+BANNER = (
+    "This email originated from outside of RELEX. Be careful of attachments and links from "
+    "unknown senders. Report suspicious emails using the report button."
+)
+
+
+def test_a_short_reply_in_a_matching_thread_is_found_despite_competing_body_matches(
+    conn, seed_units
+):
+    """The UAT case: 'Signed and attached.' sits in a thread titled like the
+    question, while many other units mention 'sign' or 'UAT' more loudly."""
+    reply = seed_units(
+        conn,
+        "signoff",
+        [f"{BANNER}\n\nSigned and attached. The wording is what I asked for."],
+        document_type="EMAIL",
+        title="UAT sign-off - core replenishment",
+        date="2025-01-22",
+    )
+    for n in range(12):
+        seed_units(
+            conn,
+            f"noise{n}",
+            [f"We sign off items weekly with the vendor, report {n}, and discuss unrelated scope."],
+            title=f"Weekly meeting {n}",
+        )
+    result = RetrievalService(conn, None).retrieve("Did Acme sign off UAT for the programme?")
+    assert reply[0] in result.ranked_ids[:5]
+    assert "title" in result.fused[result.ranked_ids.index(reply[0])].sources
+
+
+def test_one_long_meeting_with_a_matching_title_cannot_flood_the_title_list(conn, seed_units):
+    seed_units(
+        conn, "long", [f"unrelated chatter number {i}" for i in range(40)], title="UAT sign-off"
+    )
+    other = seed_units(
+        conn,
+        "email",
+        ["Signed and attached."],
+        document_type="EMAIL",
+        title="UAT sign-off - core replenishment",
+    )
+    hits = [h for h in RetrievalService(conn, None).retrieve("UAT sign-off").fused]
+    from_long = [h for h in hits if h.evidence_id.startswith("EV-long-") and "title" in h.sources]
+    assert len(from_long) <= 4
+    assert other[0] in [h.evidence_id for h in hits]

@@ -1,8 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api import cases, deps, evidence, privacy, radar
 from app.core.config import get_settings
@@ -54,3 +56,12 @@ async def _locked(_request: Request, _exc: ops.PrivacyLockedError) -> JSONRespon
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "database_path": get_settings().database_path}
+
+
+# One-process mode: when the frontend has been built (`npm run build`), the API
+# server also serves it, so the whole app runs from `uvicorn app.main:app`. It is
+# mounted last so every /api route wins. The UI uses hash routing, so no
+# server-side fallback is needed.
+_FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+if (_FRONTEND_DIST / "index.html").is_file():
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")

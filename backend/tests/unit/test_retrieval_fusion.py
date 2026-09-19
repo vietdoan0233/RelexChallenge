@@ -26,3 +26,12 @@ def test_limit_and_ranks_are_contiguous():
 def test_empty_input_gives_empty_output():
     assert reciprocal_rank_fusion({}) == []
     assert reciprocal_rank_fusion({"lexical": []}) == []
+
+
+def test_a_weighted_list_can_outrank_an_unweighted_one():
+    plain = reciprocal_rank_fusion({"lexical": _hits("a"), "title": _hits("b")})
+    assert [f.evidence_id for f in plain] == ["a", "b"]  # tie -> evidence_id
+    weighted = reciprocal_rank_fusion(
+        {"lexical": _hits("a"), "title": _hits("b")}, weights={"title": 1.5}
+    )
+    assert [f.evidence_id for f in weighted] == ["b", "a"]

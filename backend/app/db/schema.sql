@@ -113,6 +113,13 @@ CREATE VIRTUAL TABLE IF NOT EXISTS evidence_fts USING fts5(
     speaker_sender
 );
 
+-- Version stamps for derived structures (e.g. which text FTS was built from), so
+-- a stale index is rebuilt in place rather than silently served.
+CREATE TABLE IF NOT EXISTS derived_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS cases (
     case_id TEXT PRIMARY KEY,
     query TEXT NOT NULL,

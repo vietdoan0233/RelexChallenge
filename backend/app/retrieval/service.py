@@ -29,6 +29,8 @@ FUSED_LIMIT = 15
 # would drift toward sending the whole archive to the reasoner.
 CONTEXT_SEED_COUNT = 8
 _SWEEP_ANCHOR_COUNT = 5
+_TITLE_PER_DOCUMENT = 4
+_LIST_WEIGHTS = {"title": 1.5}
 
 
 @dataclass
@@ -124,6 +126,15 @@ class RetrievalService:
         semantic_used = query_vector is not None
 
         ranked = {"lexical": lexical_hits}
+        # Thread-title view, at most a few units per document so one long
+        # meeting with a matching title cannot flood the list.
+        ranked["title"] = lexical.search(
+            self._conn,
+            terms=terms,
+            limit=self._fused_limit,
+            weights=lexical.TITLE_WEIGHTS,
+            per_document_cap=_TITLE_PER_DOCUMENT,
+        )
         if semantic_used:
             ranked["semantic"] = semantic_hits
         if hint:
@@ -136,7 +147,7 @@ class RetrievalService:
                 ranked["dated_semantic"] = self._index.search(
                     query_vector, limit=self._fused_limit, date_from=hint[0], date_to=hint[1]
                 )
-        fused = reciprocal_rank_fusion(ranked, limit=self._fused_limit)
+        fused = reciprocal_rank_fusion(ranked, limit=self._fused_limit, weights=_LIST_WEIGHTS)
 
         needs_sweep = is_temporal_query(query) if temporal_sweep is None else temporal_sweep
         sweep = self._sweep(terms, fused, query_vector) if needs_sweep else None

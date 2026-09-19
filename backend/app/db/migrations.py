@@ -28,6 +28,46 @@ def initialize(conn: sqlite3.Connection) -> None:
     _ensure_fts_indexes_context(conn)
     apply_schema(conn)
     _ensure_source_locators_revoked_at_column(conn)
+    # An index built before the indexed text changed is rebuilt from the units.
+    if conn.execute("SELECT 1 FROM evidence_units LIMIT 1").fetchone() and not _fts_is_current(
+        conn
+    ):
+        _rebuild_fts_from_units(conn)
+
+
+# Bump when what FTS indexes changes (columns or the text fed to it). 2: gateway
+# boilerplate stripped from the indexed text.
+FTS_VERSION = "2"
+
+
+def _fts_is_current(conn: sqlite3.Connection) -> bool:
+    row = conn.execute("SELECT value FROM derived_meta WHERE key = 'fts_version'").fetchone()
+    return row is not None and row[0] == FTS_VERSION
+
+
+def mark_fts_current(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO derived_meta (key, value) VALUES ('fts_version', ?)", (FTS_VERSION,)
+    )
+    conn.commit()
+
+
+def _rebuild_fts_from_units(conn: sqlite3.Connection) -> None:
+    """Repopulate the derived index from evidence_units. Embeddings and every
+    other table are untouched, so no provider call is needed."""
+    from app.ingestion.text_utils import search_text
+
+    conn.execute("DELETE FROM evidence_fts")
+    rows = conn.execute(
+        "SELECT evidence_id, raw_text, COALESCE(thread_context, ''), COALESCE(speaker_sender, '') "
+        "FROM evidence_units"
+    ).fetchall()
+    conn.executemany(
+        "INSERT INTO evidence_fts (evidence_id, raw_text, thread_context, speaker_sender) "
+        "VALUES (?, ?, ?, ?)",
+        [(r[0], search_text(r[1]), r[2], r[3]) for r in rows],
+    )
+    mark_fts_current(conn)
 
 
 def _ensure_fts_indexes_context(conn: sqlite3.Connection) -> None:
@@ -42,11 +82,7 @@ def _ensure_fts_indexes_context(conn: sqlite3.Connection) -> None:
         return
     conn.execute("DROP TABLE evidence_fts")
     apply_schema(conn)
-    conn.execute(
-        "INSERT INTO evidence_fts (evidence_id, raw_text, thread_context, speaker_sender) "
-        "SELECT evidence_id, raw_text, COALESCE(thread_context, ''), COALESCE(speaker_sender, '') "
-        "FROM evidence_units"
-    )
+    _rebuild_fts_from_units(conn)
     conn.commit()
 
 

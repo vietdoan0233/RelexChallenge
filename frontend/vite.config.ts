@@ -8,4 +8,6 @@ export default defineConfig({
   // Backend and frontend share one root .env (VITE_APP_NAME alongside
   // APP_NAME) rather than keeping a second frontend-only env file.
   envDir: '../',
+  // The backend serves /api; proxying keeps the browser on one origin.
+  server: { proxy: { '/api': 'http://localhost:8000' } },
 })

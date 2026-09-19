@@ -1,0 +1,125 @@
+export type Stance =
+  | 'PROPOSAL'
+  | 'ASSUMPTION'
+  | 'OBJECTION'
+  | 'AGREEMENT'
+  | 'COMMITMENT'
+  | 'STATUS_UPDATE'
+  | 'IMPLEMENTATION_EVIDENCE'
+  | 'SUPERSEDED'
+  | 'UNCERTAIN'
+
+export type Confidence = 'HIGH' | 'MEDIUM' | 'LOW'
+
+export type CaseStatus =
+  | 'SUPPORTED'
+  | 'PARTIALLY_SUPPORTED'
+  | 'CONFLICTING_EVIDENCE'
+  | 'INSUFFICIENT_EVIDENCE'
+
+// Every field below is hydrated from the database by the backend; the UI
+// only renders it and never composes provenance itself.
+export interface Citation {
+  evidence_id: string
+  document_id: string
+  filename: string
+  document_type: string
+  document_title: string | null
+  event_date: string | null
+  timestamp_text: string | null
+  speaker_sender: string | null
+  thread_context: string | null
+  raw_text: string
+  is_truncated: boolean
+}
+
+export interface ReceiptClaim {
+  claim_text: string
+  stance: Stance
+  confidence: Confidence
+  uncertainty: string | null
+  support: Citation[]
+  conflicts: Citation[]
+}
+
+export interface ReceiptTimelineEvent {
+  event_text: string
+  state: Stance
+  confidence: Confidence
+  event_date: string | null
+  citations: Citation[]
+}
+
+export interface ReviewObjection {
+  text: string
+  severity: Confidence
+  evidence_ids: string[]
+}
+
+export interface ReviewInfo {
+  risk_level: string
+  risk_triggers: string[]
+  skeptic_ran: boolean
+  counter_queries: number
+  counter_units_examined: number
+  counter_evidence_ids: string[]
+  objections: ReviewObjection[]
+  reconciled: boolean
+  completed: boolean
+}
+
+export interface CaseReceipt {
+  case_id: string
+  query: string
+  status: CaseStatus
+  answer_summary: string
+  claims: ReceiptClaim[]
+  conflict_resolution: string | null
+  timeline_events: ReceiptTimelineEvent[]
+  missing_information: string[]
+  related_questions: string[]
+  validation: {
+    rejected_evidence_ids: string[]
+    dropped_claims: number
+    dropped_timeline_events: number
+    downgraded_claims: number
+    notes: string[]
+  }
+  review: ReviewInfo
+  created_at: string
+}
+
+export interface EvidenceView {
+  citation: Citation
+  context_before: Citation[]
+  context_after: Citation[]
+}
+
+export interface PersonSummary {
+  person_id: string
+  canonical_name: string
+  author_units: number
+  speaker_units: number
+  mentioned_units: number
+}
+
+export interface PurgePreview {
+  person_id: string
+  author_units: number
+  speaker_units: number
+  mentioned_units: number
+  units_to_anonymize: number
+  files_to_sanitize: number
+  cases_to_invalidate: number
+}
+
+export interface PurgeResult {
+  operation_id: string
+  files_sanitized: number
+  units_anonymized: number
+  cases_invalidated: number
+  embeddings_regenerated: number
+  embeddings_pending: number
+  verification: Record<string, number>
+  verified: boolean
+}

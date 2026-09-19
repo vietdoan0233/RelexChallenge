@@ -18,10 +18,9 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from app.core.config import get_settings  # noqa: E402
-from app.db.connection import connect  # noqa: E402
-from app.ingestion.embeddings import GeminiEmbeddingProvider  # noqa: E402
-from app.ingestion.service import ingest  # noqa: E402
+from app.core.config import get_settings
+from app.db.connection import connect
+from app.ingestion.service import ingest
 
 
 def main() -> None:
@@ -35,10 +34,20 @@ def main() -> None:
 
     provider = None
     if not args.skip_embeddings:
-        if settings.google_api_key and settings.gemini_embedding_model:
-            provider = GeminiEmbeddingProvider(settings.google_api_key, settings.gemini_embedding_model)
+        configured_fields = (
+            settings.gpt_api_key,
+            settings.gpt_base_url,
+            settings.gpt_embedding_model,
+        )
+        if any(configured_fields):
+            print(
+                "GPT embedding configuration is present, but the organizer API "
+                "transport is still a placeholder; skipping embeddings."
+            )
         else:
-            print("No GOOGLE_API_KEY/GEMINI_EMBEDDING_MODEL configured; skipping embeddings.")
+            print(
+                "Organizer GPT API configuration is not available yet; skipping embeddings."
+            )
 
     conn = connect(args.db_path)
     try:
@@ -51,17 +60,23 @@ def main() -> None:
     print(f"FTS rows: {report.fts_row_count}")
     print(f"People: {report.people_count}, aliases: {report.alias_count}")
     if report.unresolved_alias_candidates:
-        print(f"Unresolved alias candidates (left unmerged): {report.unresolved_alias_candidates}")
+        print(
+            f"Unresolved alias candidates (left unmerged): {report.unresolved_alias_candidates}"
+        )
     if report.text_only_mentions:
-        print(f"Text-only mentions found (not auto-added to roster): {report.text_only_mentions}")
+        print(
+            f"Text-only mentions found (not auto-added to roster): {report.text_only_mentions}"
+        )
     if report.parse_warnings:
         print(f"Parse warnings: {report.parse_warnings}")
     if report.embeddings.skipped:
-        print("Embeddings: skipped (--skip-embeddings or no API key configured).")
+        print("Embeddings: skipped (--skip-embeddings or GPT provider pending).")
     elif report.embeddings.error:
         print(f"Embeddings: FAILED - {report.embeddings.error}")
     else:
-        print(f"Embeddings generated: {report.embeddings.succeeded}/{report.embeddings.attempted}")
+        print(
+            f"Embeddings generated: {report.embeddings.succeeded}/{report.embeddings.attempted}"
+        )
 
 
 if __name__ == "__main__":

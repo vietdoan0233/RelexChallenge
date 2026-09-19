@@ -5,11 +5,14 @@ Must never make the rest of ingestion depend on network access:
 FTS, and people/alias work fully offline (CLAUDE.md 8.1). A provider
 failure is reported, not raised, so deterministic ingestion output still
 succeeds when embeddings do not.
+
+The organizer GPT transport is intentionally absent until its endpoint,
+authentication, and request/response contract are supplied. The protocol
+below is the stable boundary for that adapter.
 """
 
 import hashlib
 import json
-import time
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -41,43 +44,6 @@ class MockEmbeddingProvider:
             vector = rng.normal(size=self.dimensions)
             vectors.append((vector / np.linalg.norm(vector)).tolist())
         return vectors
-
-
-class GeminiEmbeddingProvider:
-    """Batched, retried calls to the Google GenAI embedding endpoint.
-    Unverified against a live key as of Phase 1 -- no GOOGLE_API_KEY was
-    available in this environment, so only the mock-provider path has
-    actually been exercised. See the integration smoke test, which skips
-    itself when no key is configured."""
-
-    def __init__(
-        self, api_key: str, model_name: str, batch_size: int = 32, max_retries: int = 3
-    ) -> None:
-        from google import genai  # lazy import: mock/offline paths never need this installed
-
-        self._client = genai.Client(api_key=api_key)
-        self.model_name = model_name
-        self.batch_size = batch_size
-        self.max_retries = max_retries
-
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        vectors: list[list[float]] = []
-        for start in range(0, len(texts), self.batch_size):
-            vectors.extend(self._embed_chunk_with_retry(texts[start : start + self.batch_size]))
-        return vectors
-
-    def _embed_chunk_with_retry(self, chunk: list[str]) -> list[list[float]]:
-        last_error: Exception | None = None
-        for attempt in range(self.max_retries):
-            try:
-                response = self._client.models.embed_content(model=self.model_name, contents=chunk)
-                return [item.values for item in response.embeddings]
-            except Exception as exc:  # transient network/rate-limit failures
-                last_error = exc
-                time.sleep(2**attempt)
-        raise RuntimeError(
-            f"embedding request failed after {self.max_retries} attempts"
-        ) from last_error
 
 
 @dataclass

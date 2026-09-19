@@ -682,3 +682,31 @@ def test_plan_and_lock_are_private_to_the_owner(inst, monkeypatch):
     monkeypatch.setattr(service, "_rebuild_from_sanitized_source", peek)
     inst.purge()
     assert seen["dir"] == 0o700 and seen["plan"] == 0o600
+
+
+def test_reviewed_spoken_employee_number_is_redacted_with_the_person(inst):
+    """An employee number spoken in words identifies a person as directly as a name;
+    once a reviewer lists it as a variant of that person it goes with them."""
+    kickoff = inst.source / "transcripts" / "03_kickoff.txt"
+    kickoff.write_text(
+        "Meeting: Kickoff\nCustomer: Acme Org\nDate: 2024-07-15\nPhase: Implementation\n"
+        "Attendees: Marco Rossi (RELEX), Lena Fischer (Acme)\n\n"
+        "Marco Rossi\n0:050:05\nMR\nMarco Rossi 5 seconds\n"
+        "For the access list, Kwame is five one oh three, if your system wants that.\n",
+        encoding="utf-8",
+    )
+    manifest = json.loads((inst.source / "reviewed_identities.json").read_text(encoding="utf-8"))
+    manifest["entries"][0]["verified_aliases"].append(
+        {"alias": "five one oh three", "alias_type": "VARIANT", "source_reference": "test"}
+    )
+    (inst.source / "reviewed_identities.json").write_text(json.dumps(manifest), encoding="utf-8")
+    ingest(inst.conn, inst.source, inst.provider)
+
+    result = inst.purge()
+
+    assert result.verified
+    text = kickoff.read_text(encoding="utf-8")
+    assert "five one oh three" not in text and "Kwame" not in text
+    assert "if your system wants that" in text  # the non-personal remainder survives
+    assert verify.scan_files(inst.source, [*NEEDLES, "five one oh three"]) == 0
+    assert verify.scan_database_files(inst.db_path, [*NEEDLES, "five one oh three"]) == 0

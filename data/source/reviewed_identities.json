@@ -81,6 +81,23 @@
         "emails/14_go-live-user-access.txt",
         "transcripts/21_2026-04-09_data-protection-review.txt"
       ]
+    },
+    {
+      "canonical_name": "Kwame Boateng",
+      "verified_aliases": [
+        {
+          "alias": "Kwame",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use (on-call cover, hand-offs, vocatives) refers to this person's technical-consultant role"
+        },
+        {
+          "alias": "five one oh three",
+          "alias_type": "VARIANT",
+          "source_reference": "transcripts/05_2024-07-15_implementation-kickoff.txt: this person's employee number, spoken in words; occurs once in the archive"
+        }
+      ],
+      "review_note": "Already identified structurally as a speaker and sender. This entry only reviews two extra identifiers for this person: the bare first name, and an employee number spoken in words that identifies them just as directly as a name does.",
+      "source_documents": ["transcripts/05_2024-07-15_implementation-kickoff.txt"]
     }
   ]
 }

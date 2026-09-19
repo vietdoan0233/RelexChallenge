@@ -110,8 +110,15 @@ def _parse_teams(body_lines: list[str], attendees: list[str]) -> list[Transcript
     # redacted turn specifically) the sanitized content is silently
     # dropped as untraceable chrome instead of surviving as an anonymous
     # unit.
+    # A Teams "Guest N" caption is never listed in Attendees, so it is
+    # discovered from the body: its bare name line is the same chrome as
+    # any other speaker's. Left unrecognized, its dialogue -- and its own
+    # "Guest 1 3 minutes 57 seconds" line -- would be appended to whichever
+    # named speaker came before, misattributing what a guest said.
+    guests = sorted({ln.strip() for ln in body_lines if anonymous_labels.is_guest_label(ln)})
     canonical_names = [
         *attendees,
+        *guests,
         anonymous_labels.ANONYMOUS_SPEAKER_LABEL_UNKNOWN,
         anonymous_labels.REDACTED_SPEAKER,
     ]

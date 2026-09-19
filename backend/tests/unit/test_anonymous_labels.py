@@ -41,3 +41,14 @@ def test_non_person_labels_is_exactly_anonymous_labels_union_redaction_markers()
         anonymous_labels.ANONYMOUS_SPEAKER_LABELS | anonymous_labels.REDACTION_MARKERS
     )
     assert len(anonymous_labels.NON_PERSON_LABELS) == 6
+
+
+def test_teams_guest_labels_are_non_person():
+    for label in ("Guest 1", "Guest 12", "  Guest 2 "):
+        assert anonymous_labels.is_guest_label(label) is True
+        assert anonymous_labels.is_non_person_label(label) is True
+
+
+def test_guest_label_match_is_exact_not_fuzzy():
+    for value in ("Guest", "Guest Speaker", "Guest 1 Smith", "The Guest 1", "guest 1x", None):
+        assert anonymous_labels.is_guest_label(value) is False

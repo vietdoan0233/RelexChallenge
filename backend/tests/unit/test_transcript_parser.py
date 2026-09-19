@@ -188,3 +188,19 @@ def test_deleting_a_turn_does_not_fuse_its_now_adjacent_same_speaker_neighbors(c
     by_text = {u.raw_text: u for u in units_after}
     assert by_text["First turn."].natural_locator == first_locator
     assert by_text["Third turn."].natural_locator == third_locator
+
+
+def test_guest_caption_is_its_own_anonymous_unit_not_merged_into_prior_speaker(conn):
+    body = (
+        "Priya Nair\n2:332:33\nPN\nPriya Nair 2 minutes 33 seconds\nOkay, yeah.\n"
+        "Guest 1\n2:342:34\nG1\nGuest 1 2 minutes 34 seconds\n"
+        "Please find out and put it in writing.\n"
+        "Lena Fischer\n2:442:44\nLF\nLena Fischer 2 minutes 44 seconds\nGood.\n"
+    )
+    header = TEAMS_HEADER.replace("Sofia Almeida (Acme)", "Priya Nair (Acme)")
+    units, _ = _units(conn, header + body)
+    assert [u.speaker_sender for u in units] == ["Priya Nair", "Guest 1", "Lena Fischer"]
+    assert units[0].raw_text == "Okay, yeah."
+    assert units[1].raw_text == "Please find out and put it in writing."
+    # No timestamp/initials chrome may leak into anyone's text.
+    assert all("minutes" not in u.raw_text and "G1" not in u.raw_text for u in units)

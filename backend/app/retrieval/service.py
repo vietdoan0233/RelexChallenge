@@ -178,6 +178,33 @@ class RetrievalService:
         result.fused = [h for h in result.fused if h.evidence_id in result.records]
         return result
 
+    def later_evidence(
+        self, terms: list[str], after_date: str, *, limit: int = FUSED_LIMIT
+    ) -> RetrievalResult:
+        """Lexical retrieval for ``terms`` restricted to evidence strictly after
+        ``after_date``, packaged like any retrieval (context windows, hydrated
+        records). Used for the post-answer sweep (CLAUDE.md 9.5): the terms are
+        the answer's own topic, so a later change of state surfaces even when the
+        question never used those words."""
+        hits = lexical.search(self._conn, terms=terms, limit=limit, after_date=after_date)
+        fused = reciprocal_rank_fusion({"later": hits}, limit=limit)
+        windows = context.expand(self._conn, [h.evidence_id for h in fused[:CONTEXT_SEED_COUNT]])
+        wanted = list(
+            dict.fromkeys([h.evidence_id for h in fused] + [i for w in windows for i in w.unit_ids])
+        )
+        return RetrievalResult(
+            query=" ".join(terms),
+            terms=terms,
+            lexical_hits=hits,
+            semantic_hits=[],
+            fused=fused,
+            windows=windows,
+            temporal=None,
+            is_temporal=True,
+            semantic_used=False,
+            records={r.evidence_id: r for r in hydrate(self._conn, wanted)},
+        )
+
     def _semantic(self, query: str, warnings: list[str]) -> tuple[list[float] | None, list[Hit]]:
         if self._provider is None:
             warnings.append("semantic retrieval unavailable: no embedding provider configured")

@@ -27,6 +27,7 @@ RULES
 7. When asked for figures, give every figure with its own evidence, and say which one is current and why.
 8. Use no outside knowledge. Do not restate evidence text at length. Put evidence ids ONLY in the id fields, never inside claim_text, answer_summary or any other prose.
 9. timeline_events lists dated state changes of the topic in order, only where evidence supports them, each with evidence_ids. Never invent a transition to make the story smooth.
+10. search_terms: 2-5 short phrases naming the topic or things your answer is about (for example a named control, system, decision or figure). They are used only to look for LATER evidence that could change the answer; they are never shown as fact.
 
 Reply with ONE JSON object and nothing else, with exactly these keys:
 {

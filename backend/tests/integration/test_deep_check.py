@@ -269,3 +269,63 @@ def test_invalid_primary_shape_is_an_error_when_evidence_exists(conn, world):
     bad = json.dumps({"claims": [[{"claim_text": "x"}]]})
     with pytest.raises(AnalysisUnavailableError):
         _service(conn, RoleRoutedLLM({"PRIMARY": bad})).answer("What message bus was agreed?")
+
+
+def test_later_evidence_on_the_answers_own_terms_is_swept_and_forces_the_skeptic(conn, seed_units):
+    """The question never mentions 'file size check', but the Primary's answer does.
+    A later unit about it must reach the Skeptic (marked new) and force a deep check
+    even though the question alone would have been low risk."""
+    early = seed_units(
+        conn,
+        "hypercare",
+        [
+            ("The failed jobs were checked for problems in March.", "Ana", "2025-03-18"),
+            ("A file size check was proposed after the empty file.", "Priya", "2025-03-18"),
+        ],
+    )
+    later = seed_units(
+        conn,
+        "cutover",
+        [
+            (
+                "Since we added the file size check in March there have been no silent",
+                "Kwame",
+                "2025-12-11",
+            )
+        ],
+        date="2025-12-11",
+    )
+    seen = {}
+
+    def verdict(system, user):
+        seen["user"] = user
+        return json.dumps({"objections": []})
+
+    primary = _out(
+        [_claim([early[1]], "A file size check was proposed.", "PROPOSAL", "HIGH")],
+        search_terms=["file size check"],
+    )
+    llm = RoleRoutedLLM(
+        {
+            "PRIMARY": primary,
+            "SKEPTIC_PLAN": json.dumps(
+                {"weakest_claim": "x", "why_it_could_be_wrong": "y", "bundles": []}
+            ),
+            "SKEPTIC_VERDICT": verdict,
+        }
+    )
+    receipt, trace = _service(conn, llm).answer("What happened with the failed jobs?")
+
+    assert "later evidence on the answer's own terms exists" in receipt.review.risk_triggers
+    assert receipt.review.skeptic_ran
+    assert f"![{later[0]}]" in seen["user"]  # shown to the Skeptic as newly found
+    assert later[0] not in trace.retrieved_ids  # the question alone never surfaced it
+
+
+def test_no_search_terms_or_nothing_later_means_no_extra_trigger(conn, world):
+    _, _, parking = world
+    llm = RoleRoutedLLM(
+        {"PRIMARY": _out([_claim(parking, "Parking is on level two.", "STATUS_UPDATE")])}
+    )
+    receipt, _ = _service(conn, llm).answer("Where is the parking?")
+    assert "later evidence on the answer's own terms exists" not in receipt.review.risk_triggers

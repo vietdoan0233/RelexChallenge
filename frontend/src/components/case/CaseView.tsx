@@ -41,7 +41,9 @@ function ReviewPanel({ review }: { review: CaseReceipt['review'] }) {
         </p>
       )}
       {review.risk_triggers.length > 0 && (
-        <details>
+        // Open by default: collapsed text is skipped by copy/paste and screen-scrapers,
+        // which left the reasons looking empty.
+        <details open>
           <summary className="cursor-pointer font-semibold">Why this was checked</summary>
           <ul className="ml-5 mt-1 list-disc">
             {review.risk_triggers.map((t) => (

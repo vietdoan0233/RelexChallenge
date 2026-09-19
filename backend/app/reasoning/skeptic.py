@@ -103,8 +103,14 @@ def run(
     query: str,
     output: PrimaryOutput,
     evidence: EvidenceSet,
+    extra_new_ids: list[str] | None = None,
 ) -> SkepticResult:
+    """``extra_new_ids``: later evidence the answer's own terms surfaced before the
+    Skeptic ran. It is marked as new for the verdict just like counter-search hits."""
     result = counter_retrieve(llm, retrieval_service, query, output, evidence)
+    result.new_evidence_ids = list(
+        dict.fromkeys([*(extra_new_ids or []), *result.new_evidence_ids])
+    )
 
     # No new evidence means there is nothing further to inspect; the
     # candidate stands as far as this search could tell.

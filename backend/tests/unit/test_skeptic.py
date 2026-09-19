@@ -179,7 +179,7 @@ def test_alternative_and_later_strategies_use_the_temporal_sweep(conn, world):
 
 
 def test_counter_search_contribution_is_bounded(conn, seed_units):
-    seed_units(conn, "big", [f"alpha topic unit {i} with several words here" for i in range(60)])
+    seed_units(conn, "big", [f"alpha topic unit {i} with several words here." for i in range(60)])
     service = RetrievalService(conn, None)
     evidence = EvidenceSet()
     new = evidence.add(

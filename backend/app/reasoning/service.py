@@ -16,12 +16,16 @@ from app.db import repository
 from app.reasoning import primary, reconcile, risk, skeptic
 from app.reasoning.evidence import EvidenceSet
 from app.reasoning.llm import LLMClient
+from app.retrieval import temporal
 from app.retrieval.service import RetrievalService
+from app.retrieval.text import topic_terms
 from app.schemas.reasoning import PrimaryOutput
 from app.schemas.receipt import CaseReceipt, ReviewInfo, ReviewObjection, ValidatedReceipt
 from app.validation import receipt_validator
 
 _LOGGER = logging.getLogger(__name__)
+
+_LATER_SWEEP_HITS = 6
 
 PROVISIONAL_NOTE = (
     "The adversarial check of this answer could not be completed; treat it as provisional."
@@ -75,10 +79,15 @@ class CaseService:
         # Routing is deterministic; the model's own confidence can only
         # escalate scrutiny, never waive it (CLAUDE.md 12).
         assessment = risk.assess(query, output, retrieval, evidence)
+        # CLAUDE.md 9.5: sweep for later evidence on the *answer's* own topic terms,
+        # which the question may never have used ("file size check").
+        later_new = self._later_sweep(output, evidence)
+        if later_new:
+            assessment.triggers.append("later evidence on the answer's own terms exists")
         review.risk_level = assessment.level
         review.risk_triggers = assessment.triggers
         if assessment.deep_check:
-            output, review = self._deep_check(query, output, evidence, review)
+            output, review = self._deep_check(query, output, evidence, review, later_new)
 
         trace.risk_level = review.risk_level
         trace.risk_triggers = review.risk_triggers
@@ -101,8 +110,26 @@ class CaseService:
         )
         return self._store(validated, trace)
 
+    def _later_sweep(self, output: PrimaryOutput, evidence: EvidenceSet) -> list[str]:
+        """Ids of later evidence not yet shown to any model, found by the Primary's
+        own ``search_terms`` after the earliest evidence it cited."""
+        terms = topic_terms(" ".join(output.search_terms))
+        cited = {i for c in output.claims for i in c.supporting_evidence_ids}
+        after = temporal.earliest_date(self._conn, sorted(cited))
+        if not terms or after is None:
+            return []
+        return evidence.add(
+            self._retrieval.later_evidence(terms, after),
+            top_hits=_LATER_SWEEP_HITS,
+        )
+
     def _deep_check(
-        self, query: str, output: PrimaryOutput, evidence: EvidenceSet, review: ReviewInfo
+        self,
+        query: str,
+        output: PrimaryOutput,
+        evidence: EvidenceSet,
+        review: ReviewInfo,
+        later_new: list[str] | None = None,
     ) -> tuple[PrimaryOutput, ReviewInfo]:
         """Skeptic -> counter-retrieval -> reconciliation. A failure here
         never yields an unchecked confident answer: the result is degraded
@@ -111,7 +138,9 @@ class CaseService:
             # Attempted, whether or not it finishes: a failure is then visible
             # as skeptic_ran with completed=False, never as "no check happened".
             review.skeptic_ran = True
-            result = skeptic.run(self._llm, self._retrieval, query, output, evidence)
+            result = skeptic.run(
+                self._llm, self._retrieval, query, output, evidence, extra_new_ids=later_new
+            )
             review.counter_queries = result.queries_run
             review.counter_units_examined = len(result.new_evidence_ids)
             review.objections = [

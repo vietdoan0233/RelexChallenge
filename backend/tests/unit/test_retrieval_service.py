@@ -222,3 +222,23 @@ def test_one_long_meeting_with_a_matching_title_cannot_flood_the_title_list(conn
     from_long = [h for h in hits if h.evidence_id.startswith("EV-long-") and "title" in h.sources]
     assert len(from_long) <= 4
     assert other[0] in [h.evidence_id for h in hits]
+
+
+def test_later_evidence_returns_only_strictly_later_units_with_context(conn, seed_units):
+    ids = seed_units(
+        conn,
+        "meeting",
+        [
+            ("The file size check was proposed.", "A", "2025-03-18"),
+            ("Okay.", "B", "2025-12-11"),
+            (
+                "Since we added the file size check there were no silent failures.",
+                "C",
+                "2025-12-11",
+            ),
+        ],
+    )
+    result = RetrievalService(conn, None).later_evidence(["file", "size", "check"], "2025-03-18")
+    assert [h.evidence_id for h in result.fused] == [ids[2]]
+    assert ids[1] in result.records  # neighbouring context is hydrated too
+    assert ids[0] not in [h.evidence_id for h in result.fused]

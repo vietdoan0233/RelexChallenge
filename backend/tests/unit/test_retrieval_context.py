@@ -65,3 +65,57 @@ def test_context_dependence_heuristic():
     assert not context.is_context_dependent(
         "The extract we received contains a column nobody asked for and it identifies people."
     )
+
+
+def test_a_sentence_cut_by_backchannel_turns_is_followed_to_its_end(conn, seed_units):
+    """The real December cutover call: one sentence spread over three of Kwame's
+    units with two acknowledgements in between."""
+    ids = seed_units(
+        conn,
+        "call",
+        [
+            ("Mm, okay.", "Sofia"),
+            ("standing caveat. Since we added the file size,", "Kwame"),
+            ("Okay, yeah.", "Unknown"),
+            ("check in March there have been no silent,", "Kwame"),
+            ("Okay.", "Ana"),
+            ("failures, only loud ones. Four loud ones since March.", "Kwame"),
+            ("Four loud is better than one silent.", "Lena"),
+            ("Much better.", "Kwame"),
+        ],
+    )
+    (window,) = context.expand(conn, [ids[1]])
+    assert ids[5] in window.unit_ids  # the clause that says "failures, only loud ones"
+    assert list(window.unit_ids) == sorted(window.unit_ids, key=ids.index)  # document order
+
+
+def test_a_mid_sentence_anchor_is_followed_backwards_too(conn, seed_units):
+    ids = seed_units(
+        conn,
+        "call",
+        [
+            ("Since we added the file size,", "Kwame"),
+            ("Okay, yeah.", "Unknown"),
+            ("Okay.", "Ana"),
+            ("Right.", "Lena"),
+            ("check in March there have been no silent failures.", "Kwame"),
+        ],
+    )
+    (window,) = context.expand(conn, [ids[4]])
+    assert ids[0] in window.unit_ids
+
+
+def test_a_finished_sentence_is_not_extended_and_the_chase_is_bounded(conn, seed_units):
+    done = seed_units(
+        conn,
+        "done",
+        ["The plan is agreed.", "Fine.", "Ok.", "Sure.", "Yes.", "Later note from Ana."],
+    )
+    (w,) = context.expand(conn, [done[0]])
+    assert done[5] not in w.unit_ids
+
+    endless = seed_units(conn, "endless", [f"and then we kept going, part {n}," for n in range(30)])
+    (w,) = context.expand(conn, [endless[0]])
+    assert len(w.unit_ids) <= 1 + context.MAX_RADIUS + context.CONTINUATION_HOPS * (
+        context.CONTINUATION_LOOKAHEAD + 1
+    )

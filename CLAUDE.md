@@ -71,7 +71,8 @@ This section reflects the verified repository state at the end of work on 2026-0
   - 110 email-message units,
   - 292 report units.
 - The latest verified FTS row count is 2,517.
-- The latest verified quality gate is 42 passing backend tests, clean Ruff checks, and a successful frontend build.
+- The latest verified quality gate is 71 passing backend tests, clean Ruff checks, and a successful frontend typecheck/build.
+- Phase 1 identity hardening is complete: `people`/`person_aliases` are rebuilt every ingestion run from `data/source/` plus a human-reviewed identity manifest (`data/source/reviewed_identities.json`); a capitalized free-text span is never auto-promoted to `people`; short-form aliases (first name, last name, initials, nicknames, spelling variants) are promoted only through an explicit reviewed manifest entry with its own alias_type and source_reference, never from uniqueness or independent corpus usage alone.
 
 ## Important corpus discoveries already verified
 
@@ -120,21 +121,19 @@ Do not make parsing dependent on one exact placeholder token.
 
 ## Phase state
 
-**Phase 1 is implemented but remains at the mandatory review/hardening gate. Phase 2 has not started.**
+**Phase 1 identity hardening is complete. Phase 1 otherwise remains at the mandatory review/hardening gate on real embeddings and the organizer GPT contract. Phase 2 has not started.**
 
-The following must be resolved before Phase 1 is accepted:
+Identity hardening is resolved: capitalized free-text phrases can no longer become deletion-relevant identities, and the resulting people/alias/evidence-person counts have been reviewed against the corpus (see below). What still must be resolved before Phase 1 is fully accepted:
 
-- tighten people/alias discovery so capitalized phrases cannot become deletion-relevant identities,
-- review the resulting people/alias/evidence-person counts against the corpus,
 - configure a local `.env` without committing secrets,
 - finalize the organizer-provided GPT API transport after its endpoint/SDK contract is supplied,
 - run one real GPT embedding smoke test,
 - generate and verify real embedding rows for the intended corpus before claiming semantic retrieval readiness,
-- rerun all Phase 1 quality gates and issue a corrected Phase 1 review report.
+- rerun all Phase 1 quality gates and issue a corrected Phase 1 review report once real embeddings exist.
 
-The current offline ingestion produced 74 people and 234 aliases, including obvious non-person phrase candidates. This violates the high-confidence identity requirement and is a Phase 1 correctness issue, not a cosmetic cleanup. The runtime database contains zero real embedding rows because no local API configuration was available.
+The corrected offline ingestion produces 25 people and 39 aliases (25 FULL_NAME + 14 EMAIL; zero short-form aliases are currently promoted, because none have yet passed the explicit human-review path that is now the only route to a deletion-relevant first name, last name, initials, nickname, or spelling variant) against the real 45-document archive. All previously identified false identities (e.g. "Risk Fresh Phase", "This So", "Slight Delay Bakery"/"Bakery", "Not Nadia Öberg") are confirmed absent from both `people` and `person_aliases`, and all 9 reviewed text-only identities (Tobias Ekström, Nadia Öberg, Nils Ackermann, Osman Yildirim, Marika Lindqvist, Heidi Salminen, Martina Reuss, Ahmed Nasser, Elin Bergqvist) are confirmed present. Relationship counts: `AUTHOR` 402, `MENTIONED` 242, `SPEAKER` 1964. The runtime database contains zero real embedding rows because no organizer API configuration is available yet.
 
-Do not jump to Phase 2 until Phase 1 exit criteria pass and the ingestion output has been reviewed.
+Do not jump to Phase 2 until the remaining Phase 1 exit criteria (real embeddings, organizer GPT contract) pass.
 
 ---
 
@@ -198,8 +197,51 @@ The architecture version changes only when the frozen product or technical archi
 - **v1.4 — current, frozen.** Replaced the Google/Gemini provider choice with an organizer-provided GPT service. The API key, base URL, reasoning model, and embedding model remain environment placeholders until the organizers supply the exact contract. The provider-neutral offline ingestion path remains mandatory.
 - **v1.3 — previous frozen architecture.** Audited architecture contract covering the Phase 0 checkpoint, GitHub workflow, stable source-locator manifest, canonical-source rebuild invariant, embedding resilience, citation-context invariant, Skeptic counter-retrieval behavior, deletion cleanup, and mandatory Phase 1 review gate.
 - **2026-09-19 implementation checkpoint — no architecture version change.** Recorded the implemented Phase 1 Evidence Locker, verified offline ingestion/test counts, known identity-discovery false positives, missing real embeddings, and the decision to stop before Phase 2.
+- **2026-09-19 identity/documentation correction pass — no architecture version change.** Fixed a short-alias independence check that only looked backward from a candidate's match position (so a first name at the start of its own full name was wrongly treated as independently observed, while the corresponding last-name case was already correct); replaced heuristic short-alias promotion with an explicit reviewed-alias mechanism (uniqueness and independent corpus usage are review signals, not promotion criteria on their own); restructured the reviewed identity manifest to avoid duplicating raw quotations or naming unrelated people, so deleting one person's entry never requires editing another; reordered ingestion to validate parsed source files and the reviewed identity manifest before the destructive rebuildable-table reset, so a malformed manifest fails loudly instead of emptying the database first; corrected documentation that overstated the rebuild reset as covering "every table except source_locators" when Cases/Pulse tables are untouched and not yet implemented; removed a remaining hardcoded codename from backend package metadata; and corrected stale checkpoint numbers below. See section 0.5 for the destructive-test isolation contract added in this pass.
 
 Earlier architecture iterations are not reconstructed here because their authoritative change notes are not present in the repository. Do not invent retrospective version details.
+
+# 0.4 BRANDING NEUTRALITY
+
+“KEEPER” is a temporary project codename, not a frozen brand. The final product will use a different name. This clarification does not change Architecture v1.4.
+
+Rules:
+
+- runtime behavior and persistent identifiers must not depend on the codename,
+- user-facing and configurable surfaces (API title, frontend title/heading, CLI descriptions, default database filename, package metadata) must read from configuration or use neutral functional terminology, never a hardcoded “KEEPER”,
+- use `APP_NAME` (backend) and `VITE_APP_NAME` (frontend) for a configurable display name, falling back to a neutral name such as “Organizational Memory Auditor” when unset,
+- the default runtime database filename is a neutral `data/app.db`, not `data/keeper.db`,
+- historical architecture, handoff, and challenge documentation may retain “KEEPER” when identifying the existing codename — this file, `AGENTS.md`, and `docs/HANDOFF_*.md` are not rewritten to remove it,
+- do not invent the final product name; use neutral terminology until one is chosen,
+- do not rename the repository.
+
+# 0.5 TEST ISOLATION AND DESTRUCTIVE-TEST SAFETY
+
+Phase 5 deletion has not been implemented yet, but tests that exercise ingestion rebuild, contaminated-data cleanup, or (later) purge behavior are inherently destructive to whatever database/source they run against. This section is the binding contract for those tests, so that development work can never permanently sanitize the repository's own canonical source, a runtime database intended for judges, or an already-prepared demo instance.
+
+Three distinct concepts:
+
+1. **Development fixture/reference** — the pristine, untouched hackathon archive kept outside `data/source/` and outside application-owned persistence (gitignored). It exists only to be copied from when creating an isolated development/test environment. It must never become a runtime fallback after deletion, and normal ingestion/rebuild must never read it directly (see section 7's canonical-source boundary).
+2. **Test instance** — a temporary copy of the required canonical source, created fresh per test in a location the test framework owns (e.g. pytest `tmp_path`), with its own temporary database, artifacts directory, and cache directory. Destructive tests may modify only this temporary instance.
+3. **Judge/demo instance** — the repository's real `data/source/`, real runtime database (`data/app.db`), and their real artifacts/cache directories, initialized from a clean canonical source copy. A judge-requested deletion against this instance is intentionally permanent.
+
+**Binding test rule.** Every test that modifies source content, deletes a person, or simulates purge/rebuild must:
+
+1. create a temporary directory using the test framework,
+2. copy only the required source fixture into it,
+3. configure `SOURCE_DATA_DIR`, `DATABASE_PATH`, artifact paths, and cache paths so they point inside that temporary directory,
+4. ingest into its temporary database,
+5. perform destructive work only against that temporary source and database,
+6. verify database/source/index/artifact cleanup,
+7. rebuild only from the temporary sanitized source,
+8. verify the person is not resurrected,
+9. discard the temporary instance afterward.
+
+A destructive test must never write to `<repository>/data/source/`, `<repository>/data/app.db`, or `<repository>/data/keeper.db`.
+
+Existing read-only integration tests may inspect the canonical corpus directly if they never modify it and use an isolated/in-memory database; there is no need to copy the full archive for a purely read-only test. `backend/tests/conftest.py`'s `isolated_instance` fixture provides a ready-made temporary on-disk instance (source directory, database, artifacts directory, and cache directory, all under `tmp_path`) for destructive tests that need real on-disk behavior — for example, the eventual Phase 5 WAL/VACUUM purge tests (section 18.3.1) — rather than the in-memory `conn` fixture used for pure logic tests.
+
+This section does not implement Phase 5 deletion. It only fixes the isolation contract destructive tests must follow once that phase begins.
 
 # 1. PRODUCT MISSION
 
@@ -436,7 +478,7 @@ GPT_API_KEY=
 GPT_BASE_URL=
 GPT_MODEL=
 GPT_EMBEDDING_MODEL=
-DATABASE_PATH=./data/keeper.db
+DATABASE_PATH=./data/app.db
 SOURCE_DATA_DIR=./data/source
 ```
 
@@ -466,7 +508,7 @@ relex-keeper/
 │
 ├── data/
 │   ├── source/                  # canonical imported source under app control
-│   ├── keeper.db                # runtime DB, gitignored
+│   ├── app.db                   # runtime DB, gitignored
 │   ├── artifacts/               # derived runtime artifacts, gitignored
 │   └── cache/                   # disposable cache, gitignored
 │

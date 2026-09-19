@@ -1,0 +1,86 @@
+{
+  "description": "Reviewed text-only identities: people who are never a transcript speaker/attendee or an email/report sender anywhere in data/source/, but are named clearly enough in evidence text that a human reviewer confirmed they refer to a real person. This is NOT a roster -- structural speakers, attendees, and senders are identified automatically from the evidence itself and never need an entry here for identity purposes. A capitalized free-text span never becomes a person on its own; this file is the only path by which a text-only mention does. A verified_aliases entry may also be attached to an already-structural person purely to review a short-form alias (first name, last name, initials, nickname, or spelling variant) for that person; in that case the entry does not itself confirm identity, only the extra alias, and it is left out of the ingestion report's reviewed-text-only-identity count. Every field in every entry (canonical_name, verified_aliases, review_note, source_documents) is application-owned personal data and must be treated as purge-scannable: deleting one of these people removes that person's entire entry from this file, not just their name from other entries' text. Review notes deliberately avoid naming or quoting other people so that deleting one entry never requires editing another. Because ingestion only ever reads this file plus data/source/ -- never any other identity source, and never falls back to the untouched hackathon fixture outside data/source/ -- a normal rebuild after an entry's removal cannot resurrect the deleted person or alias.",
+  "entries": [
+    {
+      "canonical_name": "Tobias Ekström",
+      "verified_aliases": [],
+      "review_note": "Named once by the current account contact as a departed colleague who previously held a role now split between two people. A departed employee; never a speaker, attendee, or sender anywhere in the archive.",
+      "source_documents": ["transcripts/01_2024-03-20_solution-demo-value-workshop.txt"]
+    },
+    {
+      "canonical_name": "Nadia Öberg",
+      "verified_aliases": [],
+      "review_note": "Named and explicitly distinguished from a different, unrelated same-first-name person in two independent places. Kept as a separate identity so a bare first name alone stays ambiguous between them.",
+      "source_documents": [
+        "emails/01_shelf-life-field-mapping.txt",
+        "transcripts/23_2026-07-02_INTERNAL-renewal-resourcing.txt"
+      ]
+    },
+    {
+      "canonical_name": "Nils Ackermann",
+      "verified_aliases": [],
+      "review_note": "Named as the external system owner of a specific referenced platform, outside the vendor/customer core teams. Never a speaker or sender.",
+      "source_documents": ["emails/20_chain-wide-proposal.txt"]
+    },
+    {
+      "canonical_name": "Osman Yildirim",
+      "verified_aliases": [],
+      "review_note": "Named as an individual example record cited twice while discussing operator-ID data handling. Never a speaker or sender.",
+      "source_documents": [
+        "transcripts/17_2025-11-17_fresh-phase2-go-no-go.txt",
+        "emails/07_op-id-field-exclusion.txt"
+      ]
+    },
+    {
+      "canonical_name": "Marika Lindqvist",
+      "verified_aliases": [],
+      "review_note": "Named as an example operator-ID record cited while scoping which individual-identifying fields to exclude from a data extract. Never a speaker or sender.",
+      "source_documents": ["emails/07_op-id-field-exclusion.txt"]
+    },
+    {
+      "canonical_name": "Heidi Salminen",
+      "verified_aliases": [],
+      "review_note": "Named as an example operator-ID record cited alongside other examples while scoping which individual-identifying fields to exclude from a data extract. Never a speaker or sender.",
+      "source_documents": ["emails/07_op-id-field-exclusion.txt"]
+    },
+    {
+      "canonical_name": "Martina Reuss",
+      "verified_aliases": [
+        {
+          "alias": "martina.reuss@acme-org.example",
+          "alias_type": "EMAIL",
+          "source_reference": "emails/14_go-live-user-access.txt user-access list entry"
+        }
+      ],
+      "review_note": "Named with an associated email address on a go-live user-access list. Never a speaker or sender.",
+      "source_documents": ["emails/14_go-live-user-access.txt"]
+    },
+    {
+      "canonical_name": "Ahmed Nasser",
+      "verified_aliases": [
+        {
+          "alias": "ahmed.nasser@acme-org.example",
+          "alias_type": "EMAIL",
+          "source_reference": "emails/14_go-live-user-access.txt user-access list entry"
+        }
+      ],
+      "review_note": "Named with an associated email address on a go-live user-access list. Never a speaker or sender.",
+      "source_documents": ["emails/14_go-live-user-access.txt"]
+    },
+    {
+      "canonical_name": "Elin Bergqvist",
+      "verified_aliases": [
+        {
+          "alias": "elin.bergqvist@acme-org.example",
+          "alias_type": "EMAIL",
+          "source_reference": "emails/14_go-live-user-access.txt user-access list entry"
+        }
+      ],
+      "review_note": "Named with an associated email address on a go-live user-access list, and independently named again in a later data-protection discussion. Never a speaker or sender.",
+      "source_documents": [
+        "emails/14_go-live-user-access.txt",
+        "transcripts/21_2026-04-09_data-protection-review.txt"
+      ]
+    }
+  ]
+}

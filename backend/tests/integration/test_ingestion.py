@@ -87,3 +87,45 @@ def test_a_known_truncated_statement_is_flagged(conn):
     ).fetchone()
     assert row is not None
     assert row["is_truncated"] == 1
+
+
+def test_real_archive_never_stores_known_false_positive_identities(conn):
+    report = ingest(conn, _SOURCE_DIR, embedding_provider=None)
+    rejected_names = {
+        "Risk Fresh Phase",
+        "Risk Still",
+        "Slight Delay Bakery",
+        "Bakery",
+        "This So",
+        "Not Nadia Öberg",
+        "Hi All",
+        "Data Protection Officer",
+        "Chief Financial Officer",
+    }
+    for name in rejected_names:
+        assert repository.find_person_id_by_canonical_name(conn, name) is None, name
+    all_aliases = {row["alias"] for row in repository.all_aliases(conn)}
+    assert not (rejected_names & all_aliases)
+    assert report.people_count == repository.people_row_count(conn)
+    assert report.alias_count == repository.alias_row_count(conn)
+
+
+def test_real_archive_reviewed_text_only_people_are_confirmed(conn):
+    ingest(conn, _SOURCE_DIR, embedding_provider=None)
+    for name in ("Tobias Ekström", "Nadia Öberg", "Nils Ackermann"):
+        assert repository.find_person_id_by_canonical_name(conn, name) is not None, name
+
+
+def test_real_archive_repeated_ingestion_is_idempotent(conn):
+    first = ingest(conn, _SOURCE_DIR, embedding_provider=None)
+    people_first = {row["canonical_name"] for row in repository.all_people(conn)}
+    aliases_first = {(row["person_id"], row["alias"]) for row in repository.all_aliases(conn)}
+
+    second = ingest(conn, _SOURCE_DIR, embedding_provider=None)
+    people_second = {row["canonical_name"] for row in repository.all_people(conn)}
+    aliases_second = {(row["person_id"], row["alias"]) for row in repository.all_aliases(conn)}
+
+    assert people_first == people_second
+    assert aliases_first == aliases_second
+    assert first.people_count == second.people_count
+    assert first.alias_count == second.alias_count

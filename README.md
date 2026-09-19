@@ -279,3 +279,13 @@ npm run build
 - [`docs/HANDOFF_2026-09-19.md`](docs/HANDOFF_2026-09-19.md) — an earlier handoff snapshot; the current checkpoint is in `AGENTS.md`.
 - [`data/ARCHIVE_README.md`](data/ARCHIVE_README.md) — description of the challenge archive.
 - [`data/PRACTICE_QUESTIONS.md`](data/PRACTICE_QUESTIONS.md) — practice questions for later retrieval/evaluation work; these are not evidence.
+
+## Innovation roadmap
+
+After the core phases are complete, Phase 7 includes a small, precomputed
+**Reconsideration Radar** demonstration. It surfaces previously rejected or
+deferred ideas whose original blocker may have changed, while keeping internal
+evidence, external signals, assessment, and missing information separate. The
+feature is deliberately bounded: it says only **worth reassessing**, never that
+the organization should pursue an idea. See
+[docs/RECONSIDERATION_RADAR.md](docs/RECONSIDERATION_RADAR.md).

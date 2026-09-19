@@ -57,6 +57,31 @@ def test_unknown_speaker_is_its_own_anonymous_unit_not_merged_into_prior_speaker
     assert units[1].raw_text == "You're on mute."
 
 
+def test_redacted_speaker_marker_opens_a_normal_fragment_and_content_survives(conn):
+    header = TEAMS_HEADER.replace(
+        "Attendees: Lena Fischer (Acme), Sofia Almeida (Acme), Marco Rossi (RELEX)",
+        "Attendees: Lena Fischer (Acme), Marco Rossi (RELEX)",
+    )
+    body = (
+        "Lena Fischer\n0:240:24\nLF\nLena Fischer 24 seconds\nYeah.\n"
+        "[REDACTED SPEAKER]\n0:250:25\n"
+        "[REDACTED SPEAKER] 5 seconds\nWe discussed the budget privately.\n"
+        "Marco Rossi\n0:280:28\nMR\nMarco Rossi 28 seconds\nSorry, go ahead.\n"
+    )
+    units, _ = _units(conn, header + body)
+    assert [u.speaker_sender for u in units] == [
+        "Lena Fischer",
+        "[REDACTED SPEAKER]",
+        "Marco Rossi",
+    ]
+    # The redacted turn's body survives ingestion, not silently dropped
+    # as untraceable chrome or merged into a neighboring turn.
+    assert units[1].raw_text == "We discussed the budget privately."
+    # Neighboring named turns still parse and stay separate.
+    assert units[0].raw_text == "Yeah."
+    assert units[2].raw_text == "Sorry, go ahead."
+
+
 def test_speaker_name_mismatch_between_header_and_body_diacritics_still_matches(conn):
     # The corpus itself is inconsistent here: the Attendees header spells
     # a name with an o-with-stroke, but that speaker's own caption lines

@@ -2,6 +2,7 @@ import re
 import sqlite3
 import unicodedata
 
+from app.core import anonymous_labels
 from app.db import repository
 from app.ingestion import locator_manifest
 from app.ingestion.models import ParsedDocument, ParsedUnit, TranscriptFragment
@@ -13,15 +14,6 @@ _DISCLAIMER_PREFIX = "***"
 _DOUBLED_TIMESTAMP = re.compile(r"^(\d{1,2}:\d{2})\1$")
 _TIME_PHRASE = re.compile(r"^\s*(?:(\d+)\s+minutes?)?\s*(?:(\d+)\s+seconds?)?\s*$")
 _INTERNAL_LINE = re.compile(r"^(Me|Them):\s?(.*)$")
-
-# A genuine Teams UI artifact, not a hypothetical one: some turns are
-# captioned "Unknown Speaker" because Teams itself could not identify
-# who was talking. It follows the exact same name/timestamp/initials
-# structure as a named turn, so it must be recognized as a marker line
-# in its own right -- otherwise that dialogue silently merges into
-# whichever named speaker's turn happened to precede it, a real
-# misattribution rather than a cosmetic gap.
-_ANONYMOUS_SPEAKER_LABEL = "Unknown Speaker"
 
 _LENGTH_PRESERVING_MAP = str.maketrans({"ø": "o", "Ø": "O", "å": "a", "Å": "A"})
 
@@ -106,7 +98,23 @@ def _initials(name: str) -> str:
 
 
 def _parse_teams(body_lines: list[str], attendees: list[str]) -> list[TranscriptFragment]:
-    canonical_names = [*attendees, _ANONYMOUS_SPEAKER_LABEL]
+    # "Unknown Speaker" is a genuine Teams UI artifact, not a hypothetical
+    # one: some turns are captioned that way because Teams itself could
+    # not identify who was talking. "[REDACTED SPEAKER]" is the reserved
+    # marker a future anonymization operation writes in its place
+    # (CLAUDE.md 18.7). Both follow the exact same name/timestamp/
+    # initials structure as a named turn, so both must be recognized as
+    # marker lines in their own right -- otherwise that dialogue silently
+    # merges into whichever named speaker's turn happened to precede it,
+    # a real misattribution rather than a cosmetic gap, or (for a
+    # redacted turn specifically) the sanitized content is silently
+    # dropped as untraceable chrome instead of surviving as an anonymous
+    # unit.
+    canonical_names = [
+        *attendees,
+        anonymous_labels.ANONYMOUS_SPEAKER_LABEL_UNKNOWN,
+        anonymous_labels.REDACTED_SPEAKER,
+    ]
     name_by_normalized = {_normalize_name(name): name for name in canonical_names}
     known_initials = {_initials(name) for name in canonical_names}
 

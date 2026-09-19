@@ -28,6 +28,15 @@ class LocatorAssignment:
     genesis_position: int
 
 
+class RevokedLocatorCollisionError(RuntimeError):
+    """Raised when a natural locator (a transcript timestamp, an email
+    date-slug) collides with a source_locators row that a prior
+    deletion/anonymization operation revoked. This must fail loudly as
+    an integrity/privacy error -- ingestion must never catch and
+    suppress it -- rather than silently reuse or resurrect the revoked
+    locator (CLAUDE.md 18.8)."""
+
+
 def evidence_id_for(document_id: str, source_locator: str) -> str:
     return f"EV-{document_id}-{source_locator}"
 
@@ -79,10 +88,23 @@ def assign_natural_locator(
     needs no fingerprint matching since it is already stable by
     construction. Recording is idempotent -- INSERT OR IGNORE -- so
     re-ingestion keeps the original genesis_position/first_seen_at rather
-    than overwriting them."""
-    position = repository.find_locator_position(conn, document_id, natural_locator)
-    if position is None:
+    than overwriting them.
+
+    Raises RevokedLocatorCollisionError if this exact locator string was
+    previously revoked (CLAUDE.md 18.8): a natural locator is derived
+    from source content (a timestamp, a date), so it can organically
+    recur, and a revoked one must never be silently reused just because
+    a new fragment happens to produce the same value again.
+    """
+    row = repository.find_locator_row(conn, document_id, natural_locator)
+    if row is None:
         position = repository.next_genesis_position(conn, document_id)
         now = datetime.now(UTC).isoformat()
         repository.record_source_locator(conn, document_id, natural_locator, fp, position, now)
-    return LocatorAssignment(natural_locator, position)
+        return LocatorAssignment(natural_locator, position)
+    if row["revoked_at"] is not None:
+        raise RevokedLocatorCollisionError(
+            f"natural locator {natural_locator!r} in document {document_id!r} was revoked "
+            f"at {row['revoked_at']!r} and must never be reassigned"
+        )
+    return LocatorAssignment(natural_locator, row["genesis_position"])

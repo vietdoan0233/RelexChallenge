@@ -33,6 +33,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app.core import anonymous_labels
 from app.core.enums import DocumentType, PersonRelation
 from app.db import migrations, repository
 from app.ingestion import locator_manifest, people
@@ -234,7 +235,7 @@ def _link_relations(
     for evidence_id, document_type, unit in unit_records:
         exclude: set[str] = set()
 
-        is_anonymous_speaker = unit.speaker_sender in ("Me", "Them", "Unknown Speaker")
+        is_anonymous_speaker = anonymous_labels.is_non_person_label(unit.speaker_sender)
         if unit.speaker_sender and not is_anonymous_speaker:
             person_id = repository.find_person_id_by_canonical_name(conn, unit.speaker_sender)
             if person_id:

@@ -77,6 +77,31 @@ def test_swedish_locale_headers_and_den_date_format_are_recognized():
     assert doc.units[1].event_date == "2025-03-17"
 
 
+def test_redacted_sender_header_remains_a_separate_parseable_message():
+    text = DISCLAIMER + (
+        "Subject: Shelf life field mapping\n"
+        "From: Nadia Haddad <n.haddad@relexsolutions.example>\n"
+        "Date: Thursday, October 30, 2025 12:02 PM\n"
+        "To: Ana Duarte <ana.duarte@relexsolutions.example>\n"
+        "Messages in thread: 2\n\n"
+        "We proceeded. Nobody objected.\n\n"
+        "From: [REDACTED SENDER]\n"
+        "Sent: Thursday, September 4, 2025 14:20\n"
+        "To: Nadia Haddad <n.haddad@relexsolutions.example>\n"
+        "Subject: Re: Shelf life field mapping\n\n"
+        "Following up on the below.\n"
+    )
+    doc = email.parse(text, "doc-redacted", "doc-redacted.txt")
+    assert len(doc.units) == 2
+    # The two messages stay separate -- the redacted header does not
+    # cause it to merge into the preceding message's body.
+    assert doc.units[0].raw_text == "We proceeded. Nobody objected."
+    assert doc.units[1].speaker_sender == "[REDACTED SENDER]"
+    assert doc.units[1].raw_text == "Following up on the below."
+    # No fabricated email address for the anonymized sender.
+    assert doc.units[1].speaker_email is None
+
+
 def test_empty_message_body_is_skipped_not_emitted_as_a_blank_unit():
     text = DISCLAIMER + (
         "Subject: Empty reply\n"

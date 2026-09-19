@@ -188,3 +188,151 @@ def test_deleting_a_turn_does_not_fuse_its_now_adjacent_same_speaker_neighbors(c
     by_text = {u.raw_text: u for u in units_after}
     assert by_text["First turn."].natural_locator == first_locator
     assert by_text["Third turn."].natural_locator == third_locator
+
+
+# ------------------------------------------------ dial-in (phone-number) speaker
+
+_PHONE = "+358 40 5512 097"
+
+# Mirrors the real export shape: the dial-in is not in the Attendees
+# header, and its chrome is number / doubled timestamp / "+4" chip / marker.
+_DIAL_IN_BODY = (
+    "Lena Fischer\n6:346:34\nLF\n"
+    "Lena Fischer 6 minutes 34 seconds\n"
+    "Ninety-nine on everything, in theory, which is\n"
+    f"{_PHONE}\n6:406:40\n+4\n"
+    f"{_PHONE} 6 minutes 40 seconds\n"
+    "Mm-hm.\n"
+    "Lena Fischer\n6:446:44\nLF\n"
+    "Lena Fischer 6 minutes 44 seconds\n"
+    "why we carry so much stock.\n"
+    "Marco Rossi\n6:486:48\nMR\n"
+    "Marco Rossi 6 minutes 48 seconds\n"
+    "Okay, yeah.\n"
+)
+
+
+def test_phone_number_speaker_becomes_its_own_unit_with_no_chrome_leak(conn):
+    units, doc = _units(conn, TEAMS_HEADER + _DIAL_IN_BODY)
+
+    assert [(u.speaker_sender, u.raw_text) for u in units] == [
+        ("Lena Fischer", "Ninety-nine on everything, in theory, which is"),
+        (_PHONE, "Mm-hm."),
+        ("Lena Fischer", "why we carry so much stock."),
+        ("Marco Rossi", "Okay, yeah."),
+    ]
+    for unit in units:
+        assert "+358" not in unit.raw_text
+        assert "+4" not in unit.raw_text
+        assert "minutes" not in unit.raw_text
+    # Timestamp text and natural locator come from the marker line, as for
+    # any named speaker.
+    assert units[1].timestamp_text == "6 minutes 40 seconds"
+    assert units[1].natural_locator == "t400"
+    # A caller who is not in the Attendees header is not added to it.
+    assert _PHONE not in doc.attendees
+
+
+def test_dial_in_interjection_does_not_fuse_the_interrupted_speakers_turn(conn):
+    # The pre-fix behaviour merged both Lena fragments (and the dial-in's
+    # chrome and reply) into one unit. The interjection is a real turn
+    # between them, so they must stay separate.
+    units, _ = _units(conn, TEAMS_HEADER + _DIAL_IN_BODY)
+    lena_texts = [u.raw_text for u in units if u.speaker_sender == "Lena Fischer"]
+    assert lena_texts == [
+        "Ninety-nine on everything, in theory, which is",
+        "why we carry so much stock.",
+    ]
+
+
+def test_consecutive_fragments_from_the_same_dial_in_merge_into_one_turn(conn):
+    body = (
+        f"{_PHONE}\n1:101:10\n+4\n{_PHONE} 1 minute 10 seconds\nYes, I can hear\n"
+        f"{_PHONE} 1 minute 14 seconds\nyou fine.\n"
+        "Marco Rossi\n1:201:20\nMR\nMarco Rossi 1 minute 20 seconds\nGood.\n"
+    )
+    units, _ = _units(conn, TEAMS_HEADER + body)
+    assert [(u.speaker_sender, u.raw_text) for u in units] == [
+        (_PHONE, "Yes, I can hear you fine."),
+        ("Marco Rossi", "Good."),
+    ]
+    assert units[0].timestamp_text == "1 minute 10 seconds"
+
+
+def test_phone_marker_with_seconds_only_duration_splits_number_from_duration(conn):
+    # "+1 555 010 0199 45 seconds": the duration digits must not be
+    # absorbed into the number.
+    body = "+1 555 010 0199\n0:450:45\n+1\n+1 555 010 0199 45 seconds\nHello?\n"
+    units, _ = _units(conn, TEAMS_HEADER + body)
+    assert [(u.speaker_sender, u.raw_text, u.timestamp_text) for u in units] == [
+        ("+1 555 010 0199", "Hello?", "45 seconds")
+    ]
+
+
+def test_phone_number_inside_caption_text_is_not_treated_as_chrome(conn):
+    # Position, not shape, decides chrome: a phone-shaped or "+4"-shaped
+    # caption line that is not followed by / preceded by the timestamp
+    # chrome stays in the turn it belongs to. Meaning is never repaired.
+    body = (
+        "Marco Rossi\n2:002:00\nMR\nMarco Rossi 2 minutes\n"
+        "Call the supplier on\n"
+        "+358 40 5512 097\n"
+        "and ask about the delta,\n"
+        "+4\n"
+        "and no more.\n"
+    )
+    units, _ = _units(conn, TEAMS_HEADER + body)
+    assert len(units) == 1
+    assert units[0].raw_text == (
+        "Call the supplier on +358 40 5512 097 and ask about the delta, +4 and no more."
+    )
+
+
+def test_truncated_dial_in_statement_is_flagged_and_not_completed(conn):
+    body = f"{_PHONE}\n3:003:00\n+4\n{_PHONE} 3 minutes\nThe number I have is 4\n"
+    units, _ = _units(conn, TEAMS_HEADER + body)
+    assert len(units) == 1
+    assert units[0].speaker_sender == _PHONE
+    assert units[0].raw_text == "The number I have is 4"
+
+
+# --------------------------------------------- unlisted "Guest N" participants
+
+# Mirrors the real export shape: "Guest 1" is not in the Attendees header;
+# its chrome is label / doubled timestamp / "G1" chip / marker.
+_GUEST_BODY = (
+    "Lena Fischer\n3:543:54\nLF\nLena Fischer 3 minutes 54 seconds\nYeah, yeah.\n"
+    "Guest 1\n3:573:57\nG1\nGuest 1 3 minutes 57 seconds\n"
+    "done half of the ownership,\n"
+    "Marco Rossi\n4:044:04\nMR\nMarco Rossi 4 minutes 4 seconds\nRight.\n"
+)
+
+
+def test_guest_speaker_becomes_its_own_unit_with_no_chrome_leak(conn):
+    units, doc = _units(conn, TEAMS_HEADER + _GUEST_BODY)
+
+    assert [(u.speaker_sender, u.raw_text) for u in units] == [
+        ("Lena Fischer", "Yeah, yeah."),
+        ("Guest 1", "done half of the ownership,"),
+        ("Marco Rossi", "Right."),
+    ]
+    assert units[1].timestamp_text == "3 minutes 57 seconds"
+    assert units[1].natural_locator == "t237"
+    assert "Guest 1" not in doc.attendees
+    for unit in units:
+        assert "G1" not in unit.raw_text
+        assert "3:57" not in unit.raw_text
+
+
+def test_guest_label_or_chip_inside_caption_text_is_not_treated_as_chrome(conn):
+    body = (
+        "Marco Rossi\n2:002:00\nMR\nMarco Rossi 2 minutes\n"
+        "We asked\n"
+        "Guest 1\n"
+        "to join and the room code was\n"
+        "G1\n"
+        "on the invite.\n"
+    )
+    units, _ = _units(conn, TEAMS_HEADER + body)
+    assert len(units) == 1
+    assert units[0].raw_text == ("We asked Guest 1 to join and the room code was G1 on the invite.")

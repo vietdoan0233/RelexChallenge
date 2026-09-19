@@ -203,3 +203,44 @@ def test_malformed_verdict_shape_is_a_controlled_error(conn, world):
     )
     with pytest.raises(AnalysisUnavailableError):
         _run(conn, llm, early)
+
+
+def test_plan_prompt_offers_value_and_source_reliability_strategies():
+    from app.reasoning import skeptic
+
+    for strategy in ("CONFLICTING_VALUE", "SOURCE_RELIABILITY"):
+        assert strategy in skeptic.PLAN_SYSTEM
+    # A source's unreliability is usually found in a LATER check, so that
+    # strategy must search for later evidence.
+    assert "SOURCE_RELIABILITY" in skeptic._TEMPORAL_STRATEGIES
+    assert "CONFLICTING_VALUE" not in skeptic._TEMPORAL_STRATEGIES
+
+
+def _bundles(*strategies):
+    from app.schemas.reasoning import CounterBundle, SkepticPlan
+
+    return SkepticPlan(bundles=[CounterBundle(strategy=s, queries=["q"]) for s in strategies])
+
+
+def _out(terms=("fresh waste",)):
+    return PrimaryOutput.model_validate(
+        {"answer_summary": "s", "status": "SUPPORTED", "claims": [], "search_terms": list(terms)}
+    )
+
+
+def test_a_reliability_question_always_gets_a_source_reliability_bundle():
+    plan = skeptic.ensure_reliability_bundle(
+        "Give the waste figures and say how reliable they are.",
+        _out(),
+        _bundles("DIRECT_CONTRADICTION", "ALTERNATIVE_STATE"),
+    )
+    strategies = [b.strategy for b in plan.bundles]
+    assert strategies == ["DIRECT_CONTRADICTION", "SOURCE_RELIABILITY"]  # cap of 2 kept
+    assert all("fresh waste" in q for q in plan.bundles[-1].queries)
+
+
+def test_an_existing_reliability_bundle_or_an_unrelated_question_is_left_alone():
+    planned = _bundles("CONFLICTING_VALUE", "SOURCE_RELIABILITY")
+    assert skeptic.ensure_reliability_bundle("How reliable is it?", _out(), planned) is planned
+    ordinary = _bundles("DIRECT_CONTRADICTION")
+    assert skeptic.ensure_reliability_bundle("Who signed it?", _out(), ordinary) is ordinary

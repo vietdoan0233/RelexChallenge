@@ -222,3 +222,37 @@ def test_prose_that_is_only_an_evidence_id_never_falls_back_to_the_raw_id(conn, 
     assert receipt.related_questions == []
     assert receipt.answer_summary == v.EMPTY_SUMMARY
     assert not receipt.conflict_resolution
+
+
+def _draft_claim(ids, confidence="HIGH", text='The signed scope was: "core replenishment only".'):
+    return _claim(ids, confidence=confidence, text=text)
+
+
+def test_quoted_draft_presented_as_signed_is_capped_and_flagged(conn, seed_units):
+    ids = seed_units(
+        conn,
+        "signoff",
+        [('Lena, as discussed, for signature: "core replenishment only".', "Ana", "2025-01-21")],
+        document_type="EMAIL",
+    )
+    receipt = v.validate_primary(
+        conn, _output(claims=[_draft_claim(ids)]), query="q", visible_ids=None
+    )
+    claim = receipt.claims[0]
+    assert claim.confidence == Confidence.MEDIUM
+    assert v.DRAFT_NOTE in (claim.uncertainty or "")
+    assert receipt.validation.downgraded_claims == 1
+
+
+def test_a_quote_from_a_non_draft_source_is_left_alone(conn, seed_units):
+    ids = seed_units(
+        conn,
+        "minutes",
+        [('The committee signed off on "core replenishment only".', "Ana", "2025-01-22")],
+        document_type="EMAIL",
+    )
+    receipt = v.validate_primary(
+        conn, _output(claims=[_draft_claim(ids)]), query="q", visible_ids=None
+    )
+    assert receipt.claims[0].confidence == Confidence.HIGH
+    assert not receipt.claims[0].uncertainty

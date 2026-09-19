@@ -44,6 +44,20 @@ def clean_prose(text: str | None) -> str | None:
     return re.sub(r"\s{2,}", " ", _PROSE_ID.sub("", text)).strip()
 
 
+# Wording sent "for signature" is a draft. A claim that quotes it as what was
+# signed, at high confidence, asserts something the archive cannot show unless
+# the executed document is itself in it.
+_DRAFT_MARKER = re.compile(
+    r"for (?:your )?(?:signature|signing|review)|please sign|\bdraft\b|proposed wording",
+    re.IGNORECASE,
+)
+_EXECUTED_WORD = re.compile(r"\b(?:signed|executed)\b", re.IGNORECASE)
+_QUOTED = re.compile(r"[\"\u201c\u201d]")
+DRAFT_NOTE = (
+    "The quoted wording is the text sent for signature; the executed document is not in the "
+    "archive, so it cannot be confirmed as identical."
+)
+
 EMPTY_SUMMARY = "See the claims below for what the evidence supports."
 
 NO_SUPPORT_SUMMARY = (
@@ -95,6 +109,18 @@ def validate_primary(
                 confidence = Confidence.LOW
                 report.downgraded_claims += 1
                 report.notes.append("claim rests only on truncated evidence; confidence capped")
+        uncertainty = clean_prose(claim.uncertainty)
+        if (
+            _QUOTED.search(claim_text)
+            and _EXECUTED_WORD.search(claim_text)
+            and any(_DRAFT_MARKER.search(records[i].raw_text) for i in support)
+        ):
+            if confidence == Confidence.HIGH:
+                confidence = Confidence.MEDIUM
+                report.downgraded_claims += 1
+            if not uncertainty or DRAFT_NOTE not in uncertainty:
+                uncertainty = f"{uncertainty} {DRAFT_NOTE}".strip() if uncertainty else DRAFT_NOTE
+            report.notes.append("quoted wording is a draft sent for signature; confidence capped")
         claims.append(
             ValidatedClaim(
                 claim_text=claim_text,
@@ -102,7 +128,7 @@ def validate_primary(
                 confidence=confidence,
                 supporting_evidence_ids=support,
                 conflicting_evidence_ids=conflicts,
-                uncertainty=clean_prose(claim.uncertainty),
+                uncertainty=uncertainty,
             )
         )
 

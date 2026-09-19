@@ -125,3 +125,17 @@ def test_no_claims_triggers_and_three_triggers_is_high(conn, corpus):
         _output([_claim(a, confidence="LOW", conflicts=later)]),
     )
     assert high.level == "HIGH"
+
+
+def test_a_claim_stating_a_specific_value_forces_the_conflicting_value_check(conn, corpus):
+    a, _ = corpus
+    claim = _claim(a) | {"claim_text": "A 12 month retention period was agreed."}
+    result = _assess(conn, "Where is parking?", _output([claim]))
+    assert "a claim states a specific value that another source could contradict" in result.triggers
+    assert result.deep_check
+
+
+def test_a_claim_without_a_value_does_not_trigger_the_value_check(conn, corpus):
+    a, _ = corpus
+    result = _assess(conn, "Where is parking?", _output([_claim(a)]))
+    assert not any("specific value" in t for t in result.triggers)

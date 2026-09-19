@@ -3,13 +3,14 @@
 The Skeptic's job is not a second opinion. It looks for evidence that
 would make the candidate answer wrong, and it must actually retrieve:
 step 1 plans up to two counter-search bundles (direct contradiction,
-alternative/replacement state, later implementation), step 2 runs them
+alternative/replacement state, later implementation, conflicting value, source reliability), step 2 runs them
 through the same RetrievalService, step 3 inspects only what came back.
 A prompt-only critique with no new retrieval would not count.
 """
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 
 from pydantic import ValidationError
@@ -19,7 +20,7 @@ from app.reasoning.evidence import EvidenceSet
 from app.reasoning.llm import LLMClient
 from app.reasoning.prompts import format_evidence_set
 from app.retrieval.service import RetrievalService
-from app.schemas.reasoning import PrimaryOutput, SkepticPlan, SkepticVerdict
+from app.schemas.reasoning import CounterBundle, PrimaryOutput, SkepticPlan, SkepticVerdict
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ MAX_QUERIES_PER_BUNDLE = 3
 # to keep the verdict prompt inside its evidence budget.
 _COUNTER_TOP_HITS = 5
 _COUNTER_TOP_LATER = 3
-_TEMPORAL_STRATEGIES = {"ALTERNATIVE_STATE", "LATER_IMPLEMENTATION"}
+_TEMPORAL_STRATEGIES = {"ALTERNATIVE_STATE", "LATER_IMPLEMENTATION", "SOURCE_RELIABILITY"}
 
 PLAN_SYSTEM = """[ROLE:SKEPTIC_PLAN]
 You are the Skeptic of an evidence-first organizational memory auditor. You are NOT giving a second opinion and you do NOT restate the candidate answer. Your only job: find evidence that would make the candidate answer WRONG.
@@ -40,17 +41,19 @@ You are the Skeptic of an evidence-first organizational memory auditor. You are 
    - DIRECT_CONTRADICTION: explicit rejection, disagreement, cancellation, reversal, or non-approval.
    - ALTERNATIVE_STATE: later adoption of a competing technology, scope, plan, owner or implementation that would indirectly falsify the claim. Do not only negate the claim: if it says X was chosen, search the same domain for the replacement, migration, or alternative that could have superseded X.
    - LATER_IMPLEMENTATION: what the organization actually implemented, shipped, escalated, deferred or worked around after the supposed decision.
+   - CONFLICTING_VALUE: the candidate states a specific value (a period, count, percentage, amount, date, or owner). Search for the SAME attribute stated with a DIFFERENT value, in a different document or by a different person - for example a "12 month retention period" should be checked against every other stated retention figure ("retention period", "months from creation", "effective"). If any claim states a specific value, one of your bundles MUST use this strategy.
+   - SOURCE_RELIABILITY: the candidate relies on a figure or status that was DERIVED from, or reported by, some source (an extract, a report, a system, a measurement). Search for evidence that the source itself was unreconciled, unchecked, wrong or incomplete - later checks, comparisons against another record, "does not match", "nobody has checked". Use this when the question asks how reliable something is, when a claim says a figure was derived or computed, or when a status report is the only support; If the question asks how reliable, accurate, trustworthy or verified something is, one bundle MUST use this strategy.
 3. Each bundle has 1-3 SHORT search queries. Use vocabulary the archive is likely to use that DIFFERS from the candidate's own wording.
 Also consider: lack of confirmation, proposal-only language, operational behaviour contradicting a status report, later implementation inconsistent with a stated agreement, a narrower scope than claimed, a superseding decision worded differently.
 
 Reply with ONE JSON object only:
 {"weakest_claim": string, "why_it_could_be_wrong": string,
- "bundles": [{"strategy": "DIRECT_CONTRADICTION"|"ALTERNATIVE_STATE"|"LATER_IMPLEMENTATION", "queries": [string]}]}"""
+ "bundles": [{"strategy": "DIRECT_CONTRADICTION"|"ALTERNATIVE_STATE"|"LATER_IMPLEMENTATION"|"CONFLICTING_VALUE"|"SOURCE_RELIABILITY", "queries": [string]}]}"""
 
 VERDICT_SYSTEM = """[ROLE:SKEPTIC_VERDICT]
 You are the Skeptic. Below are the question, the candidate claims, the evidence the analyst already used, and NEW evidence (marked with '!') found by targeted counter-search. Decide whether any evidence makes the candidate answer wrong, overstated, out of date, or too broad.
 
-Rules: cite evidence ONLY by the evidence_id in square brackets; never invent one; never write your own speaker, date or quotation. A unit marked TRUNCATED is incomplete - do not complete it. Newer is not automatically truer: distinguish superseded/stale from false/unverified. If nothing real contradicts the candidate answer, return an empty objections list - do not invent objections. Put evidence ids only in the evidence_ids fields, not in prose.
+Rules: cite evidence ONLY by the evidence_id in square brackets; never invent one; never write your own speaker, date or quotation. A unit marked TRUNCATED is incomplete - do not complete it. Newer is not automatically truer: distinguish superseded/stale from false/unverified. A DIFFERENT value for the same attribute stated elsewhere (for example 18 months where the candidate says 12) is a real objection: raise it as HIGH and cite both. If nothing real contradicts the candidate answer, return an empty objections list - do not invent objections. Put evidence ids only in the evidence_ids fields, not in prose.
 
 Reply with ONE JSON object only:
 {"objections": [{"text": string, "severity": "HIGH"|"MEDIUM"|"LOW", "evidence_ids": [string]}]}"""
@@ -69,6 +72,38 @@ class SkepticResult:
         return bool(self.objections)
 
 
+_ASKS_RELIABILITY = re.compile(
+    r"\b(?:reliab\w*|trustworth\w*|accura\w*|verified|validated|dependable|can we trust)\b",
+    re.IGNORECASE,
+)
+# Fixed vocabulary for "was the source itself checked?", joined to the answer's own topic terms.
+_RELIABILITY_PROBES = ("does not reconcile", "nobody has checked", "does not match")
+
+
+def asks_reliability(query: str) -> bool:
+    return _ASKS_RELIABILITY.search(query) is not None
+
+
+def ensure_reliability_bundle(query: str, output: PrimaryOutput, plan: SkepticPlan) -> SkepticPlan:
+    """A question about reliability must get a search for the source's own
+    validity, whatever the model planned: the model chooses counter-search
+    strategies freely, and this is the one whose absence silently leaves a
+    'MEDIUM reliability' verdict standing on evidence nobody checked."""
+    if not asks_reliability(query) or any(
+        b.strategy.upper() == "SOURCE_RELIABILITY" for b in plan.bundles
+    ):
+        return plan
+    topic = " ".join(output.search_terms[:2]).strip()
+    if not topic:
+        return plan
+    bundle = CounterBundle(
+        strategy="SOURCE_RELIABILITY", queries=[f"{topic} {probe}" for probe in _RELIABILITY_PROBES]
+    )
+    # Replace the last planned bundle rather than exceed the bundle cap.
+    kept = plan.bundles[: MAX_BUNDLES - 1]
+    return plan.model_copy(update={"bundles": [*kept, bundle]})
+
+
 def counter_retrieve(
     llm: LLMClient,
     retrieval_service: RetrievalService,
@@ -81,7 +116,7 @@ def counter_retrieve(
     Split out so other reviewers (the Reconsideration Radar) can reuse real
     counter-retrieval with their own verdict step.
     """
-    plan = _plan(llm, query, output, evidence)
+    plan = ensure_reliability_bundle(query, output, _plan(llm, query, output, evidence))
     result = SkepticResult(plan=plan, evidence=evidence)
 
     new_ids: list[str] = []

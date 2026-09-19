@@ -37,6 +37,15 @@ _QUERY_TRIGGERS = (
     (r"\bwho\b", "asks who"),
 )
 
+# A claim that states a specific value is exactly where a second, different
+# value elsewhere in the archive would matter, so it always gets the Skeptic's
+# conflicting-value search.
+_SPECIFIC_VALUE = re.compile(
+    r"\d[\d,.]*\s*(?:%|percent|months?|weeks?|days?|years?|hours?|tonnes?|stores?|articles?)"
+    r"|\b(?:\d[\d,.]*)\b|\b(?:twelve|eighteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)\b",
+    re.IGNORECASE,
+)
+
 # Support spread wider than this is treated as evidence "spanning materially
 # different dates".
 _DATE_SPREAD_DAYS = 90
@@ -85,6 +94,8 @@ def assess(
         len(set(c.supporting_evidence_ids)) == 1 for c in claims if c.stance != Stance.UNCERTAIN
     ):
         triggers.append("a claim rests on a single supporting unit")
+    if any(_SPECIFIC_VALUE.search(c.claim_text) for c in claims):
+        triggers.append("a claim states a specific value that another source could contradict")
     if retrieval.temporal and retrieval.temporal.hits:
         triggers.append("later relevant evidence exists")
 

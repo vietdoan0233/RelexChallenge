@@ -64,6 +64,7 @@ This section reflects the verified repository state at the end of work on 2026-0
   - people/aliases and `evidence_people`,
   - FTS5 population,
   - provider-neutral embedding interface, deterministic mock, and `--skip-embeddings`,
+  - bounded embedding batches, exponential retry, vector validation, and a clear partial-failure report,
   - ingestion CLI/report,
   - unit and integration tests.
 - The latest verified offline ingestion parsed 45 documents into 2,517 Evidence Units:
@@ -71,7 +72,7 @@ This section reflects the verified repository state at the end of work on 2026-0
   - 110 email-message units,
   - 292 report units.
 - The latest verified FTS row count is 2,517.
-- The latest verified quality gate is 71 passing backend tests, clean Ruff checks, and a successful frontend typecheck/build.
+- The latest verified quality gate is 125 passing backend tests, clean Ruff checks, and a successful frontend typecheck/build.
 - Phase 1 identity hardening is complete: `people`/`person_aliases` are rebuilt every ingestion run from `data/source/` plus a human-reviewed identity manifest (`data/source/reviewed_identities.json`); a capitalized free-text span is never auto-promoted to `people`; short-form aliases (first name, last name, initials, nicknames, spelling variants) are promoted only through an explicit reviewed manifest entry with its own alias_type and source_reference, never from uniqueness or independent corpus usage alone.
 
 ## Important corpus discoveries already verified
@@ -125,17 +126,16 @@ Do not make parsing dependent on one exact placeholder token.
 
 Identity hardening is resolved: capitalized free-text phrases can no longer become deletion-relevant identities, and the resulting people/alias/evidence-person counts have been reviewed against the corpus (see below). What still must be resolved before Phase 1 is fully accepted:
 
-- configure a local `.env` without committing secrets,
 - finalize the organizer-provided GPT API transport after its endpoint/SDK contract is supplied,
 - run one real GPT embedding smoke test,
 - generate and verify real embedding rows for the intended corpus before claiming semantic retrieval readiness,
 - rerun all Phase 1 quality gates and issue a corrected Phase 1 review report once real embeddings exist.
 
-The corrected offline ingestion produces 25 people and 39 aliases (25 FULL_NAME + 14 EMAIL; zero short-form aliases are currently promoted, because none have yet passed the explicit human-review path that is now the only route to a deletion-relevant first name, last name, initials, nickname, or spelling variant) against the real 45-document archive. All previously identified false identities (e.g. "Risk Fresh Phase", "This So", "Slight Delay Bakery"/"Bakery", "Not Nadia Öberg") are confirmed absent from both `people` and `person_aliases`, and all 9 reviewed text-only identities (Tobias Ekström, Nadia Öberg, Nils Ackermann, Osman Yildirim, Marika Lindqvist, Heidi Salminen, Martina Reuss, Ahmed Nasser, Elin Bergqvist) are confirmed present. Relationship counts: `AUTHOR` 402, `MENTIONED` 242, `SPEAKER` 1964. The runtime database contains zero real embedding rows because no organizer API configuration is available yet.
+The corrected offline ingestion produces 25 people and 39 aliases (25 FULL_NAME + 14 EMAIL; zero short-form aliases are currently promoted, because none have yet passed the explicit human-review path that is now the only route to a deletion-relevant first name, last name, initials, nickname, or spelling variant) against the real 45-document archive. All previously identified false identities (e.g. "Risk Fresh Phase", "This So", "Slight Delay Bakery"/"Bakery", "Not Nadia Öberg") are confirmed absent from both `people` and `person_aliases`, and all 9 reviewed text-only identities (Tobias Ekström, Nadia Öberg, Nils Ackermann, Osman Yildirim, Marika Lindqvist, Heidi Salminen, Martina Reuss, Ahmed Nasser, Elin Bergqvist) are confirmed present. Relationship counts: `AUTHOR` 402, `MENTIONED` 242, `SPEAKER` 1964. A local, gitignored `.env` has all four GPT fields populated, but the runtime database contains zero real embedding rows because the organizer's transport contract is still unknown and no endpoint call has been made.
 
 Do not jump to Phase 2 until the remaining Phase 1 exit criteria (real embeddings, organizer GPT contract) pass.
 
-Architecture v1.5 (section 0.3) corrects the Phase 5 deletion/anonymization target design in response to a judge-confirmed clarification. As of this checkpoint, **Phase 5 has not been implemented**: there is no `app/privacy/` module, no purge/redaction code, no `source_locators.revoked_at` column or migration, no reserved-marker handling in the parsers, and no deletion/anonymization tests. Section 18 (and its new subsections 18.6–18.12) records the corrected target design for that future implementation; it is a contract correction, not a report of new code.
+Architecture v1.5 (section 0.3) corrects the Phase 5 deletion/anonymization target design in response to a judge-confirmed clarification. **Phase 5 is not implemented**: there is no `app/privacy/` module, privacy-operation service, canonical-source redaction, dependency invalidation, purge verification, or end-to-end deletion/anonymization test. Limited groundwork is implemented: reserved redaction markers are excluded from identity parsing, and `source_locators.revoked_at` plus the in-place revocation primitive prevent locator reuse. That groundwork does not sanitize a person or perform a deletion. Section 18 (and its new subsections 18.6–18.12) remains the implementation contract for the future full feature.
 
 ---
 
@@ -206,7 +206,7 @@ Do not let GitHub integration change the architecture or source-of-truth rules.
 
 The architecture version changes only when the frozen product or technical architecture changes. Updating implementation progress, repository state, test counts, or handoff notes does **not** create a new architecture version.
 
-- **v1.5 — current, frozen.** Judge-confirmed clarification of the deletion requirement, replacing v1.4's default of deleting every whole Evidence Unit associated with the target person. The corrected invariant: a deletion request permanently removes or irreversibly anonymizes the requested person's personal data from every application-owned storage surface while preserving non-personal organizational evidence wherever reasonably possible; a unit is deleted in full only when it cannot be adequately anonymized without leaving the person reasonably identifiable. This changes only the deletion/anonymization strategy in sections 2.4 and 18 (and adds sections 18.6–18.12); retrieval, reasoning, risk, Skeptic, the tech stack, and every other frozen decision are unchanged. This is the project's own judge-confirmed deletion/anonymization requirement — it is not a claim of universal legal or GDPR compliance, and scalability is explicitly out of scope for it. This version bump records a **design correction only**: Phase 5 deletion/anonymization has not been implemented, so no code, schema migration, or test in the repository yet reflects it.
+- **v1.5 — current, frozen.** Judge-confirmed clarification of the deletion requirement, replacing v1.4's default of deleting every whole Evidence Unit associated with the target person. The corrected invariant: a deletion request permanently removes or irreversibly anonymizes the requested person's personal data from every application-owned storage surface while preserving non-personal organizational evidence wherever reasonably possible; a unit is deleted in full only when it cannot be adequately anonymized without leaving the person reasonably identifiable. This changes only the deletion/anonymization strategy in sections 2.4 and 18 (and adds sections 18.6–18.12); retrieval, reasoning, risk, Skeptic, the tech stack, and every other frozen decision are unchanged. This is the project's own judge-confirmed deletion/anonymization requirement — it is not a claim of universal legal or GDPR compliance, and scalability is explicitly out of scope for it. Phase 5's end-to-end deletion/anonymization operation remains unimplemented. The repository does contain limited supporting groundwork for the policy: reserved-marker parsing and tested locator revocation; neither performs person redaction, deletion, or verification.
 - **v1.4 — previous frozen architecture.** Replaced the Google/Gemini provider choice with an organizer-provided GPT service. The API key, base URL, reasoning model, and embedding model remain environment placeholders until the organizers supply the exact contract. The provider-neutral offline ingestion path remains mandatory.
 - **v1.3 — earlier frozen architecture.** Audited architecture contract covering the Phase 0 checkpoint, GitHub workflow, stable source-locator manifest, canonical-source rebuild invariant, embedding resilience, citation-context invariant, Skeptic counter-retrieval behavior, deletion cleanup, and mandatory Phase 1 review gate.
 - **2026-09-19 implementation checkpoint — no architecture version change.** Recorded the implemented Phase 1 Evidence Locker, verified offline ingestion/test counts, known identity-discovery false positives, missing real embeddings, and the decision to stop before Phase 2.
@@ -1422,6 +1422,15 @@ If implemented, limit v1 to:
 - possible unresolved commitment,
 - possibly stale/superseded decision.
 
+Reconsideration Radar is a separate Phase 7 innovation extension, not a
+replacement for the frozen core and not a reason to delay the Phase 1 review or
+the Phase 2–6 exits. It must surface only previously rejected/deferred ideas
+whose original blocker and a possible changed condition are both evidence-
+backed. It must distinguish internal evidence, external signals, bounded
+assessment, and missing information, and may say only `worth reassessing` — not
+that the organization should pursue the idea. The design and exit criteria are
+in `docs/RECONSIDERATION_RADAR.md`.
+
 Each Pulse finding must link to a validated Case.
 
 Dependency:
@@ -1752,7 +1761,7 @@ A unit that is deleted in full must have its locator identity permanently retire
 - a collision between a freshly computed natural locator (e.g. a transcript timestamp or a date-slug) and an existing **revoked** row must fail loudly rather than silently reuse or resurrect it,
 - before revocation, a `source_locators` row legitimately contains a fingerprint *derived from* the original unit's content — do not claim the row "never contained personal data." The accurate statement is: after the fingerprint is overwritten with the sentinel and the SQLite physical-cleanup sequence (section 18.4.1) completes, the row retains no original fingerprint or direct personal identifier.
 
-**Migration note (design only, not implemented in this pass):** `source_locators` is a persistent table (section 7.3), never dropped/recreated by rebuild. Adding `revoked_at` to it will require an explicit guarded schema migration (e.g. checking `PRAGMA table_info` before an `ALTER TABLE ... ADD COLUMN`) for databases created before this field existed — `CREATE TABLE IF NOT EXISTS` does not add a column to a table that already exists. This migration is future work; it is not implemented by this documentation pass.
+**Migration checkpoint:** `source_locators` is a persistent table (section 7.3), never dropped/recreated by rebuild. The repository includes a guarded `PRAGMA table_info` / `ALTER TABLE ... ADD COLUMN` migration for `revoked_at`, because `CREATE TABLE IF NOT EXISTS` cannot add the column to an existing table. That migration and the locator-revocation primitive are only groundwork; the future privacy service must decide when to revoke all affected locators as part of a full deletion operation.
 
 **Merged transcript constituents.** A final transcript Evidence Unit may be the result of merging several consecutive same-speaker pre-merge fragments (section 8's transcript merge behavior), and its evidence_id exposes only the **first** constituent fragment's locator — the other constituent fragments were each independently assigned their own locator during parsing, but only the first is ever surfaced. Do not describe an Evidence Unit as if it always maps to exactly one source locator or one contiguous source line. A future deletion/redaction implementation acting on a merged unit must:
 
@@ -2005,7 +2014,7 @@ At minimum:
 
 ## Privacy/anonymization tests (required once Phase 5 is implemented; none exist yet)
 
-Phase 5 has not been implemented, so none of the following tests exist yet. This list is the required future coverage once redaction/deletion code lands, reflecting the Architecture v1.5 policy in section 18:
+Phase 5's end-to-end operation has not been implemented, so the following end-to-end coverage does not exist yet. Limited groundwork tests already cover reserved markers and locator revocation; this list is the required future coverage once redaction/deletion code lands, reflecting the Architecture v1.5 policy in section 18:
 
 - authored evidence is preserved (redacted, not deleted) after adequate anonymization,
 - mentioned-only evidence is preserved where possible, including the other participant's own attribution and unrelated content in the same unit,
@@ -2217,7 +2226,7 @@ Exit:
 
 - complete live judge flow works without developer intervention.
 
-## Phase 7 — Hardening (reserve ~7h)
+## Phase 7 — Hardening + Reconsideration Radar innovation (reserve ~7h)
 
 Tasks:
 
@@ -2227,9 +2236,19 @@ Tasks:
 - test insufficient evidence,
 - test retrieval misses,
 - rehearse deletion,
-- optimize demo clarity.
+- optimize demo clarity,
+- implement the small, precomputed Reconsideration Radar demonstration after
+  all core exit criteria pass,
+- add the Radar view and Finding Card to the final judge flow,
+- run red-team checks for false rejection reasons, changed-condition claims,
+  external/internal evidence mixing, and insufficient evidence.
 
-Only after all core exit criteria pass may Project Pulse be added.
+Only after all core exit criteria pass may Project Pulse and Reconsideration
+Radar be added. Reconsideration Radar is complete only when every candidate has
+an explicit rejected/deferred proposal, an evidence-backed original blocker, a
+receipt for the possible changed condition, visible missing information, a
+Skeptic result, and a link to a validated Case. It must not produce an
+automatic recommendation or free-floating AI finding.
 
 ---
 
@@ -2376,6 +2395,10 @@ KEEPER MVP is done when all of the following are true:
 13. Judges can ask unseen questions through the UI.
 14. The live demo works without editing code.
 15. The core is tested before optional Project Pulse work begins.
+
+The optional innovation extension is complete only when the Reconsideration
+Radar criteria in `docs/RECONSIDERATION_RADAR.md` pass and at least one finding
+is surfaced proactively before a judge asks about it.
 
 ---
 

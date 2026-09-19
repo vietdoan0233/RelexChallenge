@@ -10,6 +10,20 @@ def fingerprint(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
+# fingerprint() always produces 16 lowercase hex characters. This
+# sentinel is neither shaped like one nor derived from any content, so a
+# revoked row's overwritten fingerprint can never real-match a freshly
+# computed fingerprint during ingestion (CLAUDE.md 18.8).
+REVOKED_FINGERPRINT_SENTINEL = "REVOKED"
+
+
+class LocatorNotFoundError(LookupError):
+    """Raised by revoke_source_locator when no row exists for the given
+    (document_id, source_locator). Revocation targets a specific,
+    already-assigned locator; silently no-oping on a typo'd or
+    never-assigned locator would hide a real bug."""
+
+
 def slugify(text: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return slug or "x"
@@ -190,12 +204,16 @@ def evidence_people_for(conn: sqlite3.Connection, evidence_id: str) -> list[sqli
 
 
 def load_locator_manifest(conn: sqlite3.Connection, document_id: str) -> list[sqlite3.Row]:
-    """Existing (locator, fingerprint) pairs for a document, in the order
-    they were first assigned. This genesis ordering -- not the current
-    file's ordering -- is what makes rebuild-after-delete safe."""
+    """Existing LIVE (non-revoked) (locator, fingerprint) pairs for a
+    document, in the order they were first assigned. This genesis
+    ordering -- not the current file's ordering -- is what makes
+    rebuild-after-delete safe. A revoked row (revoked_at IS NOT NULL) is
+    excluded so its sentinel fingerprint can never real-match new
+    content and a revoked locator can never be silently reassigned via
+    manifest-based fingerprint matching (CLAUDE.md 18.8)."""
     return conn.execute(
         "SELECT source_locator, content_fingerprint, genesis_position FROM source_locators "
-        "WHERE document_id = ? ORDER BY genesis_position",
+        "WHERE document_id = ? AND revoked_at IS NULL ORDER BY genesis_position",
         (document_id,),
     ).fetchall()
 
@@ -209,14 +227,19 @@ def next_genesis_position(conn: sqlite3.Connection, document_id: str) -> int:
     return row["next"]
 
 
-def find_locator_position(
+def find_locator_row(
     conn: sqlite3.Connection, document_id: str, source_locator: str
-) -> int | None:
-    row = conn.execute(
-        "SELECT genesis_position FROM source_locators WHERE document_id = ? AND source_locator = ?",
+) -> sqlite3.Row | None:
+    """The existing (genesis_position, revoked_at) row for
+    (document_id, source_locator), or None if it was never assigned.
+    Distinguishing a live row from a revoked one is what lets
+    locator_manifest.assign_natural_locator refuse to silently resurrect
+    a revoked locator instead of just checking whether a row exists."""
+    return conn.execute(
+        "SELECT genesis_position, revoked_at FROM source_locators "
+        "WHERE document_id = ? AND source_locator = ?",
         (document_id, source_locator),
     ).fetchone()
-    return row["genesis_position"] if row else None
 
 
 def record_source_locator(
@@ -237,8 +260,36 @@ def record_source_locator(
     )
 
 
-def delete_source_locator(conn: sqlite3.Connection, document_id: str, source_locator: str) -> None:
-    conn.execute(
-        "DELETE FROM source_locators WHERE document_id = ? AND source_locator = ?",
+def revoke_source_locator(
+    conn: sqlite3.Connection, document_id: str, source_locator: str, revoked_at: str
+) -> None:
+    """Tombstones a source_locators row in place for a fully-deleted
+    Evidence Unit (CLAUDE.md 18.8). The row itself, and its document_id/
+    source_locator/genesis_position/first_seen_at, are preserved
+    forever -- this never DELETEs the row, so next_genesis_position's
+    high-water mark can never shrink and this exact locator string can
+    never be reassigned. content_fingerprint is overwritten with
+    REVOKED_FINGERPRINT_SENTINEL so the row can never real-match a
+    freshly computed fingerprint again.
+
+    Idempotent: revoking an already-revoked row is a safe no-op that
+    preserves the original revoked_at and never re-touches the
+    fingerprint a second time. Raises LocatorNotFoundError if no row
+    exists at all for (document_id, source_locator).
+    """
+    row = conn.execute(
+        "SELECT revoked_at FROM source_locators WHERE document_id = ? AND source_locator = ?",
         (document_id, source_locator),
+    ).fetchone()
+    if row is None:
+        raise LocatorNotFoundError(
+            f"no source_locators row for document_id={document_id!r}, "
+            f"source_locator={source_locator!r}"
+        )
+    if row["revoked_at"] is not None:
+        return
+    conn.execute(
+        "UPDATE source_locators SET revoked_at = ?, content_fingerprint = ? "
+        "WHERE document_id = ? AND source_locator = ?",
+        (revoked_at, REVOKED_FINGERPRINT_SENTINEL, document_id, source_locator),
     )

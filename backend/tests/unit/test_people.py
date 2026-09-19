@@ -124,6 +124,63 @@ def test_unknown_speaker_label_never_becomes_a_person(conn, tmp_path):
     assert repository.find_person_id_by_canonical_name(conn, "Unknown Speaker") is None
 
 
+# ------------------------------------------------- reserved redaction markers
+
+
+@pytest.mark.parametrize("marker", ["[REDACTED PERSON]", "[REDACTED SPEAKER]", "[REDACTED SENDER]"])
+def test_every_reserved_marker_is_excluded_from_structural_person_discovery(conn, tmp_path, marker):
+    docs = [
+        _doc(
+            "TRANSCRIPT",
+            [ParsedUnit(raw_text="Some content.", speaker_sender=marker)],
+            attendees=[marker],
+        )
+    ]
+    people.seed_and_discover(conn, docs, tmp_path)
+    assert repository.find_person_id_by_canonical_name(conn, marker) is None
+
+
+@pytest.mark.parametrize("marker", ["[REDACTED PERSON]", "[REDACTED SPEAKER]", "[REDACTED SENDER]"])
+def test_manifest_cannot_declare_a_reserved_marker_as_canonical_person(conn, tmp_path, marker):
+    _write_manifest(tmp_path, [_identity_entry(marker)])
+    with pytest.raises(ManifestValidationError):
+        people.load_reviewed_identities(tmp_path)
+
+
+def test_manifest_cannot_declare_a_reserved_marker_as_a_reviewed_alias(conn, tmp_path):
+    _write_manifest(
+        tmp_path,
+        [
+            _identity_entry(
+                "Marco Rossi",
+                verified_aliases=[
+                    {
+                        "alias": "[REDACTED SPEAKER]",
+                        "alias_type": "NICKNAME",
+                        "source_reference": "n/a",
+                    }
+                ],
+            )
+        ],
+    )
+    with pytest.raises(ManifestValidationError):
+        people.load_reviewed_identities(tmp_path)
+
+
+def test_redacted_person_marker_inline_is_only_text_not_a_person_or_mention(conn, tmp_path):
+    text = "[REDACTED PERSON] told me the extraction succeeded."
+    docs = [_doc("TRANSCRIPT", [ParsedUnit(raw_text=text, speaker_sender="Me")])]
+    report = people.seed_and_discover(conn, docs, tmp_path)
+    assert repository.find_person_id_by_canonical_name(conn, "[REDACTED PERSON]") is None
+    assert "[REDACTED PERSON]" not in report.rejected_candidates
+    assert "[REDACTED PERSON]" not in report.unresolved_alias_candidates
+
+    _seed_evidence_unit(conn, "EV-marker", text)
+    linked = people.link_mentions(conn, "EV-marker", text, exclude=set())
+    assert linked == 0
+    assert repository.evidence_people_for(conn, "EV-marker") == []
+
+
 def test_confirmed_person_named_inside_anonymous_text_can_be_mentioned(conn, tmp_path):
     docs = [
         _doc(

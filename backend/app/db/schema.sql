@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS source_locators (
     content_fingerprint TEXT NOT NULL,
     genesis_position INTEGER NOT NULL,
     first_seen_at TEXT NOT NULL,
+    revoked_at TEXT NULL,
     PRIMARY KEY (document_id, source_locator)
 );
 CREATE INDEX IF NOT EXISTS idx_source_locators_fingerprint

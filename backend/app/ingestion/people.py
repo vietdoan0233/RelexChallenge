@@ -34,14 +34,13 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app.core import anonymous_labels
 from app.core.enums import AliasType, PersonRelation
 from app.db import repository
 from app.ingestion.models import ParsedDocument
 from app.ingestion.text_utils import strip_image_placeholders
 
 _FULL_NAME = re.compile(r"\b[A-ZÅÄÖØÆÉ][a-zåäöøæé'-]+(?:[ \t]+[A-ZÅÄÖØÆÉ][a-zåäöøæé'-]+){1,2}\b")
-
-_ANONYMOUS_SPEAKER_LABELS = ("Me", "Them", "Unknown Speaker")
 
 # A manifest verified_aliases entry may not redeclare FULL_NAME: that alias
 # is always assigned automatically from canonical_name, and letting the
@@ -159,6 +158,11 @@ def load_reviewed_identities(source_dir: Path) -> list[ReviewedIdentity]:
             raise ManifestValidationError(
                 f"reviewed_identities.json entry {index}: canonical_name is required"
             )
+        if anonymous_labels.is_non_person_label(name):
+            raise ManifestValidationError(
+                f"reviewed_identities.json entry {index}: canonical_name {name!r} is a "
+                "reserved anonymous/redaction label and can never be a real person"
+            )
         if name in seen_names:
             raise ManifestValidationError(
                 f"reviewed_identities.json: duplicate canonical_name {name!r}"
@@ -198,6 +202,11 @@ def load_reviewed_identities(source_dir: Path) -> list[ReviewedIdentity]:
             if not isinstance(alias_value, str) or not alias_value.strip():
                 raise ManifestValidationError(
                     f"reviewed_identities.json entry {name!r}: alias value is required"
+                )
+            if anonymous_labels.is_non_person_label(alias_value):
+                raise ManifestValidationError(
+                    f"reviewed_identities.json entry {name!r}: alias {alias_value!r} is a "
+                    "reserved anonymous/redaction label and can never be a reviewed alias"
                 )
             if alias_type not in _MANIFEST_ALIAS_TYPES:
                 raise ManifestValidationError(
@@ -240,10 +249,12 @@ def seed_and_discover(
 
     for doc in documents:
         for attendee in doc.attendees:
-            if attendee not in _ANONYMOUS_SPEAKER_LABELS:
+            if not anonymous_labels.is_non_person_label(attendee):
                 structural_names.add(attendee)
         for unit in doc.units:
-            if unit.speaker_sender and unit.speaker_sender not in _ANONYMOUS_SPEAKER_LABELS:
+            if unit.speaker_sender and not anonymous_labels.is_non_person_label(
+                unit.speaker_sender
+            ):
                 structural_names.add(unit.speaker_sender)
                 if unit.speaker_email:
                     email_by_name.setdefault(unit.speaker_sender, unit.speaker_email)
@@ -260,6 +271,8 @@ def seed_and_discover(
             cleaned_text = strip_image_placeholders(unit.raw_text)
             for match in _FULL_NAME.findall(cleaned_text):
                 if match in _NAME_STOPLIST or match in structural_names:
+                    continue
+                if anonymous_labels.is_non_person_label(match):
                     continue
                 if not _looks_like_a_name(match):
                     continue

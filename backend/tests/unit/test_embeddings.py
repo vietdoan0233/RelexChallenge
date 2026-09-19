@@ -1,10 +1,18 @@
 import json
+import logging
+import sqlite3
 
+import httpx
 import pytest
 
 from app.core.enums import DocumentType
 from app.db import repository
-from app.ingestion.embeddings import MockEmbeddingProvider, generate_embeddings
+from app.ingestion.embeddings import (
+    EmbeddingTransientError,
+    MockEmbeddingProvider,
+    OpenAICompatibleEmbeddingProvider,
+    generate_embeddings,
+)
 from app.schemas.evidence import Document, EvidenceUnit
 
 
@@ -78,7 +86,7 @@ class _FailingProvider:
 def test_provider_failure_is_reported_not_raised(conn):
     report = generate_embeddings(conn, [("EV-1", "text")], provider=_FailingProvider())
     assert report.error is not None
-    assert "simulated API failure" in report.error
+    assert report.error == "embedding batch 1 provider failure"
     assert repository.embedding_row_count(conn) == 0
 
 
@@ -154,7 +162,7 @@ def test_failed_batch_does_not_write_partial_embedding_rows(conn):
     )
 
     assert report.succeeded == 0
-    assert "returned 1 vectors for 2 evidence units" in report.error
+    assert report.error == "embedding batch 1 response validation failed"
     assert report.persisted_rows == 0
     assert repository.embedding_row_count(conn) == 0
 
@@ -186,7 +194,7 @@ def test_partial_batch_failure_reports_the_persisted_prefix(conn):
 
     assert report.succeeded == 2
     assert report.persisted_rows == 2
-    assert "embedding batch 2 failed" in report.error
+    assert report.error == "embedding batch 2 provider failure"
 
 
 @pytest.mark.parametrize(
@@ -208,7 +216,7 @@ def test_malformed_vectors_are_rejected_without_writes(conn, vector, message):
 
     report = generate_embeddings(conn, [("EV-1", "text")], _MalformedProvider(), max_retries=0)
 
-    assert message in report.error
+    assert report.error == "embedding batch 1 response validation failed"
     assert report.persisted_rows == 0
 
 
@@ -236,4 +244,165 @@ def test_dimension_mismatch_between_batches_is_rejected(conn):
 
     assert report.succeeded == 1
     assert report.persisted_rows == 1
-    assert "dimension 1; expected 2" in report.error
+    assert report.error == "embedding batch 2 response validation failed"
+
+
+def test_database_failure_rolls_back_the_entire_embedding_batch(conn, monkeypatch):
+    rows = [("EV-1", "first"), ("EV-2", "second")]
+    _seed_evidence_units(conn, [row[0] for row in rows])
+    original_insert = repository.insert_embedding
+    calls = 0
+
+    def failing_second_insert(connection, evidence_id, model_name, vector_json):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise sqlite3.OperationalError("simulated persistence failure")
+        original_insert(connection, evidence_id, model_name, vector_json)
+
+    monkeypatch.setattr(repository, "insert_embedding", failing_second_insert)
+
+    report = generate_embeddings(conn, rows, MockEmbeddingProvider(), max_retries=0)
+
+    assert report.succeeded == 0
+    assert report.persisted_rows == 0
+    assert report.error == "embedding batch 1 persistence failed"
+
+
+def test_openai_provider_sends_the_verified_contract_and_restores_index_order(caplog):
+    captured = {}
+
+    def request(url, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return httpx.Response(
+            200,
+            headers={"x-request-id": "request-123"},
+            json={
+                "data": [
+                    {"index": 1, "embedding": [3.0, 4.0]},
+                    {"index": 0, "embedding": [1.0, 2.0]},
+                ]
+            },
+        )
+
+    provider = OpenAICompatibleEmbeddingProvider(
+        api_key="test-api-key",
+        base_url="https://example.invalid/v1",
+        model_name="test-embedding-model",
+        request=request,
+    )
+    with caplog.at_level(logging.INFO):
+        vectors = provider.embed_batch(["private first input", "private second input"])
+
+    assert captured["url"] == "https://example.invalid/v1/embeddings"
+    assert captured["headers"]["Authorization"] == "Bearer test-api-key"
+    assert captured["json"] == {
+        "model": "test-embedding-model",
+        "input": ["private first input", "private second input"],
+    }
+    assert captured["timeout"] == 30.0
+    assert vectors == [[1.0, 2.0], [3.0, 4.0]]
+    assert "status=200" in caplog.text
+    assert "request-123" in caplog.text
+    assert "private first input" not in caplog.text
+    assert "test-api-key" not in caplog.text
+
+
+def test_openai_provider_marks_rate_limits_as_transient():
+    def request(url, **kwargs):
+        return httpx.Response(429)
+
+    provider = OpenAICompatibleEmbeddingProvider(
+        api_key="test-api-key",
+        base_url="https://example.invalid/v1",
+        model_name="test-embedding-model",
+        request=request,
+    )
+
+    with pytest.raises(EmbeddingTransientError, match="HTTP 429"):
+        provider.embed_batch(["text"])
+
+
+def test_openai_provider_rejects_permanent_http_errors_without_retries(conn):
+    calls = 0
+
+    def request(url, **kwargs):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(401)
+
+    _seed_evidence_units(conn, ["EV-1"])
+    provider = OpenAICompatibleEmbeddingProvider(
+        api_key="test-api-key",
+        base_url="https://example.invalid/v1",
+        model_name="test-embedding-model",
+        request=request,
+    )
+
+    report = generate_embeddings(
+        conn,
+        [("EV-1", "text")],
+        provider,
+        max_retries=2,
+        initial_retry_delay_seconds=0,
+    )
+
+    assert calls == 1
+    assert report.error == "embedding batch 1 permanent provider failure"
+    assert report.persisted_rows == 0
+
+
+def test_openai_provider_retries_rate_limit_without_persisting_a_duplicate_batch(conn):
+    calls = 0
+
+    def request(url, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(429)
+        return httpx.Response(200, json={"data": [{"index": 0, "embedding": [1.0, 2.0]}]})
+
+    _seed_evidence_units(conn, ["EV-1"])
+    provider = OpenAICompatibleEmbeddingProvider(
+        api_key="test-api-key",
+        base_url="https://example.invalid/v1",
+        model_name="test-embedding-model",
+        request=request,
+    )
+
+    report = generate_embeddings(
+        conn,
+        [("EV-1", "text")],
+        provider,
+        max_retries=1,
+        initial_retry_delay_seconds=0,
+    )
+
+    assert calls == 2
+    assert report.succeeded == 1
+    assert report.persisted_rows == 1
+    assert repository.embedding_row_count(conn) == 1
+
+
+def test_openai_provider_rejects_mixed_response_indexes():
+    def request(url, **kwargs):
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"index": 0, "embedding": [1.0]},
+                    {"embedding": [2.0]},
+                ]
+            },
+        )
+
+    provider = OpenAICompatibleEmbeddingProvider(
+        api_key="test-api-key",
+        base_url="https://example.invalid/v1",
+        model_name="test-embedding-model",
+        request=request,
+    )
+
+    with pytest.raises(ValueError, match="mixes indexed and unindexed"):
+        provider.embed_batch(["first", "second"])

@@ -242,3 +242,51 @@ def test_later_evidence_returns_only_strictly_later_units_with_context(conn, see
     assert [h.evidence_id for h in result.fused] == [ids[2]]
     assert ids[1] in result.records  # neighbouring context is hydrated too
     assert ids[0] not in [h.evidence_id for h in result.fused]
+
+
+def test_enumerative_question_widens_the_pass_and_sweeps_later_evidence(conn, seed_units):
+    # 40 meetings all repeating the topic, plus one email that states the figure
+    # in words the question never used. A plain top-15 is filled by the meetings.
+    for n in range(40):
+        seed_units(
+            conn,
+            f"meeting{n:02d}",
+            [("We talked about the shelf life field again and again today.", "Ana", "2025-01-10")],
+        )
+    (email_id,) = seed_units(
+        conn,
+        "remediation-email",
+        [("Shelf life populated 48% of the cohort.", "Kwame", "2024-09-30")],
+        document_type="EMAIL",
+    )
+
+    plain = RetrievalService(conn, None).retrieve("What was said about shelf life?")
+    wide = RetrievalService(conn, None).retrieve("Give every figure about shelf life.")
+
+    assert not plain.wide and len(plain.fused) <= 15
+    assert wide.wide and 15 < len(wide.fused) <= 30
+    assert wide.is_temporal  # the later-evidence sweep is on by default for wide questions
+    assert email_id in wide.visible_evidence_ids
+
+
+def test_wide_can_be_forced_off_for_internal_callers(conn, corpus):
+    result = RetrievalService(conn, None).retrieve("Give every figure about bakery.", wide=False)
+    assert not result.wide and len(result.fused) <= 15
+
+
+def test_coverage_evidence_spreads_over_documents(conn, seed_units):
+    for n in range(6):
+        seed_units(
+            conn,
+            f"long{n}",
+            [
+                (f"retention period discussed at length, part {i}", "Ana", "2026-04-09")
+                for i in range(5)
+            ],
+        )
+    result = RetrievalService(conn, None).coverage_evidence(["retention"])
+    per_doc: dict[str, int] = {}
+    for hit in result.fused:
+        doc = result.records[hit.evidence_id].document_id
+        per_doc[doc] = per_doc.get(doc, 0) + 1
+    assert len(per_doc) == 6 and max(per_doc.values()) <= 2

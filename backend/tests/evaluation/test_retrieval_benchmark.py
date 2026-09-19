@@ -14,7 +14,7 @@ import pytest
 from app.ingestion.service import ingest
 from app.retrieval.benchmark import evaluate, load_topics
 from app.retrieval.records import hydrate
-from app.retrieval.service import RetrievalService
+from app.retrieval.service import WIDE_FUSED_LIMIT, RetrievalService
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SOURCE_DIR = _REPO_ROOT / "data" / "source"
@@ -71,7 +71,9 @@ def test_retrieval_invariants_hold_across_all_topics(loaded):
         assert len(ids) == len(set(ids))
         # Every visible id is a real, hydratable unit.
         assert {r.evidence_id for r in hydrate(loaded, ids)} == set(ids)
-        assert len(result.fused) <= 15
+        # The default pass keeps 15; only an enumerative question widens it, and
+        # to a fixed, larger bound -- never toward the whole archive.
+        assert len(result.fused) <= (WIDE_FUSED_LIMIT if result.wide else 15)
         # Neighbour expansion stays bounded: nowhere near the whole archive.
         assert len(ids) < 250
 

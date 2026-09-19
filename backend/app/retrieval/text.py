@@ -103,6 +103,43 @@ def is_temporal_query(query: str) -> bool:
     return any(token in _TEMPORAL_CUES for token in tokenize(lowered))
 
 
+# Questions that ask for a set ("every figure", "each meeting") or a story
+# ("how did it change", "show the trail") are answered by many scattered units,
+# not by the handful a plain top-k keeps. They are routed to a wider pass.
+_ENUMERATIVE_QUANTIFIED = re.compile(
+    r"\b(?:every|each|all)\s+(?:the\s+|of\s+the\s+)?"
+    r"(?:\w+\s+)?(?:figures?|numbers?|values?|percent(?:age)?s?|proportions?|mentions?|"
+    r"instances?|versions?|meetings?|times?|decisions?|proposals?|changes?|updates?|"
+    r"reports?|statements?|occurrences?|dates?)\b",
+    re.IGNORECASE,
+)
+_ENUMERATIVE_PHRASES = (
+    "how did",
+    "how has",
+    "how have",
+    "changed over time",
+    "show how",
+    "the trail",
+    "trail from",
+    "timeline",
+    "history of",
+    "evolution",
+    "evolved",
+    "list all",
+    "list every",
+)
+
+
+def is_enumerative_query(query: str) -> bool:
+    """True when the question needs coverage across the archive rather than
+    the single best match. Like temporal routing this only widens retrieval;
+    it never decides what the answer is."""
+    lowered = query.lower()
+    if any(phrase in lowered for phrase in _ENUMERATIVE_PHRASES):
+        return True
+    return _ENUMERATIVE_QUANTIFIED.search(lowered) is not None
+
+
 # Irregular derivations plain prefix matching cannot bridge.
 _IRREGULAR_STEMS = {"decid": ("decis",), "sign": ("signat",)}
 

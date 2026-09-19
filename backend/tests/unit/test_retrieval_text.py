@@ -86,3 +86,34 @@ def test_a_question_asking_for_figures_also_searches_percent():
     assert "percent" in text.topic_terms("Give every figure reported")
     assert "percent" in text.topic_terms("What proportion of articles were complete?")
     assert "percent" not in text.topic_terms("Who attended the kickoff?")
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "What proportion of articles were populated? Give every figure in the archive.",
+        "Is bakery inside the fresh workstream? Show how the answer changed over time.",
+        "How did the decision change?",
+        "List all the meetings where retention was discussed.",
+        "Show the trail from the agreement to the present.",
+    ],
+)
+def test_enumerative_questions_are_recognised(query):
+    from app.retrieval.text import is_enumerative_query
+
+    assert is_enumerative_query(query) is True
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Who signed the UAT document?",
+        "What service levels were agreed for ordering?",
+        "Did Acme sign off UAT for the programme?",
+        "Is the nightly extract still failing?",
+    ],
+)
+def test_ordinary_questions_are_not_enumerative(query):
+    from app.retrieval.text import is_enumerative_query
+
+    assert is_enumerative_query(query) is False

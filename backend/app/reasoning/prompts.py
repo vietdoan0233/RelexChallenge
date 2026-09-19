@@ -27,7 +27,10 @@ RULES
 7. When asked for figures, give every figure with its own evidence, and say which one is current and why.
 8. Use no outside knowledge. Do not restate evidence text at length. Put evidence ids ONLY in the id fields, never inside claim_text, answer_summary or any other prose.
 9. timeline_events lists dated state changes of the topic in order, only where evidence supports them, each with evidence_ids. Never invent a transition to make the story smooth.
-10. search_terms: 2-5 short phrases naming the topic or things your answer is about (for example a named control, system, decision or figure). They are used only to look for LATER evidence that could change the answer; they are never shown as fact.
+10. Draft versus executed. Wording sent "for signature", "for review" or as a proposed/draft text is NOT the executed text. If the executed document (the signed copy, the minutes, the final record) is not itself in the evidence, do not call the quoted wording "what was signed/agreed"; say it is the wording sent for signature, cap that claim at MEDIUM confidence, and name the missing executed document in missing_information. What the signer said about it in their own words is separate evidence.
+11. Answer the question that was asked. Only for a YES/NO question about a broad thing (did X sign off the programme? is Y inside the workstream?) where the evidence supports only a narrower one: begin answer_summary with "No" or "Not as asked" and then state exactly what was done and its limits, and never open with "Yes" for the broad thing. Do not use that opening for what/who/how many/list questions: answer those directly.
+12. Conflicting values. If the evidence states different values for the same attribute (a period, count, percentage, amount, date, owner), never present one as THE value. Report each value with its own evidence and date, set status to CONFLICTING_EVIDENCE (or PARTIALLY_SUPPORTED), and in conflict_resolution say which is stronger and why - or that the archive cannot settle it.
+13. search_terms: 2-5 short phrases naming the topic or things your answer is about (for example a named control, system, decision or figure). They are used only to look for LATER evidence that could change the answer; they are never shown as fact.
 
 Reply with ONE JSON object and nothing else, with exactly these keys:
 {
@@ -48,6 +51,19 @@ Reply with ONE JSON object and nothing else, with exactly these keys:
 
 def build_user_prompt(query: str, retrieval: RetrievalResult) -> str:
     return f"QUESTION\n{query}\n\nEVIDENCE\n{format_evidence(retrieval)}"
+
+
+def build_widened_prompt(query: str, evidence: EvidenceSet, new_ids: set[str]) -> str:
+    """Second look at an enumerative question after a wider search: the same
+    question over the enlarged evidence, with the added units marked '!'."""
+    return (
+        f"QUESTION\n{query}\n\n"
+        "A first pass answered from the best matches. A second, wider search across the archive "
+        "added the units marked '!'. Give ONE complete answer over ALL the evidence below: include "
+        "every distinct figure, statement or step it supports, each with its own evidence, and "
+        "keep any conflict between them explicit.\n\n"
+        f"EVIDENCE\n{format_evidence_set(evidence, new_ids=new_ids)}"
+    )
 
 
 def format_evidence(retrieval: RetrievalResult) -> str:

@@ -16,6 +16,7 @@ from app.db import repository
 from app.reasoning import primary, reconcile, risk, skeptic
 from app.reasoning.evidence import EvidenceSet
 from app.reasoning.llm import LLMClient
+from app.reasoning.prompts import SYSTEM_PROMPT, build_widened_prompt
 from app.retrieval import temporal
 from app.retrieval.service import RetrievalService
 from app.retrieval.text import topic_terms
@@ -26,6 +27,7 @@ from app.validation import receipt_validator
 _LOGGER = logging.getLogger(__name__)
 
 _LATER_SWEEP_HITS = 6
+_COVERAGE_HITS = 14
 
 PROVISIONAL_NOTE = (
     "The adversarial check of this answer could not be completed; treat it as provisional."
@@ -50,6 +52,7 @@ class CaseTrace:
     counter_queries: int = 0
     counter_new_ids: list[str] = field(default_factory=list)
     counter_units_examined: int = 0
+    coverage_new_ids: list[str] = field(default_factory=list)
     reconciled: bool = False
     review_completed: bool = True
 
@@ -74,6 +77,8 @@ class CaseService:
             return self._store(_insufficient(query), trace)
 
         output = primary.analyze(self._llm, query, retrieval)
+        if retrieval.wide:
+            output = self._widen(query, output, evidence, trace)
         review = ReviewInfo()
 
         # Routing is deterministic; the model's own confidence can only
@@ -109,6 +114,27 @@ class CaseService:
             }
         )
         return self._store(validated, trace)
+
+    def _widen(
+        self, query: str, output: PrimaryOutput, evidence: EvidenceSet, trace: CaseTrace
+    ) -> PrimaryOutput:
+        """Enumerative questions ("every figure", "how did it change") are
+        answered by units the question's own words rarely reach. Search the whole
+        archive on the terms of the reasoner's first answer; if that finds units
+        it had not seen, it answers again over the enlarged evidence. The added
+        units get no special trust: the Skeptic and validator still run after."""
+        terms = topic_terms(" ".join(output.search_terms))
+        if not terms:
+            return output
+        added = evidence.add(
+            self._retrieval.coverage_evidence(terms), top_hits=_COVERAGE_HITS, top_later=0
+        )
+        trace.coverage_new_ids = added
+        if not added:
+            return output
+        return primary.parse_output(
+            self._llm, SYSTEM_PROMPT, build_widened_prompt(query, evidence, set(added))
+        )
 
     def _later_sweep(self, output: PrimaryOutput, evidence: EvidenceSet) -> list[str]:
         """Ids of later evidence not yet shown to any model, found by the Primary's

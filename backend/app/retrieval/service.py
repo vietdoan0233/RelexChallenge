@@ -20,7 +20,12 @@ from app.retrieval.lexical import Hit
 from app.retrieval.records import EvidenceRecord, hydrate
 from app.retrieval.semantic import SemanticIndex, SemanticIndexError
 from app.retrieval.temporal import TemporalSweep
-from app.retrieval.text import date_range_hint, is_temporal_query, topic_terms
+from app.retrieval.text import (
+    date_range_hint,
+    is_enumerative_query,
+    is_temporal_query,
+    topic_terms,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +33,12 @@ FUSED_LIMIT = 15
 # Only the strongest hits get neighbour expansion; expanding all of them
 # would drift toward sending the whole archive to the reasoner.
 CONTEXT_SEED_COUNT = 8
+# Enumerative questions ("every figure", "how did it change") need coverage,
+# not just the best few matches. The reasoner's prompt already caps total
+# units, so widening here stays bounded.
+WIDE_FUSED_LIMIT = 30
+WIDE_CONTEXT_SEED_COUNT = 12
+_WIDE_PER_DOCUMENT = 2
 _SWEEP_ANCHOR_COUNT = 5
 _TITLE_PER_DOCUMENT = 4
 _LIST_WEIGHTS = {"title": 1.5}
@@ -45,6 +56,7 @@ class RetrievalResult:
     is_temporal: bool
     semantic_used: bool
     warnings: list[str] = field(default_factory=list)
+    wide: bool = False
     records: dict[str, EvidenceRecord] = field(default_factory=dict)
 
     @property
@@ -75,6 +87,7 @@ class RetrievalResult:
             "temporal_after": self.temporal.after_date if self.temporal else None,
             "temporal_new_ids": self.temporal.new_evidence_ids if self.temporal else [],
             "semantic_used": self.semantic_used,
+            "wide": self.wide,
             "warnings": self.warnings,
         }
 
@@ -113,7 +126,11 @@ class RetrievalService:
             self._index = None
             self._index_error = str(exc)
 
-    def retrieve(self, query: str, *, temporal_sweep: bool | None = None) -> RetrievalResult:
+    def retrieve(
+        self, query: str, *, temporal_sweep: bool | None = None, wide: bool | None = None
+    ) -> RetrievalResult:
+        wide = is_enumerative_query(query) if wide is None else wide
+        limit = max(self._fused_limit, WIDE_FUSED_LIMIT) if wide else self._fused_limit
         terms = topic_terms(query)
         warnings: list[str] = []
         hint = date_range_hint(query)
@@ -121,8 +138,8 @@ class RetrievalService:
             # "September 2024" is a filter, not a word to match in the text.
             terms = [t for t in terms if t not in hint[2]]
 
-        lexical_hits = lexical.search(self._conn, terms=terms, limit=self._fused_limit)
-        query_vector, semantic_hits = self._semantic(query, warnings)
+        lexical_hits = lexical.search(self._conn, terms=terms, limit=limit)
+        query_vector, semantic_hits = self._semantic(query, warnings, limit=limit)
         semantic_used = query_vector is not None
 
         ranked = {"lexical": lexical_hits}
@@ -131,28 +148,41 @@ class RetrievalService:
         ranked["title"] = lexical.search(
             self._conn,
             terms=terms,
-            limit=self._fused_limit,
+            limit=limit,
             weights=lexical.TITLE_WEIGHTS,
             per_document_cap=_TITLE_PER_DOCUMENT,
         )
+        if wide:
+            # A set spread over documents: without a cap, one long meeting that
+            # repeats the topic fills the list and the emails and reports that
+            # state the same figure never make it in.
+            ranked["spread"] = lexical.search(
+                self._conn, terms=terms, limit=limit, per_document_cap=_WIDE_PER_DOCUMENT
+            )
         if semantic_used:
             ranked["semantic"] = semantic_hits
         if hint:
             # An extra list restricted to the named period. It adds candidates;
             # evidence outside the window still competes in the lists above.
             ranked["dated_lexical"] = lexical.search(
-                self._conn, terms=terms, limit=self._fused_limit, date_from=hint[0], date_to=hint[1]
+                self._conn, terms=terms, limit=limit, date_from=hint[0], date_to=hint[1]
             )
             if semantic_used and self._index is not None:
                 ranked["dated_semantic"] = self._index.search(
-                    query_vector, limit=self._fused_limit, date_from=hint[0], date_to=hint[1]
+                    query_vector, limit=limit, date_from=hint[0], date_to=hint[1]
                 )
-        fused = reciprocal_rank_fusion(ranked, limit=self._fused_limit, weights=_LIST_WEIGHTS)
+        fused = reciprocal_rank_fusion(ranked, limit=limit, weights=_LIST_WEIGHTS)
 
-        needs_sweep = is_temporal_query(query) if temporal_sweep is None else temporal_sweep
+        # A wide question is about change or coverage, so the later-evidence
+        # sweep runs for it by default (still retrieval, never a verdict).
+        if temporal_sweep is None:
+            needs_sweep = wide or is_temporal_query(query)
+        else:
+            needs_sweep = temporal_sweep
         sweep = self._sweep(terms, fused, query_vector) if needs_sweep else None
 
-        windows = context.expand(self._conn, [h.evidence_id for h in fused[:CONTEXT_SEED_COUNT]])
+        seeds = WIDE_CONTEXT_SEED_COUNT if wide else CONTEXT_SEED_COUNT
+        windows = context.expand(self._conn, [h.evidence_id for h in fused[:seeds]])
 
         result = RetrievalResult(
             query=query,
@@ -165,6 +195,7 @@ class RetrievalService:
             is_temporal=needs_sweep,
             semantic_used=semantic_used,
             warnings=warnings,
+            wide=wide,
         )
         wanted = list(
             dict.fromkeys(
@@ -205,7 +236,39 @@ class RetrievalService:
             records={r.evidence_id: r for r in hydrate(self._conn, wanted)},
         )
 
-    def _semantic(self, query: str, warnings: list[str]) -> tuple[list[float] | None, list[Hit]]:
+    def coverage_evidence(
+        self, terms: list[str], *, limit: int = WIDE_FUSED_LIMIT
+    ) -> RetrievalResult:
+        """Lexical retrieval for ``terms`` across the whole archive, at most a
+        couple of units per document. For enumerative questions: the terms come
+        from the reasoner's own first answer, so figures and statements the
+        question never named (a table row, a follow-up email) can be reached,
+        and one repetitive meeting cannot crowd out every other document."""
+        hits = lexical.search(
+            self._conn, terms=terms, limit=limit, per_document_cap=_WIDE_PER_DOCUMENT
+        )
+        fused = reciprocal_rank_fusion({"coverage": hits}, limit=limit)
+        windows = context.expand(self._conn, [h.evidence_id for h in fused[:CONTEXT_SEED_COUNT]])
+        wanted = list(
+            dict.fromkeys([h.evidence_id for h in fused] + [i for w in windows for i in w.unit_ids])
+        )
+        return RetrievalResult(
+            query=" ".join(terms),
+            terms=terms,
+            lexical_hits=hits,
+            semantic_hits=[],
+            fused=fused,
+            windows=windows,
+            temporal=None,
+            is_temporal=False,
+            semantic_used=False,
+            wide=True,
+            records={r.evidence_id: r for r in hydrate(self._conn, wanted)},
+        )
+
+    def _semantic(
+        self, query: str, warnings: list[str], *, limit: int | None = None
+    ) -> tuple[list[float] | None, list[Hit]]:
         if self._provider is None:
             warnings.append("semantic retrieval unavailable: no embedding provider configured")
             return None, []
@@ -220,7 +283,7 @@ class RetrievalService:
             return None, []
         try:
             vector = self._provider.embed_batch([query])[0]
-            return vector, self._index.search(vector, limit=self._fused_limit)
+            return vector, self._index.search(vector, limit=limit or self._fused_limit)
         except Exception as exc:
             # Type only: exception text can echo request content.
             _LOGGER.warning("query embedding failed error_type=%s", type(exc).__name__)

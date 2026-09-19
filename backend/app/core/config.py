@@ -42,6 +42,17 @@ class Settings(BaseSettings):
         return _resolve(self.database_path)
 
     @property
+    def privacy_ops_dir_resolved(self) -> Path:
+        """Beside the database, so a test pointing DATABASE_PATH at a temp
+        directory gets a temp operations folder too (CLAUDE.md 0.5)."""
+        return self.database_path_resolved.parent / "privacy_ops"
+
+    @property
+    def derived_artifact_dirs_resolved(self) -> list[Path]:
+        base = self.database_path_resolved.parent
+        return [base / "artifacts", base / "cache"]
+
+    @property
     def source_data_dir_resolved(self) -> Path:
         return _resolve(self.source_data_dir)
 

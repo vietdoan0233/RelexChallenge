@@ -22,6 +22,7 @@ from app.core.config import get_settings  # noqa: E402
 from app.db.connection import connect  # noqa: E402
 from app.ingestion.embeddings import OpenAICompatibleEmbeddingProvider  # noqa: E402
 from app.ingestion.service import ingest  # noqa: E402
+from app.privacy import ops  # noqa: E402
 
 
 def main() -> None:
@@ -51,6 +52,8 @@ def main() -> None:
         else:
             print("Organizer GPT API configuration is not available yet; skipping embeddings.")
 
+    # A privacy operation may have sanitized source and database out of step.
+    ops.assert_unlocked(Path(args.db_path).parent / "privacy_ops")
     conn = connect(args.db_path)
     try:
         report = ingest(conn, Path(args.source), provider)

@@ -219,7 +219,8 @@ def load_locator_manifest(conn: sqlite3.Connection, document_id: str) -> list[sq
     content and a revoked locator can never be silently reassigned via
     manifest-based fingerprint matching (CLAUDE.md 18.8)."""
     return conn.execute(
-        "SELECT source_locator, content_fingerprint, genesis_position FROM source_locators "
+        "SELECT source_locator, content_fingerprint, genesis_position, starts_group "
+        "FROM source_locators "
         "WHERE document_id = ? AND revoked_at IS NULL ORDER BY genesis_position",
         (document_id,),
     ).fetchall()
@@ -243,7 +244,7 @@ def find_locator_row(
     locator_manifest.assign_natural_locator refuse to silently resurrect
     a revoked locator instead of just checking whether a row exists."""
     return conn.execute(
-        "SELECT genesis_position, revoked_at FROM source_locators "
+        "SELECT genesis_position, revoked_at, starts_group FROM source_locators "
         "WHERE document_id = ? AND source_locator = ?",
         (document_id, source_locator),
     ).fetchone()
@@ -336,3 +337,15 @@ def save_case(
 
 def load_case(conn: sqlite3.Connection, case_id: str) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM cases WHERE case_id = ?", (case_id,)).fetchone()
+
+
+def record_group_start(
+    conn: sqlite3.Connection, document_id: str, source_locator: str, starts_group: bool
+) -> None:
+    """Persist a fragment's group boundary once. Never overwrites a recorded
+    value: the boundary that existed at genesis is the one that must hold."""
+    conn.execute(
+        "UPDATE source_locators SET starts_group = ? "
+        "WHERE document_id = ? AND source_locator = ? AND starts_group IS NULL",
+        (int(starts_group), document_id, source_locator),
+    )

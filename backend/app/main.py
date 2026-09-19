@@ -1,16 +1,53 @@
-from fastapi import FastAPI
+import logging
+from contextlib import asynccontextmanager
 
-from app.api import cases, evidence
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from app.api import cases, deps, evidence, privacy
 from app.core.config import get_settings
+from app.privacy import ops, service
 
 settings = get_settings()
+_LOGGER = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Resolve any unfinished privacy operation before serving a request
+    (CLAUDE.md 18.10). Failure leaves the lock in place, so requests are
+    refused rather than served from an inconsistent state."""
+    current = get_settings()
+    try:
+        service.recover(
+            source_dir=current.source_data_dir_resolved,
+            db_path=current.database_path_resolved,
+            ops_dir=current.privacy_ops_dir_resolved,
+            artifact_dirs=current.derived_artifact_dirs_resolved,
+        )
+    except Exception as exc:
+        _LOGGER.error("privacy recovery incomplete error_type=%s", type(exc).__name__)
+    # Whatever recovery changed, never serve from a matrix loaded before it.
+    deps.reset_shared_index()
+    yield
+
 
 app = FastAPI(
     title=settings.app_name_display,
     description="Evidence-first organizational memory auditor",
+    lifespan=lifespan,
 )
 app.include_router(cases.router)
 app.include_router(evidence.router)
+app.include_router(privacy.router)
+
+
+@app.exception_handler(ops.PrivacyLockedError)
+async def _locked(_request: Request, _exc: ops.PrivacyLockedError) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "A privacy operation is in progress; please try again shortly."},
+    )
 
 
 @app.get("/api/health")

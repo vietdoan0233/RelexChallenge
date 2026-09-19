@@ -26,6 +26,9 @@ from app.db import repository
 class LocatorAssignment:
     source_locator: str
     genesis_position: int
+    # Recorded group boundary at genesis (1 = began a unit, 0 = continued the
+    # previous one); None when not yet recorded.
+    starts_group: int | None = None
 
 
 class RevokedLocatorCollisionError(RuntimeError):
@@ -54,10 +57,10 @@ def assign_manifest_locators(
     `consumed` disambiguates fragments with byte-identical text."""
     existing = repository.load_locator_manifest(conn, document_id)
 
-    by_fingerprint: dict[str, list[tuple[str, int]]] = {}
+    by_fingerprint: dict[str, list[tuple[str, int, int | None]]] = {}
     for row in existing:
         by_fingerprint.setdefault(row["content_fingerprint"], []).append(
-            (row["source_locator"], row["genesis_position"])
+            (row["source_locator"], row["genesis_position"], row["starts_group"])
         )
 
     consumed: dict[str, int] = {}
@@ -69,13 +72,13 @@ def assign_manifest_locators(
         bucket = by_fingerprint.get(fp, [])
         idx = consumed.get(fp, 0)
         if idx < len(bucket):
-            locator, position = bucket[idx]
+            locator, position, starts_group = bucket[idx]
         else:
-            locator, position = f"u{next_position:04d}", next_position
+            locator, position, starts_group = f"u{next_position:04d}", next_position, None
             repository.record_source_locator(conn, document_id, locator, fp, position, now)
             next_position += 1
         consumed[fp] = idx + 1
-        assignments.append(LocatorAssignment(locator, position))
+        assignments.append(LocatorAssignment(locator, position, starts_group))
     return assignments
 
 
@@ -107,4 +110,4 @@ def assign_natural_locator(
             f"natural locator {natural_locator!r} in document {document_id!r} was revoked "
             f"at {row['revoked_at']!r} and must never be reassigned"
         )
-    return LocatorAssignment(natural_locator, row["genesis_position"])
+    return LocatorAssignment(natural_locator, row["genesis_position"], row["starts_group"])

@@ -14,6 +14,7 @@ from app.core.config import get_settings
 from app.db import migrations
 from app.db.connection import connect
 from app.ingestion.embeddings import EmbeddingProvider, OpenAICompatibleEmbeddingProvider
+from app.privacy import ops
 from app.reasoning.llm import LLMClient, OpenAICompatibleChatClient
 from app.retrieval.semantic import SemanticIndex, SemanticIndexError
 
@@ -23,6 +24,9 @@ _index_loaded = False
 
 
 def get_conn() -> Iterator:
+    # While a privacy operation is active, source and database may disagree;
+    # nothing may read them (CLAUDE.md 18.10).
+    ops.assert_unlocked(get_settings().privacy_ops_dir_resolved)
     conn = connect(str(get_settings().database_path_resolved))
     try:
         migrations.initialize(conn)

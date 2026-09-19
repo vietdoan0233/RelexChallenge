@@ -71,7 +71,9 @@ def _ensure_source_locators_revoked_at_column(conn: sqlite3.Connection) -> None:
     columns = {row[1] for row in conn.execute("PRAGMA table_info(source_locators)")}
     if "revoked_at" not in columns:
         conn.execute("ALTER TABLE source_locators ADD COLUMN revoked_at TEXT")
-        conn.commit()
+    if "starts_group" not in columns:
+        conn.execute("ALTER TABLE source_locators ADD COLUMN starts_group INTEGER")
+    conn.commit()
 
 
 def reset_rebuildable_tables(conn: sqlite3.Connection) -> None:
@@ -84,7 +86,17 @@ def reset_rebuildable_tables(conn: sqlite3.Connection) -> None:
     unit stay deleted across a rebuild (CLAUDE.md 7.3, 18.3): rebuild only
     ever re-derives evidence_units for source_locators rows that still
     exist."""
-    for table in _REBUILDABLE_TABLES:
-        conn.execute(f"DROP TABLE IF EXISTS {table}")
-    conn.commit()
+    # Dropping evidence_units with foreign keys ON would cascade-delete every
+    # case_evidence / finding_evidence row, silently destroying the dependency
+    # record deletion relies on (CLAUDE.md 18.2). Evidence IDs are stable across
+    # a rebuild, so those references are valid again once the units are
+    # recreated; enforcement is switched off only for the drops themselves.
+    conn.commit()  # PRAGMA foreign_keys is a no-op inside a transaction
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        for table in _REBUILDABLE_TABLES:
+            conn.execute(f"DROP TABLE IF EXISTS {table}")
+        conn.commit()
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
     apply_schema(conn)

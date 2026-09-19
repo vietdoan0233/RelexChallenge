@@ -46,6 +46,11 @@ CREATE TABLE IF NOT EXISTS source_locators (
     genesis_position INTEGER NOT NULL,
     first_seen_at TEXT NOT NULL,
     revoked_at TEXT NULL,
+    -- Whether this transcript fragment began a new Evidence Unit at genesis
+    -- (1) or continued the previous one (0); NULL = not yet recorded. Persisted
+    -- so redaction, which makes several speakers share one generic label, can
+    -- never fuse two different people's adjacent turns (CLAUDE.md 18.8).
+    starts_group INTEGER NULL,
     PRIMARY KEY (document_id, source_locator)
 );
 CREATE INDEX IF NOT EXISTS idx_source_locators_fingerprint

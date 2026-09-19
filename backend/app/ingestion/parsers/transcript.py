@@ -241,7 +241,12 @@ def assign_locators_and_merge(
     for fragment, assignment in zip(fragments, assignments, strict=True):
         same_speaker = groups and groups[-1]["speaker"] == fragment.speaker_sender
         consecutive = groups and assignment.genesis_position == groups[-1]["last_position"] + 1
-        if same_speaker and consecutive:
+        # A boundary recorded at genesis wins over the speaker label: redaction
+        # gives different people the same generic label, which must never fuse
+        # their adjacent turns into one that never happened (CLAUDE.md 18.8).
+        # An unrecorded fragment (None) falls back to the label rule.
+        continues = assignment.starts_group != 1
+        if same_speaker and consecutive and continues:
             groups[-1]["lines"].append(fragment.raw_text)
             groups[-1]["last_position"] = assignment.genesis_position
         else:
@@ -254,6 +259,8 @@ def assign_locators_and_merge(
                     "last_position": assignment.genesis_position,
                 }
             )
+
+    record_group_boundaries(conn, document_id, fragments, assignments, groups)
 
     units = []
     for group in groups:
@@ -270,3 +277,14 @@ def assign_locators_and_merge(
             )
         )
     return units
+
+
+def record_group_boundaries(conn, document_id, fragments, assignments, groups) -> None:
+    """Persist which fragments began a unit, once (never overwritten)."""
+    starts = set()
+    cursor = 0
+    for group in groups:
+        starts.add(cursor)
+        cursor += len(group["lines"])
+    for index, assignment in enumerate(assignments):
+        repository.record_group_start(conn, document_id, assignment.source_locator, index in starts)

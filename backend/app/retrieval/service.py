@@ -20,7 +20,7 @@ from app.retrieval.lexical import Hit
 from app.retrieval.records import EvidenceRecord, hydrate
 from app.retrieval.semantic import SemanticIndex, SemanticIndexError
 from app.retrieval.temporal import TemporalSweep
-from app.retrieval.text import is_temporal_query, topic_terms
+from app.retrieval.text import date_range_hint, is_temporal_query, topic_terms
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -114,6 +114,10 @@ class RetrievalService:
     def retrieve(self, query: str, *, temporal_sweep: bool | None = None) -> RetrievalResult:
         terms = topic_terms(query)
         warnings: list[str] = []
+        hint = date_range_hint(query)
+        if hint:
+            # "September 2024" is a filter, not a word to match in the text.
+            terms = [t for t in terms if t not in hint[2]]
 
         lexical_hits = lexical.search(self._conn, terms=terms, limit=self._fused_limit)
         query_vector, semantic_hits = self._semantic(query, warnings)
@@ -122,6 +126,16 @@ class RetrievalService:
         ranked = {"lexical": lexical_hits}
         if semantic_used:
             ranked["semantic"] = semantic_hits
+        if hint:
+            # An extra list restricted to the named period. It adds candidates;
+            # evidence outside the window still competes in the lists above.
+            ranked["dated_lexical"] = lexical.search(
+                self._conn, terms=terms, limit=self._fused_limit, date_from=hint[0], date_to=hint[1]
+            )
+            if semantic_used and self._index is not None:
+                ranked["dated_semantic"] = self._index.search(
+                    query_vector, limit=self._fused_limit, date_from=hint[0], date_to=hint[1]
+                )
         fused = reciprocal_rank_fusion(ranked, limit=self._fused_limit)
 
         needs_sweep = is_temporal_query(query) if temporal_sweep is None else temporal_sweep

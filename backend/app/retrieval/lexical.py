@@ -27,6 +27,8 @@ def search(
     terms: list[str] | None = None,
     limit: int = DEFAULT_LIMIT,
     after_date: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
 ) -> list[Hit]:
     """Top BM25 matches for a question or an explicit term list.
 
@@ -50,6 +52,9 @@ def search(
     if after_date is not None:
         sql += " AND e.event_date > ?"
         params.append(after_date)
+    if date_from is not None and date_to is not None:
+        sql += " AND e.event_date >= ? AND e.event_date < ?"
+        params.extend([date_from, date_to])
     # bm25() is lower-is-better; evidence_id breaks ties deterministically.
     sql += " ORDER BY score, evidence_fts.evidence_id LIMIT ?"
     params.append(limit)

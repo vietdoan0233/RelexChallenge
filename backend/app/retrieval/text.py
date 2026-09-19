@@ -50,12 +50,33 @@ _TEMPORAL_PHRASES = (
     "did it happen",
 )
 
+_MONTHS = {
+    m: i
+    for i, m in enumerate(
+        (
+            "january february march april may june july august september october november december"
+        ).split(),
+        start=1,
+    )
+}
+_MONTH_YEAR = re.compile(r"\b(" + "|".join(_MONTHS) + r")\s+(?:of\s+)?(20\d{2})\b", re.IGNORECASE)
+_YEAR = re.compile(r"\b(20\d{2})\b")
+
 _SUFFIXES = ("ations", "ation", "ings", "ing", "edly", "ed", "es", "s", "ly")
 _MIN_STEM_LENGTH = 4
 
 
 def tokenize(text: str) -> list[str]:
     return [token.lower() for token in _TOKEN_RE.findall(text)]
+
+
+# A question that asks for a quantity rarely uses the word the source uses:
+# "what figures were reported" versus "thirty-one percent". Searching the unit
+# word too is a plain lexical expansion, not a guess at the answer.
+_QUANTITY_CUES = frozenset(
+    "figure figures proportion proportions percentage percentages share rate rates ratio".split()
+)
+_QUANTITY_TERMS = ("percent",)
 
 
 def topic_terms(query: str) -> list[str]:
@@ -67,6 +88,8 @@ def topic_terms(query: str) -> list[str]:
             continue
         seen.add(token)
         terms.append(token)
+    if any(t in _QUANTITY_CUES for t in tokenize(query)):
+        terms.extend(t for t in _QUANTITY_TERMS if t not in seen)
     return terms
 
 
@@ -120,3 +143,28 @@ def fts_match_expression(terms: list[str]) -> str | None:
         for variant in term_variants(term):
             parts.append(f'"{variant}"*' if len(variant) >= _MIN_STEM_LENGTH else f'"{term}"')
     return " OR ".join(dict.fromkeys(parts)) if parts else None
+
+
+def date_range_hint(query: str) -> tuple[str, str, set[str]] | None:
+    """A date window named in the question, e.g. "in September 2024".
+
+    Returns (start, end_exclusive, tokens_consumed) as ISO dates, or None.
+    A month + year gives that month; a bare year gives that year. Several
+    mentions give the window that spans them. This adds a retrieval list
+    restricted to the named period; it never drops evidence outside it.
+    """
+    lowered = query.lower()
+    spans: list[tuple[str, str]] = []
+    consumed: set[str] = set()
+    for month_name, year in _MONTH_YEAR.findall(lowered):
+        month, y = _MONTHS[month_name.lower()], int(year)
+        end_month, end_year = (1, y + 1) if month == 12 else (month + 1, y)
+        spans.append((f"{y:04d}-{month:02d}-01", f"{end_year:04d}-{end_month:02d}-01"))
+        consumed.update({month_name.lower(), year})
+    if not spans:
+        for year in _YEAR.findall(lowered):
+            spans.append((f"{int(year):04d}-01-01", f"{int(year) + 1:04d}-01-01"))
+            consumed.add(year)
+    if not spans:
+        return None
+    return min(s[0] for s in spans), max(s[1] for s in spans), consumed

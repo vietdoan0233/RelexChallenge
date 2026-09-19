@@ -148,5 +148,15 @@
         "pattern": null
       }
     ]
+  },
+  {
+    "id": "master-data-sept-2024",
+    "query": "What did the master-data assessment report as complete in September 2024? Give every figure and the document each comes from.",
+    "relevant": [
+      {
+        "document": "06_2024-09-24_master-data-workshop",
+        "pattern": "percent"
+      }
+    ]
   }
 ]

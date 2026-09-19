@@ -144,3 +144,33 @@ def test_corrupt_embeddings_degrade_to_lexical_only(conn, corpus):
     result = RetrievalService(conn, MockEmbeddingProvider()).retrieve("bakery workstream")
     assert result.semantic_used is False
     assert result.ranked_ids
+
+
+def test_a_named_month_adds_a_period_restricted_list(conn, seed_units):
+    ids = seed_units(
+        conn,
+        "meeting",
+        [
+            (
+                "Case pack quantity is missing on thirty-one percent of articles.",
+                "Kwame",
+                "2024-09-24",
+            ),
+            ("Shelf life is populated on forty-eight percent.", "Kwame", "2024-09-24"),
+        ],
+    )
+    other = seed_units(
+        conn,
+        "later",
+        [("The assessment showed percent figures for coverage.", "Ana", "2025-06-01")],
+    )
+    result = RetrievalService(conn, None).retrieve(
+        "What percent figures were reported in September 2024?"
+    )
+    assert "dated_lexical" in result.fused[0].sources or any(
+        "dated_lexical" in h.sources for h in result.fused
+    )
+    in_window = [h.evidence_id for h in result.fused if h.evidence_id in ids]
+    assert in_window and result.ranked_ids.index(in_window[0]) < result.ranked_ids.index(other[0])
+    # The month/year words are a filter, not terms to match in the text.
+    assert "september" not in result.terms and "2024" not in result.terms

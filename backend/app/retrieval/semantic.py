@@ -76,6 +76,8 @@ class SemanticIndex:
         *,
         limit: int = DEFAULT_LIMIT,
         after_date: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
     ) -> list[Hit]:
         query = np.asarray(query_vector, dtype=np.float32)
         if query.ndim != 1 or query.shape[0] != self.dimensions:
@@ -88,6 +90,12 @@ class SemanticIndex:
         if after_date is not None:
             keep = np.array([d is not None and d > after_date for d in self.event_dates])
             scores = np.where(keep, scores, -np.inf)
+
+        if date_from is not None and date_to is not None:
+            within = np.array(
+                [d is not None and date_from <= d < date_to for d in self.event_dates]
+            )
+            scores = np.where(within, scores, -np.inf)
 
         # Stable order (score desc, then evidence_id asc) keeps ties deterministic.
         order = sorted(

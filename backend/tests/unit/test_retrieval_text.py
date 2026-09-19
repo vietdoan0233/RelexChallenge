@@ -61,3 +61,28 @@ def test_match_expression_cannot_inject_fts_operators():
 
 def test_empty_terms_give_no_expression():
     assert text.fts_match_expression([]) is None
+
+
+def test_month_and_year_gives_that_month():
+    start, end, tokens = text.date_range_hint("What was reported in September 2024?")
+    assert (start, end) == ("2024-09-01", "2024-10-01")
+    assert tokens == {"september", "2024"}
+
+
+def test_december_rolls_the_year():
+    assert text.date_range_hint("changes in December 2025")[:2] == ("2025-12-01", "2026-01-01")
+
+
+def test_bare_year_gives_that_year_and_no_hint_gives_none():
+    assert text.date_range_hint("figures for 2025")[:2] == ("2025-01-01", "2026-01-01")
+    assert text.date_range_hint("What happened at the kickoff?") is None
+
+
+def test_several_dates_span_the_window():
+    assert text.date_range_hint("from March 2024 to June 2024")[:2] == ("2024-03-01", "2024-07-01")
+
+
+def test_a_question_asking_for_figures_also_searches_percent():
+    assert "percent" in text.topic_terms("Give every figure reported")
+    assert "percent" in text.topic_terms("What proportion of articles were complete?")
+    assert "percent" not in text.topic_terms("Who attended the kickoff?")

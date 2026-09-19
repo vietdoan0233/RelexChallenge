@@ -1,10 +1,12 @@
 import type {
+  ArchiveStats,
   CaseReceipt,
   FindingCard,
   EvidenceView,
   PersonSummary,
   PurgePreview,
   PurgeResult,
+  RecentCase,
 } from '../types/api'
 
 export class ApiError extends Error {
@@ -43,6 +45,8 @@ export const api = {
   people: () => request<PersonSummary[]>('/api/privacy/people'),
   preview: (personId: string) =>
     request<PurgePreview>('/api/privacy/preview', post({ person_id: personId })),
+  stats: () => request<ArchiveStats>('/api/stats'),
+  recentCases: () => request<RecentCase[]>('/api/cases?limit=6'),
   radar: () => request<FindingCard[]>('/api/radar'),
   purge: (personId: string) =>
     request<PurgeResult>('/api/privacy/purge', post({ person_id: personId, confirm: true })),

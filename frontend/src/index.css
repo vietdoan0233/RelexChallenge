@@ -1,10 +1,279 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens, drawn from RELEX's public site: Figtree, navy ink (#0A3256),
+ * primary blue (#177ABF) on pill buttons, light-blue and deep-blue gradients
+ * (#80C5EF -> #E8F3FF, #063961 -> #1884C5), with purple and orange accents.
+ * Colors are semantic variables so light and dark share one set of classes.
+ */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  --bg: #f3f8fd;
+  --surface: #ffffff;
+  --surface-2: #eaf3fb;
+  --ink: #0a3256;
+  --ink-2: #33546f;
+  --ink-3: #56708a;
+  --line: #d3e2ef;
+  --brand: #177abf;
+  --brand-strong: #0f5f98;
+  --brand-ink: #0f5f98;
+  --brand-soft: #e1f0fb;
+  --deep: #063961;
+  --purple: #7d5a9a;
+  --purple-soft: #ede8fd;
+  --orange: #b4560f;
+  --orange-soft: #fcefe3;
+  --ok: #0b7a55;
+  --ok-soft: #e0f5ec;
+  --warn: #9a5b00;
+  --warn-soft: #fdf0d5;
+  --bad: #b3261e;
+  --bad-soft: #fde8e6;
+  --neutral-soft: #e6edf3;
+  --shadow: 0 1px 2px rgb(10 50 86 / 0.06), 0 10px 28px -14px rgb(10 50 86 / 0.22);
+  --shadow-lg: 0 2px 4px rgb(10 50 86 / 0.06), 0 24px 48px -20px rgb(10 50 86 / 0.3);
+  --hero: linear-gradient(180deg, #cfe8f8 0%, #e8f3ff 62%, var(--bg) 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #041f36;
+    --surface: #08294a;
+    --surface-2: #0d3557;
+    --ink: #eaf4fc;
+    --ink-2: #bcd1e3;
+    --ink-3: #93aec8;
+    --line: #1a4468;
+    --brand: #177abf;
+    --brand-strong: #2a90d6;
+    --brand-ink: #7cc4f2;
+    --brand-soft: #0d3c62;
+    --deep: #063961;
+    --purple: #c5a9da;
+    --purple-soft: #2a2350;
+    --orange: #f2a468;
+    --orange-soft: #3a2614;
+    --ok: #4fd1a1;
+    --ok-soft: #0b3a2e;
+    --warn: #f1c265;
+    --warn-soft: #3a2c0a;
+    --bad: #ff9c94;
+    --bad-soft: #43171a;
+    --neutral-soft: #12385a;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px -14px rgb(0 0 0 / 0.6);
+    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 24px 48px -20px rgb(0 0 0 / 0.7);
+    --hero: linear-gradient(180deg, #063961 0%, #06304f 55%, var(--bg) 100%);
+  }
+}
+
+@theme inline {
+  --font-sans: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-deep: var(--deep);
+  --color-purple: var(--purple);
+  --color-purple-soft: var(--purple-soft);
+  --color-orange: var(--orange);
+  --color-orange-soft: var(--orange-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-neutral-soft: var(--neutral-soft);
+  --shadow-card: var(--shadow);
+  --shadow-lift: var(--shadow-lg);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-height: 100svh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Keyboard focus is always visible and never colour-only. */
+:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+::selection {
+  background: var(--brand);
+  color: #fff;
+}
+
+.hero-bg {
+  background: var(--hero);
+}
+
+/* --------------------------------------------------------------- motion */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes swap {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  12%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.anim-fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.anim-fade-in {
+  animation: fade-in 0.4s ease both;
+}
+.anim-swap {
+  animation: swap 2.6s ease both;
+}
+.anim-float {
+  animation: float 7s ease-in-out infinite;
+}
+.anim-spin-slow {
+  animation: spin 9s linear infinite;
+}
+.anim-spin-mid {
+  animation: spin 5s linear infinite reverse;
+}
+.anim-spin-fast {
+  animation: spin 2.4s linear infinite;
+}
+.anim-ring {
+  animation: pulse-ring 2.4s ease-out infinite;
+}
+.anim-bar {
+  transform-origin: left;
+  animation: bar 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.anim-draw {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: draw 0.7s 0.15s ease forwards;
+}
+
+/* A moving highlight across text or a placeholder: the "working" feel. */
+.shimmer-text {
+  background: linear-gradient(90deg, var(--ink-2) 20%, var(--brand) 45%, var(--purple) 55%, var(--ink-2) 80%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.8s linear infinite;
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 37%, var(--surface-2) 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+  border-radius: 10px;
+}
+
+/* Anyone who asks their system for less motion gets none. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .shimmer-text {
+    color: var(--ink-2);
+    background: none;
+  }
+}
+
+@media print {
+  header,
+  footer,
+  .no-print {
+    display: none !important;
+  }
 }

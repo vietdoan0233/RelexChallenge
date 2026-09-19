@@ -225,6 +225,10 @@ Start the backend with:
 uvicorn app.main:app --reload --port 8000
 ```
 
+### The interface
+
+A RELEX-themed UI (Figtree, navy and blue palette, pill buttons; light and dark, responsive, keyboard and screen-reader friendly, reduced-motion aware): a hero **Ask** page with live archive stats, example questions and recent Cases; a **thinking** screen with phased progress and rotating status text while a Case is built; a **Case** page with a verdict hero, claim cards with collapsible sources, a decision timeline, a "how this was checked" pipeline and a sticky side rail; the **Radar**; and a guided four-step **Privacy console**.
+
 ### Run the whole app (one process)
 
 ```bash

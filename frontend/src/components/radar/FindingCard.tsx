@@ -1,30 +1,11 @@
 import { useState } from 'react'
-import type { FindingCard as Card, RadarAssessment, RadarCheck } from '../../types/api'
+import type { FindingCard as Card, RadarCheck } from '../../types/api'
 import { btnSecondary, formatDate } from '../../lib'
 import { CitationList } from '../evidence/CitationList'
 import { EvidenceDrawer } from '../evidence/EvidenceDrawer'
+import { IconAlert, IconArrowRight, IconCheck, IconX } from '../icons'
 import { go } from '../../hooks/useRoute'
-
-// The Radar may say only these four things, and never that an idea should be
-// pursued: the labels are deliberately hedged.
-const ASSESSMENT: Record<RadarAssessment, { label: string; cls: string }> = {
-  STILL_BLOCKED: {
-    label: 'Still blocked',
-    cls: 'bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100',
-  },
-  PARTIALLY_CHANGED: {
-    label: 'Partially changed',
-    cls: 'bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-100',
-  },
-  WORTH_REASSESSING: {
-    label: 'Worth reassessing',
-    cls: 'bg-indigo-100 text-indigo-950 dark:bg-indigo-950 dark:text-indigo-100',
-  },
-  INSUFFICIENT_EVIDENCE: {
-    label: 'Insufficient evidence',
-    cls: 'bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100',
-  },
-}
+import { ASSESSMENT } from './assessments'
 
 const CHECKS = [
   'Genuinely rejected or deferred',
@@ -39,25 +20,50 @@ const CHECKS = [
 function Lens({ label, tone, children }: { label: string; tone: 'internal' | 'external' | 'assessment'; children: React.ReactNode }) {
   const cls =
     tone === 'internal'
-      ? 'border-emerald-600/60 bg-white dark:bg-zinc-900'
+      ? 'border-ok/40 bg-surface'
       : tone === 'external'
-        ? 'border-sky-600/60 bg-sky-50 dark:bg-sky-950/40'
-        : 'border-dashed border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/30'
+        ? 'border-brand/40 bg-brand-soft'
+        : 'border-dashed border-purple bg-purple-soft'
+  const tag = tone === 'internal' ? 'text-ok' : tone === 'external' ? 'text-brand-ink' : 'text-purple'
   return (
-    <div className={`space-y-2 rounded-lg border p-3 ${cls}`}>
-      <p className="text-xs font-bold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">{label}</p>
+    <div className={`space-y-2 rounded-2xl border p-4 ${cls}`}>
+      <p className={`text-xs font-extrabold uppercase tracking-wide ${tag}`}>{label}</p>
       {children}
     </div>
   )
 }
 
-function CheckRow({ result }: { result?: RadarCheck }) {
-  if (!result) return <span className="text-zinc-600 dark:text-zinc-400">Not run</span>
-  if (!result.answered) return <span className="font-semibold text-amber-900 dark:text-amber-200">Cannot be answered</span>
-  return result.passed ? (
-    <span className="font-semibold text-emerald-800 dark:text-emerald-300">Survives</span>
-  ) : (
-    <span className="font-semibold text-rose-800 dark:text-rose-300">Counts against</span>
+function CheckPill({ index, result }: { index: number; result?: RadarCheck }) {
+  const state = !result ? 'none' : !result.answered ? 'open' : result.passed ? 'pass' : 'fail'
+  const style = {
+    pass: 'border-ok/40 bg-ok-soft text-ok',
+    fail: 'border-bad/40 bg-bad-soft text-bad',
+    open: 'border-warn/40 bg-warn-soft text-warn',
+    none: 'border-line bg-surface-2 text-ink-3',
+  }[state]
+  const word = { pass: 'Survives', fail: 'Counts against', open: 'Cannot be answered', none: 'Not run' }[state]
+  return (
+    <li className={`flex items-center gap-3 rounded-xl border p-3 text-sm ${style}`}>
+      <span className="grid size-6 shrink-0 place-items-center rounded-full bg-current/15">
+        {state === 'pass' ? <IconCheck size={14} strokeWidth={3} /> : state === 'fail' ? <IconX size={14} strokeWidth={3} /> : <IconAlert size={14} />}
+      </span>
+      <span className="flex-1 font-semibold text-ink">
+        {index + 1}. {CHECKS[index]}
+      </span>
+      <span className="text-xs font-extrabold uppercase">{word}</span>
+    </li>
+  )
+}
+
+function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[2rem_1fr] gap-3">
+      <span className="grid size-8 place-items-center rounded-full bg-deep text-sm font-extrabold text-white">{n}</span>
+      <div className="min-w-0 space-y-2">
+        <h3 className="text-sm font-extrabold uppercase tracking-wide text-ink-2">{title}</h3>
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -65,114 +71,104 @@ export function FindingCard({ card }: { card: Card }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const a = ASSESSMENT[card.assessment]
   return (
-    <article className="space-y-5 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-bold uppercase tracking-widest text-indigo-800 dark:text-indigo-300">
-          Reconsideration candidate
-        </p>
-        <span className={`rounded-full px-3 py-1 text-sm font-semibold ${a.cls}`}>{a.label}</span>
+    <article className="anim-fade-up overflow-hidden rounded-3xl border border-line bg-surface shadow-lift">
+      <header className="flex flex-wrap items-start justify-between gap-3 bg-gradient-to-r from-deep to-[#1884c5] p-6 text-white">
+        <div className="min-w-0 space-y-1">
+          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-white/70">Reconsideration candidate</p>
+          <h2 className="text-balance text-xl font-extrabold leading-snug sm:text-2xl">{card.proposal}</h2>
+        </div>
+        <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-extrabold ${a.tone}`}>
+          {a.icon}
+          {a.label}
+        </span>
       </header>
 
-      <div className="space-y-1">
-        <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Original proposal</p>
-        <h2 className="text-xl font-semibold">{card.proposal}</h2>
-        <CitationList citations={card.proposal_citations} tone="neutral" onOpen={setOpenId} />
-      </div>
+      <div className="space-y-7 p-6">
+        <p className="rounded-xl bg-surface-2 p-3 text-sm font-semibold text-ink-2">{a.meaning} This is a prompt to look again, not a recommendation.</p>
 
-      <div className="space-y-1">
-        <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-          Original outcome:{' '}
-          <span className="rounded border border-zinc-400 px-2 py-0.5 text-xs">{card.outcome === 'REJECTED' ? 'Rejected' : 'Deferred'}</span>
+        <Step n={1} title="Original proposal">
+          <CitationList citations={card.proposal_citations} tone="neutral" onOpen={setOpenId} collapseAfter={2} />
+        </Step>
+        <Step n={2} title={`Outcome: ${card.outcome === 'REJECTED' ? 'Rejected' : 'Deferred'}`}>
+          <CitationList citations={card.outcome_citations} tone="neutral" onOpen={setOpenId} collapseAfter={2} />
+        </Step>
+        <Step n={3} title="Why it was stopped">
+          <p className="text-base font-semibold text-ink">{card.blocker}</p>
+          <CitationList citations={card.blocker_citations} tone="neutral" onOpen={setOpenId} collapseAfter={2} />
+          <p className="text-sm text-ink-2">
+            <strong>Would need to change:</strong> {card.monitorable_condition}
+          </p>
+        </Step>
+        <Step n={4} title="What may have changed">
+          <div className="space-y-3">
+            <Lens label="Internal evidence · from the archive" tone="internal">
+              {card.internal_change_citations.length > 0 ? (
+                <CitationList citations={card.internal_change_citations} tone="support" onOpen={setOpenId} collapseAfter={2} />
+              ) : (
+                <p className="text-sm text-ink-2">No internal evidence of a change was found.</p>
+              )}
+              {card.current_state_citations.length > 0 && (
+                <>
+                  <p className="pt-1 text-xs font-extrabold uppercase text-ink-3">Recent internal state</p>
+                  <CitationList citations={card.current_state_citations} tone="neutral" onOpen={setOpenId} collapseAfter={2} />
+                </>
+              )}
+            </Lens>
+            <Lens label="External signals · outside the organization, not internal facts" tone="external">
+              {card.external_signals.length > 0 ? (
+                <ul className="space-y-2 text-sm">
+                  {card.external_signals.map((s) => (
+                    <li key={s.signal_id}>
+                      <strong>{s.title}</strong> · {s.source} · {formatDate(s.published)}{' '}
+                      {s.url && (
+                        <a href={s.url} rel="noreferrer noopener" target="_blank" className="font-bold text-brand-ink underline">
+                          source
+                        </a>
+                      )}
+                      <br />
+                      {s.summary}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-ink-2">No curated external signal applies.</p>
+              )}
+            </Lens>
+            <Lens label="Assessment · an interpretation, not evidence" tone="assessment">
+              {card.changed_condition && <p className="text-sm italic text-ink">{card.changed_condition}</p>}
+              <p className="text-sm italic text-ink">{card.assessment_rationale}</p>
+            </Lens>
+          </div>
+        </Step>
+
+        <div className="space-y-2 rounded-2xl border border-warn/40 bg-warn-soft p-4">
+          <h3 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-wide text-warn">
+            <IconAlert size={16} /> Unestablished
+          </h3>
+          <ul className="ml-5 list-disc space-y-1 text-sm font-semibold text-ink">
+            {card.unestablished.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        </div>
+
+        <p className="rounded-2xl bg-brand-soft p-4 text-sm">
+          <strong className="text-brand-ink">Next useful check:</strong> {card.next_check}
         </p>
-        <CitationList citations={card.outcome_citations} tone="neutral" onOpen={setOpenId} />
+
+        <details className="rounded-2xl border border-line p-4">
+          <summary className="cursor-pointer text-sm font-extrabold">The Skeptic's seven checks</summary>
+          <ol className="mt-3 grid gap-2 md:grid-cols-2">
+            {CHECKS.map((_, i) => (
+              <CheckPill key={i} index={i} result={card.checks.find((c) => c.check === i + 1)} />
+            ))}
+          </ol>
+        </details>
+
+        <button type="button" className={btnSecondary} onClick={() => go.caseView(card.case_id)}>
+          Open the validated Case <IconArrowRight size={16} />
+        </button>
       </div>
-
-      <div className="space-y-1">
-        <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Why it was stopped</p>
-        <p>{card.blocker}</p>
-        <CitationList citations={card.blocker_citations} tone="neutral" onOpen={setOpenId} />
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          <span className="font-semibold">Would need to change:</span> {card.monitorable_condition}
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">What may have changed</p>
-        <Lens label="Internal evidence — from the archive" tone="internal">
-          {card.internal_change_citations.length > 0 ? (
-            <CitationList citations={card.internal_change_citations} tone="support" onOpen={setOpenId} />
-          ) : (
-            <p className="text-sm text-zinc-700 dark:text-zinc-300">No internal evidence of a change was found.</p>
-          )}
-          {card.current_state_citations.length > 0 && (
-            <>
-              <p className="pt-1 text-xs font-semibold">Recent internal state</p>
-              <CitationList citations={card.current_state_citations} tone="neutral" onOpen={setOpenId} />
-            </>
-          )}
-        </Lens>
-        <Lens label="External signals — outside the organization; not internal facts" tone="external">
-          {card.external_signals.length > 0 ? (
-            <ul className="space-y-2 text-sm">
-              {card.external_signals.map((s) => (
-                <li key={s.signal_id}>
-                  <span className="font-semibold">{s.title}</span> · {s.source} · {formatDate(s.published)}
-                  {s.url && (
-                    <>
-                      {' '}
-                      <a href={s.url} rel="noreferrer noopener" target="_blank" className="text-sky-800 underline dark:text-sky-300">
-                        source
-                      </a>
-                    </>
-                  )}
-                  <br />
-                  {s.summary}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-zinc-700 dark:text-zinc-300">No curated external signal applies.</p>
-          )}
-        </Lens>
-        <Lens label="Assessment — an interpretation, not evidence" tone="assessment">
-          {card.changed_condition && <p className="text-sm italic">{card.changed_condition}</p>}
-          <p className="text-sm italic">{card.assessment_rationale}</p>
-        </Lens>
-      </div>
-
-      <div className="space-y-1 rounded-lg bg-amber-50 p-3 dark:bg-amber-950/30">
-        <p className="text-sm font-bold">Unestablished</p>
-        <ul className="ml-5 list-disc text-sm">
-          {card.unestablished.map((m) => (
-            <li key={m}>{m}</li>
-          ))}
-        </ul>
-      </div>
-
-      <p className="text-sm">
-        <span className="font-semibold">Next useful check:</span> {card.next_check}
-      </p>
-
-      <details className="text-sm">
-        <summary className="cursor-pointer font-semibold">Skeptic checks (seven)</summary>
-        <ol className="mt-2 space-y-1">
-          {CHECKS.map((label, i) => {
-            const result = card.checks.find((c) => c.check === i + 1)
-            return (
-              <li key={label} className="flex flex-wrap justify-between gap-2 border-t border-zinc-200 py-1 dark:border-zinc-800">
-                <span>
-                  {i + 1}. {label}
-                </span>
-                <CheckRow result={result} />
-              </li>
-            )
-          })}
-        </ol>
-      </details>
-
-      <button type="button" className={btnSecondary} onClick={() => go.caseView(card.case_id)}>
-        Open the validated Case
-      </button>
       {openId && <EvidenceDrawer evidenceId={openId} onClose={() => setOpenId(null)} />}
     </article>
   )

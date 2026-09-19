@@ -1,70 +1,112 @@
 import type { ReactNode } from 'react'
 import type { CaseStatus, Confidence, Stance } from '../types/api'
+import { IconCheck } from './icons'
+import { STATUS } from './statusMap'
 
-const STATUS: Record<CaseStatus, { label: string; cls: string }> = {
-  SUPPORTED: {
-    label: 'Supported',
-    cls: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200',
-  },
-  PARTIALLY_SUPPORTED: {
-    label: 'Partially supported',
-    cls: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
-  },
-  CONFLICTING_EVIDENCE: {
-    label: 'Conflicting evidence',
-    cls: 'bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200',
-  },
-  INSUFFICIENT_EVIDENCE: {
-    label: 'Insufficient evidence',
-    cls: 'bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200',
-  },
-}
-
-export function StatusBadge({ status }: { status: CaseStatus }) {
+export function StatusBadge({ status, large }: { status: CaseStatus; large?: boolean }) {
   const s = STATUS[status]
   return (
-    <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${s.cls}`}>
+    <span
+      className={`inline-flex items-center gap-2 rounded-full font-bold ${s.tone} ${
+        large ? 'px-4 py-2 text-base' : 'px-3 py-1 text-sm'
+      }`}
+    >
+      {s.icon}
       {s.label}
     </span>
   )
 }
 
+const STANCE_TONE: Record<Stance, string> = {
+  PROPOSAL: 'bg-purple-soft text-purple',
+  ASSUMPTION: 'bg-neutral-soft text-ink-2',
+  OBJECTION: 'bg-bad-soft text-bad',
+  AGREEMENT: 'bg-ok-soft text-ok',
+  COMMITMENT: 'bg-ok-soft text-ok',
+  STATUS_UPDATE: 'bg-brand-soft text-brand-ink',
+  IMPLEMENTATION_EVIDENCE: 'bg-brand-soft text-brand-ink',
+  SUPERSEDED: 'bg-orange-soft text-orange',
+  UNCERTAIN: 'bg-warn-soft text-warn',
+}
 const pretty = (v: string) => v.replaceAll('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase())
 
 export function StanceChip({ stance }: { stance: Stance }) {
   return (
-    <span className="rounded border border-zinc-300 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300">
+    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${STANCE_TONE[stance]}`}>
       {pretty(stance)}
     </span>
   )
 }
 
-export function ConfidenceChip({ confidence }: { confidence: Confidence }) {
-  const cls =
-    confidence === 'HIGH'
-      ? 'text-emerald-800 dark:text-emerald-300'
-      : confidence === 'MEDIUM'
-        ? 'text-amber-800 dark:text-amber-300'
-        : 'text-rose-800 dark:text-rose-300'
-  return <span className={`text-xs font-semibold ${cls}`}>{pretty(confidence)} confidence</span>
+/** Three bars plus words: readable at a glance and without colour. */
+export function ConfidenceMeter({ confidence }: { confidence: Confidence }) {
+  const level = confidence === 'HIGH' ? 3 : confidence === 'MEDIUM' ? 2 : 1
+  const tone = level === 3 ? 'bg-ok' : level === 2 ? 'bg-warn' : 'bg-bad'
+  return (
+    <span className="inline-flex items-center gap-2 text-xs font-semibold text-ink-2">
+      <span className="flex gap-0.5" aria-hidden="true">
+        {[1, 2, 3].map((n) => (
+          <span key={n} className={`h-3 w-1.5 rounded-sm ${n <= level ? tone : 'bg-line'}`} />
+        ))}
+      </span>
+      {pretty(confidence)} confidence
+    </span>
+  )
+}
+
+export function Eyebrow({ children }: { children: ReactNode }) {
+  return <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-brand-ink">{children}</p>
 }
 
 export function Section({
+  id,
   title,
   hint,
+  icon,
   children,
 }: {
+  id?: string
   title: string
   hint?: string
+  icon?: ReactNode
   children: ReactNode
 }) {
   return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{title}</h2>
-        {hint && <p className="text-sm text-zinc-600 dark:text-zinc-400">{hint}</p>}
+    <section id={id} className="scroll-mt-24 space-y-4">
+      <div className="flex items-start gap-3">
+        {icon && (
+          <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand-ink">
+            {icon}
+          </span>
+        )}
+        <div>
+          <h2 className="text-xl font-extrabold tracking-tight text-ink">{title}</h2>
+          {hint && <p className="text-sm text-ink-2">{hint}</p>}
+        </div>
       </div>
       {children}
     </section>
+  )
+}
+
+export function Skeleton({ className = '' }: { className?: string }) {
+  return <div className={`skeleton ${className}`} aria-hidden="true" />
+}
+
+export function Spinner({ size = 18 }: { size?: number }) {
+  return (
+    <span
+      className="anim-spin-fast inline-block rounded-full border-2 border-current border-t-transparent"
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+    />
+  )
+}
+
+export function Tick({ size = 18 }: { size?: number }) {
+  return (
+    <span className="inline-grid place-items-center rounded-full bg-ok text-white" style={{ width: size, height: size }}>
+      <IconCheck size={size - 6} strokeWidth={3.5} className="anim-draw" />
+    </span>
   )
 }

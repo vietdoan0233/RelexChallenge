@@ -111,6 +111,7 @@ export interface PurgePreview {
   units_to_anonymize: number
   files_to_sanitize: number
   cases_to_invalidate: number
+  findings_to_invalidate?: number
 }
 
 export interface PurgeResult {
@@ -118,6 +119,7 @@ export interface PurgeResult {
   files_sanitized: number
   units_anonymized: number
   cases_invalidated: number
+  findings_invalidated?: number
   embeddings_regenerated: number
   embeddings_pending: number
   verification: Record<string, number>
@@ -168,5 +170,25 @@ export interface FindingCard {
   next_check: string
   checks: RadarCheck[]
   case_id: string
+  created_at: string
+}
+
+export interface ArchiveStats {
+  documents: number
+  documents_by_type: Record<string, number>
+  evidence_units: number
+  people: number
+  embeddings: number
+  cases: number
+  radar_findings: number
+  first_date: string | null
+  last_date: string | null
+}
+
+export interface RecentCase {
+  case_id: string
+  query: string
+  status: CaseStatus | null
+  claims: number
   created_at: string
 }

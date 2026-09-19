@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import cases, deps, evidence, privacy, radar
+from app.api import cases, deps, evidence, meta, privacy, radar
 from app.core.config import get_settings
 from app.privacy import ops, service
 
@@ -43,6 +43,7 @@ app.include_router(cases.router)
 app.include_router(evidence.router)
 app.include_router(privacy.router)
 app.include_router(radar.router)
+app.include_router(meta.router)
 
 
 @app.exception_handler(ops.PrivacyLockedError)

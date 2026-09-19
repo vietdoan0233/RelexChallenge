@@ -1,3 +1,4 @@
+import json
 import logging
 import sqlite3
 from typing import Annotated
@@ -40,6 +41,30 @@ def query_case(
         # Explicit failure, never a fabricated answer (CLAUDE.md 22).
         raise HTTPException(503, "Analysis is temporarily unavailable. Please try again.") from None
     return receipt
+
+
+@router.get("")
+def recent_cases(conn: Conn, limit: int = 8) -> list[dict]:
+    """The most recent user Cases (Radar-linked Cases are excluded), with just
+    enough to list them. Each opens through the ordinary Case endpoint."""
+    rows = conn.execute(
+        "SELECT case_id, query, receipt_json, created_at FROM cases "
+        "WHERE query NOT LIKE 'Reconsideration:%' ORDER BY created_at DESC LIMIT ?",
+        (max(1, min(limit, 30)),),
+    ).fetchall()
+    result = []
+    for row in rows:
+        stored = json.loads(row["receipt_json"])
+        result.append(
+            {
+                "case_id": row["case_id"],
+                "query": row["query"],
+                "status": stored.get("status"),
+                "claims": len(stored.get("claims", [])),
+                "created_at": row["created_at"],
+            }
+        )
+    return result
 
 
 @router.get("/{case_id}", response_model=CaseReceipt)

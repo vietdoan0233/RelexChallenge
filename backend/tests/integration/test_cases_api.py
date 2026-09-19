@@ -173,3 +173,31 @@ def test_evidence_endpoint_returns_highlighted_unit_with_neighbours(env):
     assert body["citation"]["raw_text"] == "Yes."
     assert [c["evidence_id"] for c in body["context_before"]] == [ids[0]]
     assert [c["evidence_id"] for c in body["context_after"]] == [ids[2]]
+
+
+def test_stats_are_counts_only(env):
+    client, ids, holder, _ = env
+    body = client.get("/api/stats").json()
+    assert body["documents"] == 1 and body["evidence_units"] == 3
+    assert body["first_date"] and body["last_date"]
+    # Nothing textual about the evidence or anyone in it.
+    assert "Ana Duarte" not in json.dumps(body) and "bakery" not in json.dumps(body).lower()
+
+
+def test_recent_cases_lists_newest_first_and_hides_radar_cases(env):
+    client, ids, holder, db_path = env
+    holder["llm"] = ScriptedLLM([_reply([_claim([ids[2]])])])
+    first = client.post(
+        "/api/cases/query", json={"query": "Is bakery in the fresh workstream?"}
+    ).json()
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "INSERT INTO cases VALUES ('radar-1', 'Reconsideration: some idea', '{}', "
+        "'2999-01-01T00:00:00+00:00', 't')"
+    )
+    conn.commit()
+    conn.close()
+    listed = client.get("/api/cases").json()
+    assert [c["case_id"] for c in listed] == [first["case_id"]]
+    assert listed[0]["status"] == "SUPPORTED" and listed[0]["claims"] == 1
+    assert client.get("/api/cases?limit=0").status_code == 200

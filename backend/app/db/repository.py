@@ -300,3 +300,39 @@ def revoke_source_locator(
         "WHERE document_id = ? AND source_locator = ?",
         (revoked_at, REVOKED_FINGERPRINT_SENTINEL, document_id, source_locator),
     )
+
+
+# ------------------------------------------------------------------- cases
+
+
+def save_case(
+    conn: sqlite3.Connection,
+    *,
+    case_id: str,
+    query: str,
+    receipt_json: str,
+    created_at: str,
+    evidence_usage: dict[str, set[str]],
+) -> None:
+    """Persist a validated, ids-only receipt and its evidence references.
+
+    case_evidence is what lets a later deletion find and invalidate every
+    Case that depended on a unit (CLAUDE.md 18.2).
+    """
+    conn.execute(
+        "INSERT OR REPLACE INTO cases (case_id, query, receipt_json, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (case_id, query, receipt_json, created_at, created_at),
+    )
+    conn.execute("DELETE FROM case_evidence WHERE case_id = ?", (case_id,))
+    for usage, ids in evidence_usage.items():
+        for evidence_id in sorted(ids):
+            conn.execute(
+                "INSERT OR IGNORE INTO case_evidence (case_id, evidence_id, usage) "
+                "VALUES (?, ?, ?)",
+                (case_id, evidence_id, usage),
+            )
+
+
+def load_case(conn: sqlite3.Connection, case_id: str) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM cases WHERE case_id = ?", (case_id,)).fetchone()

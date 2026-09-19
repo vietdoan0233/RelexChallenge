@@ -1,5 +1,6 @@
 import type {
   CaseReceipt,
+  FindingCard,
   EvidenceView,
   PersonSummary,
   PurgePreview,
@@ -42,6 +43,7 @@ export const api = {
   people: () => request<PersonSummary[]>('/api/privacy/people'),
   preview: (personId: string) =>
     request<PurgePreview>('/api/privacy/preview', post({ person_id: personId })),
+  radar: () => request<FindingCard[]>('/api/radar'),
   purge: (personId: string) =>
     request<PurgeResult>('/api/privacy/purge', post({ person_id: personId, confirm: true })),
 }

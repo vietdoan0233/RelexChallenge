@@ -6,12 +6,14 @@ export type Route =
   | { page: 'ask'; prefill?: string }
   | { page: 'case'; caseId: string }
   | { page: 'privacy' }
+  | { page: 'radar' }
 
 function parse(hash: string): Route {
   const [path, query = ''] = hash.replace(/^#/, '').split('?')
   const parts = path.split('/').filter(Boolean)
   if (parts[0] === 'case' && parts[1]) return { page: 'case', caseId: parts[1] }
   if (parts[0] === 'privacy') return { page: 'privacy' }
+  if (parts[0] === 'radar') return { page: 'radar' }
   return { page: 'ask', prefill: new URLSearchParams(query).get('q') ?? undefined }
 }
 

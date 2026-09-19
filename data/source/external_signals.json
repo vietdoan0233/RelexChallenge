@@ -1,0 +1,4 @@
+{
+  "description": "Curated external signals for the Reconsideration Radar (docs/RECONSIDERATION_RADAR.md). Each signal is an outside development a human has chosen to record: a publication, regulation, market or technology update. It is never an internal organizational fact. This file ships EMPTY on purpose: the system does not scrape the web and does not invent outside developments. Add entries by hand, each with {signal_id, title, source, published (YYYY-MM-DD), url (optional), summary, categories}, where categories are blocker categories such as CAPACITY_EFFORT, COST_VENDOR, TIMING_DEPENDENCY, TECHNOLOGY_MATURITY, SECURITY_COMPLIANCE, REGULATION, INSUFFICIENT_DATA (an empty list means the signal may apply to any). This file lives beside the canonical source so deletion verification scans it like any other application-owned surface.",
+  "signals": []
+}

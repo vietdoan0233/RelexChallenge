@@ -2,6 +2,7 @@ import { useRoute } from './hooks/useRoute'
 import { AskPage } from './pages/AskPage'
 import { CasePage } from './pages/CasePage'
 import { PrivacyPage } from './pages/PrivacyPage'
+import { RadarPage } from './pages/RadarPage'
 
 const APP_NAME = import.meta.env.VITE_APP_NAME || 'Organizational Memory Auditor'
 
@@ -34,6 +35,9 @@ function App() {
             <NavLink href="#/" current={route.page === 'ask' || route.page === 'case'}>
               Ask
             </NavLink>
+            <NavLink href="#/radar" current={route.page === 'radar'}>
+              Radar
+            </NavLink>
             <NavLink href="#/privacy" current={route.page === 'privacy'}>
               Privacy console
             </NavLink>
@@ -44,6 +48,7 @@ function App() {
         {route.page === 'ask' && <AskPage key={route.prefill} prefill={route.prefill} />}
         {route.page === 'case' && <CasePage caseId={route.caseId} />}
         {route.page === 'privacy' && <PrivacyPage />}
+        {route.page === 'radar' && <RadarPage />}
       </main>
     </div>
   )

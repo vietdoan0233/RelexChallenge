@@ -69,13 +69,18 @@ class SkepticResult:
         return bool(self.objections)
 
 
-def run(
+def counter_retrieve(
     llm: LLMClient,
     retrieval_service: RetrievalService,
     query: str,
     output: PrimaryOutput,
     evidence: EvidenceSet,
 ) -> SkepticResult:
+    """Steps 1-2: plan up to two counter-search bundles and actually retrieve.
+
+    Split out so other reviewers (the Reconsideration Radar) can reuse real
+    counter-retrieval with their own verdict step.
+    """
     plan = _plan(llm, query, output, evidence)
     result = SkepticResult(plan=plan, evidence=evidence)
 
@@ -89,6 +94,17 @@ def run(
             )
             result.queries_run += 1
     result.new_evidence_ids = list(dict.fromkeys(new_ids))
+    return result
+
+
+def run(
+    llm: LLMClient,
+    retrieval_service: RetrievalService,
+    query: str,
+    output: PrimaryOutput,
+    evidence: EvidenceSet,
+) -> SkepticResult:
+    result = counter_retrieve(llm, retrieval_service, query, output, evidence)
 
     # No new evidence means there is nothing further to inspect; the
     # candidate stands as far as this search could tell.

@@ -123,3 +123,50 @@ export interface PurgeResult {
   verification: Record<string, number>
   verified: boolean
 }
+
+export type RadarAssessment =
+  | 'STILL_BLOCKED'
+  | 'PARTIALLY_CHANGED'
+  | 'WORTH_REASSESSING'
+  | 'INSUFFICIENT_EVIDENCE'
+
+export interface ExternalSignal {
+  signal_id: string
+  title: string
+  source: string
+  published: string
+  url: string | null
+  summary: string
+  categories: string[]
+}
+
+export interface RadarCheck {
+  check: number
+  answered: boolean
+  passed: boolean | null
+  note: string
+  evidence_ids: string[]
+}
+
+export interface FindingCard {
+  finding_id: string
+  proposal: string
+  outcome: 'REJECTED' | 'DEFERRED'
+  proposal_citations: Citation[]
+  outcome_citations: Citation[]
+  blocker: string
+  blocker_category: string
+  blocker_citations: Citation[]
+  monitorable_condition: string
+  changed_condition: string | null
+  internal_change_citations: Citation[]
+  external_signals: ExternalSignal[]
+  current_state_citations: Citation[]
+  assessment: RadarAssessment
+  assessment_rationale: string
+  unestablished: string[]
+  next_check: string
+  checks: RadarCheck[]
+  case_id: string
+  created_at: string
+}

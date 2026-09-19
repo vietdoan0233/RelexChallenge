@@ -8,7 +8,7 @@ The temporary internal codename is **KEEPER**. It is only a project name; the fi
 2,517 stable Evidence Units, FTS has 2,517 rows, and the runtime database has
 2,517 real 1,536-dimensional embeddings. The completed gate is documented in
 [`docs/PHASE_1_REVIEW_2026-09-19.md`](docs/PHASE_1_REVIEW_2026-09-19.md).
-Phase 2 retrieval is complete (see [`docs/PHASE_2_REVIEW_2026-09-19.md`](docs/PHASE_2_REVIEW_2026-09-19.md)); run `python scripts/benchmark.py` to reproduce its benchmark. Phase 3 (structured Cases and the validator) is complete — see [`docs/PHASE_3_REVIEW_2026-09-19.md`](docs/PHASE_3_REVIEW_2026-09-19.md); Phase 4 (risk routing, Skeptic, reconciliation) is complete — see [`docs/PHASE_4_REVIEW_2026-09-19.md`](docs/PHASE_4_REVIEW_2026-09-19.md); Phase 5 (deletion/anonymization) is complete with disclosed deviations — see [`docs/PHASE_5_REVIEW_2026-09-19.md`](docs/PHASE_5_REVIEW_2026-09-19.md); Phase 6 (the judge-facing UI) is complete — see [`docs/PHASE_6_REVIEW_2026-09-19.md`](docs/PHASE_6_REVIEW_2026-09-19.md); Phase 7 is next. `docs/HANDOFF_2026-09-19.md` is an earlier,
+Phase 2 retrieval is complete (see [`docs/PHASE_2_REVIEW_2026-09-19.md`](docs/PHASE_2_REVIEW_2026-09-19.md)); run `python scripts/benchmark.py` to reproduce its benchmark. Phase 3 (structured Cases and the validator) is complete — see [`docs/PHASE_3_REVIEW_2026-09-19.md`](docs/PHASE_3_REVIEW_2026-09-19.md); Phase 4 (risk routing, Skeptic, reconciliation) is complete — see [`docs/PHASE_4_REVIEW_2026-09-19.md`](docs/PHASE_4_REVIEW_2026-09-19.md); Phase 5 (deletion/anonymization) is complete with disclosed deviations — see [`docs/PHASE_5_REVIEW_2026-09-19.md`](docs/PHASE_5_REVIEW_2026-09-19.md); Phase 6 (the judge-facing UI) is complete — see [`docs/PHASE_6_REVIEW_2026-09-19.md`](docs/PHASE_6_REVIEW_2026-09-19.md); Phase 7 (hardening and the Reconsideration Radar) is complete — see [`docs/PHASE_7_REVIEW_2026-09-19.md`](docs/PHASE_7_REVIEW_2026-09-19.md). `docs/HANDOFF_2026-09-19.md` is an earlier,
 superseded snapshot; use `CLAUDE.md` section 0.1 and section 24 for the current
 phase plan.
 
@@ -287,6 +287,25 @@ npm run build
 - [`docs/HANDOFF_2026-09-19.md`](docs/HANDOFF_2026-09-19.md) — an earlier handoff snapshot; the current checkpoint is in `AGENTS.md`.
 - [`data/ARCHIVE_README.md`](data/ARCHIVE_README.md) — description of the challenge archive.
 - [`data/PRACTICE_QUESTIONS.md`](data/PRACTICE_QUESTIONS.md) — practice questions for later retrieval/evaluation work; these are not evidence.
+
+## Reconsideration Radar
+
+The Radar surfaces ideas the organization rejected or deferred where the stated
+reason for saying no may have changed. It only ever says `STILL_BLOCKED`,
+`PARTIALLY_CHANGED`, `WORTH_REASSESSING` or `INSUFFICIENT_EVIDENCE`, keeps internal
+evidence, external signals and its own assessment visibly separate, and shows what
+it cannot establish. Findings are precomputed (never per page load), each linked to
+a validated Case and to Evidence Units.
+
+```bash
+backend/.venv/bin/python scripts/radar.py --limit 5
+```
+
+This sends retrieved evidence excerpts to the configured organizer reasoning
+service and stores the findings in the runtime database. Curated outside
+developments go in `data/source/external_signals.json`, which ships empty: the
+system never scrapes the web or invents an external signal. The findings appear
+under **Radar** in the UI. See [docs/RECONSIDERATION_RADAR.md](docs/RECONSIDERATION_RADAR.md).
 
 ## Innovation roadmap
 

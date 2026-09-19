@@ -50,6 +50,7 @@ class PreviewResult:
     units_to_anonymize: int
     files_to_sanitize: int
     cases_to_invalidate: int
+    findings_to_invalidate: int = 0
 
 
 @dataclass
@@ -58,6 +59,7 @@ class PurgeResult:
     files_sanitized: int
     units_anonymized: int
     cases_invalidated: int
+    findings_invalidated: int
     embeddings_regenerated: int
     embeddings_pending: int
     verification: dict[str, int] = field(default_factory=dict)
@@ -82,6 +84,13 @@ def preview(conn: sqlite3.Connection, source_dir: Path, person_id: str) -> Previ
         files_to_sanitize=len(files),
         cases_to_invalidate=len(
             _dependent_case_ids(conn, target, _affected_evidence_ids(conn, target))
+        ),
+        findings_to_invalidate=len(
+            _dependent_findings(
+                conn,
+                _affected_evidence_ids(conn, target),
+                {"names": list(target.names), "emails": list(target.emails)},
+            )
         ),
     )
 
@@ -202,6 +211,7 @@ def _run(conn, plan, state, source_dir, db_path, ops_dir, artifact_dirs, provide
     at = ops.STATES.index(state)
     regenerated = pending = 0
     invalidated = 0
+    findings_invalidated = 0
 
     if at <= ops.STATES.index(ops.SOURCE_IN_PROGRESS):
         _apply_manifest_remap(conn, plan["remap"])
@@ -210,7 +220,7 @@ def _run(conn, plan, state, source_dir, db_path, ops_dir, artifact_dirs, provide
         ops.set_state(ops_dir, ops.SOURCE_DONE)
 
     if at <= ops.STATES.index(ops.SOURCE_DONE):
-        invalidated = _rebuild_from_sanitized_source(conn, plan, source_dir)
+        invalidated, findings_invalidated = _rebuild_from_sanitized_source(conn, plan, source_dir)
         ops.set_state(ops_dir, ops.DB_DONE)
 
     if at <= ops.STATES.index(ops.DB_DONE):
@@ -262,6 +272,7 @@ def _run(conn, plan, state, source_dir, db_path, ops_dir, artifact_dirs, provide
         files_sanitized=len(plan["files"]),
         units_anonymized=len(plan["affected_evidence_ids"]),
         cases_invalidated=invalidated,
+        findings_invalidated=findings_invalidated,
         embeddings_regenerated=regenerated,
         embeddings_pending=pending,
         verification=dict(report.counts),
@@ -269,7 +280,7 @@ def _run(conn, plan, state, source_dir, db_path, ops_dir, artifact_dirs, provide
     )
 
 
-def _rebuild_from_sanitized_source(conn, plan, source_dir: Path) -> int:
+def _rebuild_from_sanitized_source(conn, plan, source_dir: Path) -> tuple[int, int]:
     """Stash unchanged embeddings, rebuild through the normal ingestion path,
     restore them, and invalidate dependent Cases. Idempotent."""
     identifiers = plan["identifiers"]
@@ -306,15 +317,16 @@ def _rebuild_from_sanitized_source(conn, plan, source_dir: Path) -> int:
     conn.execute(f"DROP TABLE {_STASH}")
 
     affected = set(plan["affected_evidence_ids"])
+    # Findings first: removing one also removes the validated Case it links to.
+    findings = _dependent_findings(conn, affected, identifiers)
+    for finding_id in findings:
+        _delete_finding(conn, finding_id)
     dependent = _dependent_case_ids_by(conn, affected, identifiers)
     for case_id in dependent:
         conn.execute("DELETE FROM case_evidence WHERE case_id = ?", (case_id,))
         conn.execute("DELETE FROM cases WHERE case_id = ?", (case_id,))
-    for finding_id in _dependent_findings(conn, affected):
-        conn.execute("DELETE FROM finding_evidence WHERE finding_id = ?", (finding_id,))
-        conn.execute("DELETE FROM pulse_findings WHERE finding_id = ?", (finding_id,))
     conn.commit()
-    return len(dependent)
+    return len(dependent), len(findings)
 
 
 def _physical_cleanup(conn, db_path: Path, artifact_dirs: list[Path]) -> None:
@@ -442,17 +454,46 @@ def _dependent_case_ids_by(conn, affected: set[str], identifiers: dict) -> set[s
     return cases
 
 
-def _dependent_findings(conn, affected: set[str]) -> set[str]:
-    if not affected:
-        return set()
-    marks = ",".join("?" * len(affected))
-    return {
-        r[0]
-        for r in conn.execute(
-            f"SELECT DISTINCT finding_id FROM finding_evidence WHERE evidence_id IN ({marks})",
-            sorted(affected),
+def _dependent_findings(conn, affected: set[str], identifiers: dict | None = None) -> set[str]:
+    found: set[str] = set()
+    if affected:
+        marks = ",".join("?" * len(affected))
+        found.update(
+            r[0]
+            for r in conn.execute(
+                f"SELECT DISTINCT finding_id FROM finding_evidence WHERE evidence_id IN ({marks})",
+                sorted(affected),
+            )
         )
-    }
+    if identifiers:
+        # Safety net: a finding whose stored prose names the person is derived
+        # personal data even if it cites nothing that changed.
+        patterns = [targets.name_pattern(n) for n in identifiers["names"]]
+        emails = [e.lower() for e in identifiers["emails"]]
+        for row in conn.execute(
+            "SELECT finding_id, title, summary, finding_json FROM pulse_findings"
+        ):
+            blob = f"{row['title']} {row['summary']} {row['finding_json']}"
+            if any(p.search(blob) for p in patterns) or any(x in blob.lower() for x in emails):
+                found.add(row["finding_id"])
+    return found
+
+
+def _delete_finding(conn, finding_id: str) -> None:
+    """Remove a finding, its evidence links, and the validated Case it points at."""
+    row = conn.execute(
+        "SELECT finding_json FROM pulse_findings WHERE finding_id = ?", (finding_id,)
+    ).fetchone()
+    if row is not None:
+        try:
+            case_id = json.loads(row["finding_json"]).get("case_id")
+        except ValueError:
+            case_id = None
+        if case_id:
+            conn.execute("DELETE FROM case_evidence WHERE case_id = ?", (case_id,))
+            conn.execute("DELETE FROM cases WHERE case_id = ?", (case_id,))
+    conn.execute("DELETE FROM finding_evidence WHERE finding_id = ?", (finding_id,))
+    conn.execute("DELETE FROM pulse_findings WHERE finding_id = ?", (finding_id,))
 
 
 def _table_exists(conn, name: str) -> bool:

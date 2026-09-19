@@ -4,6 +4,14 @@ This project is our solution to the RELEX Solutions **â€œMemory With a Receiptâ€
 
 The temporary internal codename is **KEEPER**. It is only a project name; the final product name has not been chosen. The application can use a different display name through `APP_NAME` and `VITE_APP_NAME`.
 
+**Status:** Phase 1 Evidence Locker is complete: all 45 documents ingest into
+2,517 stable Evidence Units, FTS has 2,517 rows, and the runtime database has
+2,517 real 1,536-dimensional embeddings. The completed gate is documented in
+[`docs/PHASE_1_REVIEW_2026-09-19.md`](docs/PHASE_1_REVIEW_2026-09-19.md).
+Phase 2 retrieval is now underway. `docs/HANDOFF_2026-09-19.md` is an earlier,
+superseded snapshot; use `CLAUDE.md` section 0.1 and section 24 for the current
+phase plan.
+
 ## The challenge in simple terms
 
 Imagine joining a company and asking:

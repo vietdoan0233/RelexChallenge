@@ -1,6 +1,6 @@
 # CLAUDE.md — KEEPER: Evidence-First Organizational Memory Auditor
 
-> **Status:** Architecture v1.5 FROZEN — Phase 1 implementation checkpoint recorded; identity hardening is complete. The organizer's OpenAI-compatible embedding contract has passed a one-text live smoke test. Remaining before Phase 2: full-corpus embedding generation and a final Phase 1 review once real rows are verified. v1.5 corrects the deletion strategy from default whole-Evidence-Unit removal to granular, irreversible redaction/anonymization with whole-unit deletion as the fallback; this is a documentation correction only — Phase 5 deletion/anonymization remains unimplemented.
+> **Status:** Architecture v1.5 FROZEN — Phase 1 Evidence Locker is complete and its final review passed with 2,517 real embedding rows. Phase 2 retrieval is active. v1.5 corrects the deletion strategy from default whole-Evidence-Unit removal to granular, irreversible redaction/anonymization with whole-unit deletion as the fallback; this is a documentation correction only — Phase 5 deletion/anonymization remains unimplemented.
 > **Challenge:** RELEX Solutions — “Memory With a Receipt”
 > **Project:** KEEPER
 > **Build model:** 1 developer, ~40 total working hours, AI-assisted implementation
@@ -123,7 +123,7 @@ Do not make parsing dependent on one exact placeholder token.
 
 ## Phase state
 
-**Phase 1 identity hardening and the live embedding contract smoke test are complete. Phase 1 remains at the mandatory review/hardening gate on full-corpus real embeddings. Phase 2 has not started.**
+**Phase 1 is complete.** Its final review is in `docs/PHASE_1_REVIEW_2026-09-19.md`: all 45 documents ingest into 2,517 stable Evidence Units, FTS has 2,517 rows, and the runtime database has 2,517 verified real embedding rows with consistent 1,536 dimensions. Phase 2 retrieval may begin.
 
 Identity hardening is resolved: capitalized free-text phrases can no longer become deletion-relevant identities, and the resulting people/alias/evidence-person counts have been reviewed against the corpus (see below). What still must be resolved before Phase 1 is fully accepted:
 

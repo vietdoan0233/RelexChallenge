@@ -45,6 +45,25 @@ class Settings(BaseSettings):
     def source_data_dir_resolved(self) -> Path:
         return _resolve(self.source_data_dir)
 
+    @property
+    def missing_embedding_configuration_fields(self) -> tuple[str, ...]:
+        """Names only: callers can explain an incomplete setup without ever
+        exposing a credential or endpoint value."""
+        configured = {
+            "GPT_API_KEY": self.gpt_api_key,
+            "GPT_BASE_URL": self.gpt_base_url,
+            "GPT_EMBEDDING_MODEL": self.gpt_embedding_model,
+        }
+        return tuple(name for name, value in configured.items() if not value)
+
+    @property
+    def has_any_embedding_configuration(self) -> bool:
+        return len(self.missing_embedding_configuration_fields) < 3
+
+    @property
+    def has_complete_embedding_configuration(self) -> bool:
+        return not self.missing_embedding_configuration_fields
+
 
 def _resolve(value: str) -> Path:
     path = Path(value)

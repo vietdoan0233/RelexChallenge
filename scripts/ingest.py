@@ -34,15 +34,16 @@ def main() -> None:
 
     provider = None
     if not args.skip_embeddings:
-        configured_fields = (
-            settings.gpt_api_key,
-            settings.gpt_base_url,
-            settings.gpt_embedding_model,
-        )
-        if any(configured_fields):
+        if settings.has_complete_embedding_configuration:
             print(
                 "GPT embedding configuration is present, but the organizer API "
                 "transport is still a placeholder; skipping embeddings."
+            )
+        elif settings.has_any_embedding_configuration:
+            parser.error(
+                "Incomplete GPT embedding configuration; missing "
+                f"{', '.join(settings.missing_embedding_configuration_fields)}. "
+                "Use --skip-embeddings for offline ingestion."
             )
         else:
             print("Organizer GPT API configuration is not available yet; skipping embeddings.")
@@ -76,11 +77,22 @@ def main() -> None:
     if report.parse_warnings:
         print(f"Parse warnings: {report.parse_warnings}")
     if report.embeddings.skipped:
-        print("Embeddings: skipped (--skip-embeddings or GPT provider pending).")
+        print(
+            "Embeddings: skipped (--skip-embeddings or GPT provider pending); "
+            f"persisted rows: {report.embeddings.persisted_rows}."
+        )
     elif report.embeddings.error:
-        print(f"Embeddings: FAILED - {report.embeddings.error}")
+        print(
+            f"Embeddings: FAILED after {report.embeddings.succeeded}/"
+            f"{report.embeddings.attempted}; persisted rows: "
+            f"{report.embeddings.persisted_rows}; {report.embeddings.error}"
+        )
     else:
-        print(f"Embeddings generated: {report.embeddings.succeeded}/{report.embeddings.attempted}")
+        print(
+            f"Embeddings generated: {report.embeddings.succeeded}/"
+            f"{report.embeddings.attempted}; persisted rows: "
+            f"{report.embeddings.persisted_rows}"
+        )
 
 
 if __name__ == "__main__":

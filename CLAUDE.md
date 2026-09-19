@@ -1,6 +1,6 @@
 # CLAUDE.md — KEEPER: Evidence-First Organizational Memory Auditor
 
-> **Status:** Architecture v1.5 FROZEN — Phase 1 Evidence Locker is complete and its final review passed with 2,517 real embedding rows. Phase 2 retrieval is complete (12-topic benchmark, `docs/PHASE_2_REVIEW_2026-09-19.md`); Phase 3 (Primary Reasoner, receipts, validator) is complete (`docs/PHASE_3_REVIEW_2026-09-19.md`); Phase 4 is next. v1.5 corrects the deletion strategy from default whole-Evidence-Unit removal to granular, irreversible redaction/anonymization with whole-unit deletion as the fallback; this is a documentation correction only — Phase 5 deletion/anonymization remains unimplemented.
+> **Status:** Architecture v1.5 FROZEN — Phase 1 Evidence Locker is complete and its final review passed with 2,517 real embedding rows. Phase 2 retrieval is complete (12-topic benchmark, `docs/PHASE_2_REVIEW_2026-09-19.md`); Phase 3 (Primary Reasoner, receipts, validator) is complete (`docs/PHASE_3_REVIEW_2026-09-19.md`); Phase 4 (risk routing, Skeptic, reconciliation) is complete (`docs/PHASE_4_REVIEW_2026-09-19.md`); Phase 5 is next. v1.5 corrects the deletion strategy from default whole-Evidence-Unit removal to granular, irreversible redaction/anonymization with whole-unit deletion as the fallback; this is a documentation correction only — Phase 5 deletion/anonymization remains unimplemented.
 > **Challenge:** RELEX Solutions — “Memory With a Receipt”
 > **Project:** KEEPER
 > **Build model:** 1 developer, ~40 total working hours, AI-assisted implementation
@@ -125,7 +125,7 @@ Do not make parsing dependent on one exact placeholder token.
 
 **Phase 1 is complete.** Its final review is in `docs/PHASE_1_REVIEW_2026-09-19.md`: all 45 documents ingest into 2,517 stable Evidence Units, FTS has 2,517 rows, and the runtime database has 2,517 verified real embedding rows with consistent 1,536 dimensions. Phase 2 retrieval may begin.
 
-**Phase 2 is complete.** Hybrid retrieval (`backend/app/retrieval/`: FTS5 BM25, NumPy cosine, RRF, neighbour context, later-evidence sweep) is implemented and benchmarked on 12 topics — 10/12 in the fused top 5, 11/12 in the top 10, 12/12 in the reasoner-visible set — see `docs/PHASE_2_REVIEW_2026-09-19.md`. `evidence_fts` now also indexes `thread_context` and `speaker_sender`; a Phase 5 purge must scrub those columns. **Phase 3 is complete:** structured Cases with DB-hydrated citations and a deterministic validator work end to end (`docs/PHASE_3_REVIEW_2026-09-19.md`); the organizer chat contract is verified (OpenAI-compatible `/chat/completions`, JSON mode, default `temperature` only). Phase 4 (risk routing, Skeptic, reconciliation) is the active phase.
+**Phase 2 is complete.** Hybrid retrieval (`backend/app/retrieval/`: FTS5 BM25, NumPy cosine, RRF, neighbour context, later-evidence sweep) is implemented and benchmarked on 12 topics — 10/12 in the fused top 5, 11/12 in the top 10, 12/12 in the reasoner-visible set — see `docs/PHASE_2_REVIEW_2026-09-19.md`. `evidence_fts` now also indexes `thread_context` and `speaker_sender`; a Phase 5 purge must scrub those columns. **Phase 3 is complete:** structured Cases with DB-hydrated citations and a deterministic validator work end to end (`docs/PHASE_3_REVIEW_2026-09-19.md`); the organizer chat contract is verified (OpenAI-compatible `/chat/completions`, JSON mode, default `temperature` only). **Phase 4 is complete** (`docs/PHASE_4_REVIEW_2026-09-19.md`). Phase 5 (deletion/anonymization) is the active phase.
 
 Identity hardening is resolved: capitalized free-text phrases can no longer become deletion-relevant identities, and the resulting people/alias/evidence-person counts have been reviewed against the corpus (see below). The two items that remained open — real full-corpus embeddings and a corrected Phase 1 review — were resolved (`docs/PHASE_1_REVIEW_2026-09-19.md`).
 
@@ -182,7 +182,7 @@ Verified local history at this checkpoint:
 
 At this checkpoint, `8c6b79b` is committed locally and currently unpushed. This is a point-in-time observation about repository state, not a standing architectural rule about where local history must sit relative to `origin/main`.
 
-Phases 1–3 are complete (section 0.1); Phase 4 is next. The Architecture v1.5 deletion/anonymization documentation (section 0.3, section 18) is a separate contract correction for future Phase 5 work — it is not part of the Phase 1–2 milestones above.
+Phases 1–4 are complete (section 0.1); Phase 5 is next. The Architecture v1.5 deletion/anonymization documentation (section 0.3, section 18) is a separate contract correction for future Phase 5 work — it is not part of the Phase 1–2 milestones above.
 
 Use an available GitHub connection only for read-only work such as:
 

@@ -44,3 +44,34 @@ class PrimaryOutput(BaseModel):
     # Model suggestions that steer retrieval only; never displayed as fact.
     search_terms: list[str] = Field(default_factory=list)
     risk_flags: list[str] = Field(default_factory=list)
+
+
+class CounterBundle(BaseModel):
+    """One targeted counter-search: a strategy and a few short queries."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    strategy: str = "DIRECT_CONTRADICTION"
+    queries: list[str] = Field(default_factory=list)
+
+
+class SkepticPlan(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    weakest_claim: str = ""
+    why_it_could_be_wrong: str = ""
+    bundles: list[CounterBundle] = Field(default_factory=list)
+
+
+class Objection(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    text: str = Field(min_length=1)
+    severity: Confidence = Confidence.MEDIUM
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class SkepticVerdict(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    objections: list[Objection] = Field(default_factory=list)

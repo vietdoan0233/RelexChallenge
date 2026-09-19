@@ -22,6 +22,35 @@ class ValidationReport(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class ReviewObjection(BaseModel):
+    text: str
+    severity: Confidence
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class ReviewInfo(BaseModel):
+    """How the Case was checked: risk routing and the Skeptic's work.
+
+    Shown to the reader so a "checked for contradictions" claim is
+    inspectable. Ids only; counter-evidence is served through the evidence
+    endpoint like any other citation.
+    """
+
+    risk_level: str = "LOW"
+    risk_triggers: list[str] = Field(default_factory=list)
+    skeptic_ran: bool = False
+    counter_queries: int = 0
+    # How many new units the counter-search surfaced (for transparency), versus
+    # `counter_evidence_ids`: only the ones the Skeptic actually relied on.
+    counter_units_examined: int = 0
+    counter_evidence_ids: list[str] = Field(default_factory=list)
+    objections: list[ReviewObjection] = Field(default_factory=list)
+    reconciled: bool = False
+    # False when a required adversarial check could not finish; the answer
+    # is then explicitly provisional rather than silently unchecked.
+    completed: bool = True
+
+
 class ValidatedClaim(BaseModel):
     claim_text: str
     stance: Stance
@@ -48,6 +77,7 @@ class ValidatedReceipt(BaseModel):
     missing_information: list[str] = Field(default_factory=list)
     related_questions: list[str] = Field(default_factory=list)
     validation: ValidationReport = Field(default_factory=ValidationReport)
+    review: ReviewInfo = Field(default_factory=ReviewInfo)
 
     def evidence_ids(self) -> dict[str, set[str]]:
         """Referenced ids by usage, for the case_evidence table."""
@@ -57,6 +87,13 @@ class ValidatedReceipt(BaseModel):
             usage["CONFLICT"].update(claim.conflicting_evidence_ids)
         for event in self.timeline_events:
             usage["TIMELINE"].update(event.evidence_ids)
+        # Counter-evidence the Skeptic *relied on* is a dependency too: deleting
+        # it must invalidate the Case just like cited support. Units merely
+        # surfaced by a search are not recorded, or nearly every Case would be
+        # invalidated by any deletion.
+        usage["CONFLICT"].update(self.review.counter_evidence_ids)
+        for objection in self.review.objections:
+            usage["CONFLICT"].update(objection.evidence_ids)
         return usage
 
 
@@ -118,6 +155,7 @@ class CaseReceipt(BaseModel):
     missing_information: list[str]
     related_questions: list[str]
     validation: ValidationReport
+    review: ReviewInfo
     created_at: str
 
 

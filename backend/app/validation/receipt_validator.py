@@ -25,6 +25,8 @@ from app.schemas.receipt import (
     EvidenceView,
     ReceiptClaim,
     ReceiptTimelineEvent,
+    ReviewInfo,
+    ReviewObjection,
     ValidatedClaim,
     ValidatedReceipt,
     ValidatedTimelineEvent,
@@ -145,6 +147,35 @@ def validate_primary(
     )
 
 
+def sanitize_review(
+    conn: sqlite3.Connection, review: ReviewInfo, visible_ids: set[str] | None
+) -> ReviewInfo:
+    """Keep only counter-evidence ids that exist (and were shown), and
+    strip ids from the Skeptic's prose, exactly as for claims."""
+    ids = set(review.counter_evidence_ids)
+    for objection in review.objections:
+        ids.update(objection.evidence_ids)
+    good = valid_ids(conn, ids, visible_ids)
+    objections = []
+    for objection in review.objections:
+        text = clean_prose(objection.text)
+        if not text:
+            continue
+        objections.append(
+            ReviewObjection(
+                text=text,
+                severity=objection.severity,
+                evidence_ids=_keep(objection.evidence_ids, good),
+            )
+        )
+    return review.model_copy(
+        update={
+            "counter_evidence_ids": _keep(review.counter_evidence_ids, good),
+            "objections": objections,
+        }
+    )
+
+
 def hydrate_receipt(
     conn: sqlite3.Connection, validated: ValidatedReceipt, *, case_id: str, created_at: str
 ) -> CaseReceipt:
@@ -155,6 +186,16 @@ def hydrate_receipt(
     therefore never render, even from a cached Case.
     """
     every = {i for ids in validated.evidence_ids().values() for i in ids}
+    existing = valid_ids(conn, every, None)
+    review = validated.review.model_copy(
+        update={
+            "counter_evidence_ids": _keep(validated.review.counter_evidence_ids, existing),
+            "objections": [
+                o.model_copy(update={"evidence_ids": _keep(o.evidence_ids, existing)})
+                for o in validated.review.objections
+            ],
+        }
+    )
     records = {r.evidence_id: r for r in hydrate(conn, sorted(every))}
 
     claims: list[ReceiptClaim] = []
@@ -208,6 +249,7 @@ def hydrate_receipt(
         missing_information=validated.missing_information,
         related_questions=validated.related_questions,
         validation=validated.validation,
+        review=review,
         created_at=created_at,
     )
 

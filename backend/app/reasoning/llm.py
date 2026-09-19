@@ -132,3 +132,26 @@ class ScriptedLLM:
         self.calls += 1
         reply = self._replies[min(self.calls, len(self._replies)) - 1]
         return reply(system, user) if callable(reply) else reply
+
+
+class RoleRoutedLLM:
+    """Offline stand-in that answers by reasoning role (Primary, Skeptic plan,
+    Skeptic verdict, Reconcile), read from the [ROLE:...] tag each system
+    prompt starts with. Records the order of roles so tests can assert which
+    stages ran. An unscripted role fails loudly."""
+
+    model_name = "role-routed-llm-v1"
+
+    def __init__(self, replies: dict[str, str | Callable[[str, str], str]]) -> None:
+        self._replies = replies
+        self.roles: list[str] = []
+
+    def complete_json(self, *, system: str, user: str) -> str:
+        role = system.split("[ROLE:", 1)[1].split("]", 1)[0]
+        self.roles.append(role)
+        if role not in self._replies:
+            raise AssertionError(f"no scripted reply for role {role}")
+        reply = self._replies[role]
+        if isinstance(reply, Exception):
+            raise reply
+        return reply(system, user) if callable(reply) else reply

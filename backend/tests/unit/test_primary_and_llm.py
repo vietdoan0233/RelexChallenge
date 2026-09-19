@@ -189,3 +189,23 @@ def test_logs_contain_status_and_request_id_only(caplog):
 def test_incomplete_configuration_is_refused():
     with pytest.raises(ValueError):
         OpenAICompatibleChatClient(api_key="", base_url="https://x", model_name="m")
+
+
+def test_over_budget_evidence_never_drops_new_counter_evidence(conn, seed_units):
+    from app.reasoning import prompts
+    from app.reasoning.evidence import EvidenceSet
+
+    ids = seed_units(conn, "big", [f"filler unit number {i} here" for i in range(30)])
+    result = RetrievalService(conn, None).retrieve("filler unit", temporal_sweep=False)
+    evidence = EvidenceSet.from_results(result)
+    # Make every unit plain context except the last, which is "new".
+    evidence.hit_ids.clear()
+    evidence.visible_ids = [i for i in ids if i in evidence.records]
+    new_id = evidence.visible_ids[-1]
+    original = prompts._MAX_UNITS
+    prompts._MAX_UNITS = 5
+    try:
+        text = prompts.format_evidence_set(evidence, new_ids={new_id})
+    finally:
+        prompts._MAX_UNITS = original
+    assert f"![{new_id}]" in text

@@ -6,13 +6,15 @@ counts as an approver. Whether something was agreed is inferred from the
 conversation itself.
 """
 
+from app.reasoning.evidence import EvidenceSet
 from app.retrieval.records import EvidenceRecord
 from app.retrieval.service import RetrievalResult
 
 _MAX_UNIT_CHARS = 1200
-_MAX_UNITS = 140
+_MAX_UNITS = 180
 
-SYSTEM_PROMPT = """You are the Primary Reasoner of an evidence-first organizational memory auditor.
+SYSTEM_PROMPT = """[ROLE:PRIMARY]
+You are the Primary Reasoner of an evidence-first organizational memory auditor.
 The EVIDENCE in the user message is authoritative. You only interpret it; you are not a source of truth.
 
 RULES
@@ -48,15 +50,30 @@ def build_user_prompt(query: str, retrieval: RetrievalResult) -> str:
 
 
 def format_evidence(retrieval: RetrievalResult) -> str:
+    return format_evidence_set(EvidenceSet.from_results(retrieval))
+
+
+def format_evidence_set(evidence: EvidenceSet, *, new_ids: set[str] | None = None) -> str:
     """Evidence grouped by document in conversation order.
 
     Markers: `*` retrieved match, `+` later evidence found by the temporal
-    sweep, blank = neighbouring context shown so short turns are readable.
+    sweep, `!` newly found by the Skeptic's counter-search, blank = neighbouring
+    context shown so short turns are readable.
     """
-    hit_ids = {h.evidence_id for h in retrieval.fused}
-    later_ids = {h.evidence_id for h in retrieval.temporal.hits} if retrieval.temporal else set()
+    new_ids = new_ids or set()
+    records = [evidence.records[i] for i in evidence.visible_ids if i in evidence.records]
+    if len(records) > _MAX_UNITS:
+        # Over budget: drop plain context first. Newly found counter-evidence
+        # and matched units must never be the ones cut.
+        def priority(unit: EvidenceRecord) -> int:
+            if unit.evidence_id in new_ids:
+                return 0
+            if unit.evidence_id in evidence.hit_ids:
+                return 1
+            return 2 if unit.evidence_id in evidence.later_ids else 3
 
-    records = [retrieval.records[i] for i in retrieval.visible_evidence_ids][:_MAX_UNITS]
+        keep = {u.evidence_id for u in sorted(records, key=priority)[:_MAX_UNITS]}
+        records = [u for u in records if u.evidence_id in keep]
     by_doc: dict[str, list[EvidenceRecord]] = {}
     for record in records:
         by_doc.setdefault(record.document_id, []).append(record)
@@ -73,10 +90,12 @@ def format_evidence(retrieval: RetrievalResult) -> str:
         )
         for unit in sorted(units, key=lambda u: u.unit_index):
             marker = (
-                "*"
-                if unit.evidence_id in hit_ids
+                "!"
+                if unit.evidence_id in new_ids
+                else "*"
+                if unit.evidence_id in evidence.hit_ids
                 else "+"
-                if unit.evidence_id in later_ids
+                if unit.evidence_id in evidence.later_ids
                 else " "
             )
             when = " ".join(p for p in (unit.event_date, unit.timestamp_text) if p)

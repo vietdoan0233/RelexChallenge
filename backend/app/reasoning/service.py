@@ -10,14 +10,22 @@ import sqlite3
 import uuid
 from dataclasses import dataclass, field
 
+from app.core.enums import CaseStatus, Confidence
+from app.core.errors import AnalysisUnavailableError
 from app.db import repository
-from app.reasoning import primary
+from app.reasoning import primary, reconcile, risk, skeptic
+from app.reasoning.evidence import EvidenceSet
 from app.reasoning.llm import LLMClient
 from app.retrieval.service import RetrievalService
-from app.schemas.receipt import CaseReceipt, ValidatedReceipt
+from app.schemas.reasoning import PrimaryOutput
+from app.schemas.receipt import CaseReceipt, ReviewInfo, ReviewObjection, ValidatedReceipt
 from app.validation import receipt_validator
 
 _LOGGER = logging.getLogger(__name__)
+
+PROVISIONAL_NOTE = (
+    "The adversarial check of this answer could not be completed; treat it as provisional."
+)
 
 
 @dataclass
@@ -32,6 +40,14 @@ class CaseTrace:
     rejected_ids: list[str] = field(default_factory=list)
     final_evidence_ids: list[str] = field(default_factory=list)
     validation_notes: list[str] = field(default_factory=list)
+    risk_level: str = "LOW"
+    risk_triggers: list[str] = field(default_factory=list)
+    skeptic_ran: bool = False
+    counter_queries: int = 0
+    counter_new_ids: list[str] = field(default_factory=list)
+    counter_units_examined: int = 0
+    reconciled: bool = False
+    review_completed: bool = True
 
 
 class CaseService:
@@ -44,23 +60,75 @@ class CaseService:
         trace = CaseTrace(request_id=uuid.uuid4().hex[:12])
 
         retrieval = self._retrieval.retrieve(query)
+        evidence = EvidenceSet.from_results(retrieval)
         trace.retrieved_ids = retrieval.ranked_ids
-        trace.visible_count = len(retrieval.visible_evidence_ids)
+        trace.visible_count = len(evidence.visible_ids)
         trace.semantic_used = retrieval.semantic_used
 
         # No evidence at all: do not ask a model to answer from nothing.
-        if retrieval.visible_evidence_ids:
-            output = primary.analyze(self._llm, query, retrieval)
-            validated = receipt_validator.validate_primary(
-                self._conn,
-                output,
-                query=query,
-                visible_ids=set(retrieval.visible_evidence_ids),
-            )
-        else:
-            validated = _insufficient(query)
+        if not evidence.visible_ids:
+            return self._store(_insufficient(query), trace)
 
+        output = primary.analyze(self._llm, query, retrieval)
+        review = ReviewInfo()
+
+        # Routing is deterministic; the model's own confidence can only
+        # escalate scrutiny, never waive it (CLAUDE.md 12).
+        assessment = risk.assess(query, output, retrieval, evidence)
+        review.risk_level = assessment.level
+        review.risk_triggers = assessment.triggers
+        if assessment.deep_check:
+            output, review = self._deep_check(query, output, evidence, review)
+
+        trace.risk_level = review.risk_level
+        trace.risk_triggers = review.risk_triggers
+        trace.skeptic_ran = review.skeptic_ran
+        trace.counter_queries = review.counter_queries
+        trace.counter_new_ids = review.counter_evidence_ids
+        trace.counter_units_examined = review.counter_units_examined
+        trace.reconciled = review.reconciled
+        trace.review_completed = review.completed
+
+        validated = receipt_validator.validate_primary(
+            self._conn, output, query=query, visible_ids=set(evidence.visible_ids)
+        )
+        validated = validated.model_copy(
+            update={
+                "review": receipt_validator.sanitize_review(
+                    self._conn, review, set(evidence.visible_ids)
+                )
+            }
+        )
         return self._store(validated, trace)
+
+    def _deep_check(
+        self, query: str, output: PrimaryOutput, evidence: EvidenceSet, review: ReviewInfo
+    ) -> tuple[PrimaryOutput, ReviewInfo]:
+        """Skeptic -> counter-retrieval -> reconciliation. A failure here
+        never yields an unchecked confident answer: the result is degraded
+        and marked provisional instead."""
+        try:
+            # Attempted, whether or not it finishes: a failure is then visible
+            # as skeptic_ran with completed=False, never as "no check happened".
+            review.skeptic_ran = True
+            result = skeptic.run(self._llm, self._retrieval, query, output, evidence)
+            review.counter_queries = result.queries_run
+            review.counter_units_examined = len(result.new_evidence_ids)
+            review.objections = [
+                ReviewObjection(text=o.text, severity=o.severity, evidence_ids=o.evidence_ids)
+                for o in result.objections
+            ]
+            review.counter_evidence_ids = list(
+                dict.fromkeys(i for o in result.objections for i in o.evidence_ids)
+            )
+            if result.has_findings:
+                output = reconcile.run(self._llm, query, output, evidence, result)
+                review.reconciled = True
+        except AnalysisUnavailableError:
+            _LOGGER.warning("adversarial check incomplete; degrading answer")
+            review.completed = False
+            output = _provisional(output)
+        return output, review
 
     def get(self, case_id: str) -> CaseReceipt | None:
         return load_case_receipt(self._conn, case_id)
@@ -119,4 +187,27 @@ def _insufficient(query: str) -> ValidatedReceipt:
         answer_summary=receipt_validator.NO_SUPPORT_SUMMARY,
         claims=[],
         missing_information=["No evidence in the archive matched this question."],
+    )
+
+
+def _provisional(output: PrimaryOutput) -> PrimaryOutput:
+    """Cap an answer whose required adversarial check did not finish."""
+    claims = [
+        c.model_copy(update={"confidence": Confidence.MEDIUM})
+        if c.confidence == Confidence.HIGH
+        else c
+        for c in output.claims
+    ]
+    status = (
+        CaseStatus.PARTIALLY_SUPPORTED if output.status == CaseStatus.SUPPORTED else output.status
+    )
+    return output.model_copy(
+        update={
+            "claims": claims,
+            "status": status,
+            "missing_information": [
+                *output.missing_information,
+                PROVISIONAL_NOTE,
+            ],
+        }
     )

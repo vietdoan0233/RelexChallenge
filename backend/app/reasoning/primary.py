@@ -22,10 +22,20 @@ _MAX_ATTEMPTS = 2
 
 
 def analyze(llm: LLMClient, query: str, retrieval: RetrievalResult) -> PrimaryOutput:
-    user = build_user_prompt(query, retrieval)
+    return parse_output(llm, SYSTEM_PROMPT, build_user_prompt(query, retrieval))
+
+
+def parse_output(
+    llm: LLMClient,
+    system: str,
+    user: str,
+    *,
+    unusable: str = "the reasoning service did not return a usable structured answer",
+) -> PrimaryOutput:
+    """One structured call with a single schema-repair retry."""
     repair_note = ""
     for attempt in range(1, _MAX_ATTEMPTS + 1):
-        raw = llm.complete_json(system=SYSTEM_PROMPT, user=user + repair_note)
+        raw = llm.complete_json(system=system, user=user + repair_note)
         try:
             return PrimaryOutput.model_validate_json(_strip_fence(raw))
         except (ValidationError, ValueError) as exc:
@@ -39,9 +49,7 @@ def analyze(llm: LLMClient, query: str, retrieval: RetrievalResult) -> PrimaryOu
                 "Reply again with ONE valid JSON object using exactly the specified keys and "
                 f"allowed enum values. Problem locations: {_error_locations(exc)}"
             )
-    raise AnalysisUnavailableError(
-        "the reasoning service did not return a usable structured answer"
-    )
+    raise AnalysisUnavailableError(unusable)
 
 
 def _strip_fence(raw: str) -> str:

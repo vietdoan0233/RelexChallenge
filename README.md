@@ -9,8 +9,9 @@ reaches the UI. The full architecture and implementation contract lives in
 [CLAUDE.md](CLAUDE.md); this file only covers running the project.
 
 **Status:** Phase 1 Evidence Locker implemented and paused at its mandatory
-hardening/review gate. Identity extraction must be tightened and real Gemini
-embeddings must be generated before Phase 2 retrieval begins. See
+hardening/review gate. Identity extraction must be tightened, the
+organizer-provided GPT API adapter must be finalized, and real embeddings must
+be generated before Phase 2 retrieval begins. See
 `docs/HANDOFF_2026-09-19.md` for the current checkpoint and `CLAUDE.md`
 section 24 for the frozen phase plan.
 
@@ -39,7 +40,10 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` at the repo root and fill in `GOOGLE_API_KEY`.
+Copy `.env.example` to `.env` at the repo root. `.env.example` is intentionally
+tracked because it contains safe placeholders; `.env` is gitignored and is the
+only place where real credentials belong. Leave the GPT fields empty until the
+organizers provide the API key, endpoint, and model details.
 
 ```bash
 uvicorn app.main:app --reload --port 8000
@@ -76,8 +80,11 @@ From the repository root, deterministic ingestion can run without API access:
 backend/.venv/Scripts/python.exe scripts/ingest.py --skip-embeddings
 ```
 
-After configuring `GOOGLE_API_KEY` and `GEMINI_EMBEDDING_MODEL` in the
-gitignored root `.env`, omit `--skip-embeddings` to generate real vectors:
+The organizer GPT transport is currently an explicit placeholder. Continue to
+use `--skip-embeddings` until the organizers provide the API contract. Once the
+adapter is implemented and `GPT_API_KEY`, `GPT_BASE_URL`, and
+`GPT_EMBEDDING_MODEL` are configured in the gitignored root `.env`, omit the
+flag to generate real vectors:
 
 ```bash
 backend/.venv/Scripts/python.exe scripts/ingest.py

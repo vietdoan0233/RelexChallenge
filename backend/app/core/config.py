@@ -15,9 +15,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_REPO_ROOT / ".env", extra="ignore")
 
-    google_api_key: str = ""
-    gemini_model: str = ""
-    gemini_embedding_model: str = ""
+    # Organizer-provided GPT connection details. These remain empty placeholders
+    # until the hackathon API contract and credentials are available.
+    gpt_api_key: str = ""
+    gpt_base_url: str = ""
+    gpt_model: str = ""
+    gpt_embedding_model: str = ""
     database_path: str = "./data/keeper.db"
     source_data_dir: str = "./data/source"
 

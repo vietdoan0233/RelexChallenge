@@ -1,6 +1,6 @@
 # AGENTS.md — KEEPER: Evidence-First Organizational Memory Auditor
 
-> **Status:** Architecture v1.3 FROZEN — Phase 1 implementation checkpoint recorded; identity hardening, real embeddings, and review are required before Phase 2
+> **Status:** Architecture v1.4 FROZEN — Phase 1 implementation checkpoint recorded; identity hardening, organizer GPT integration, real embeddings, and review are required before Phase 2
 > **Challenge:** RELEX Solutions — “Memory With a Receipt”
 > **Project:** KEEPER
 > **Build model:** 1 developer, ~40 total working hours, AI-assisted implementation
@@ -63,7 +63,7 @@ This section reflects the verified repository state at the end of work on 2026-0
   - truncation preservation,
   - people/aliases and `evidence_people`,
   - FTS5 population,
-  - batched/retried embedding integration plus deterministic mock and `--skip-embeddings`,
+  - provider-neutral embedding interface, deterministic mock, and `--skip-embeddings`,
   - ingestion CLI/report,
   - unit and integration tests.
 - The latest verified offline ingestion parsed 45 documents into 2,517 Evidence Units:
@@ -71,7 +71,7 @@ This section reflects the verified repository state at the end of work on 2026-0
   - 110 email-message units,
   - 292 report units.
 - The latest verified FTS row count is 2,517.
-- The latest verified quality gate is 41 passing backend tests, clean Ruff checks, and a successful frontend build.
+- The latest verified quality gate is 42 passing backend tests, clean Ruff checks, and a successful frontend build.
 
 ## Important corpus discoveries already verified
 
@@ -127,7 +127,8 @@ The following must be resolved before Phase 1 is accepted:
 - tighten people/alias discovery so capitalized phrases cannot become deletion-relevant identities,
 - review the resulting people/alias/evidence-person counts against the corpus,
 - configure a local `.env` without committing secrets,
-- run one real Gemini embedding smoke test,
+- finalize the organizer-provided GPT API transport after its endpoint/SDK contract is supplied,
+- run one real GPT embedding smoke test,
 - generate and verify real embedding rows for the intended corpus before claiming semantic retrieval readiness,
 - rerun all Phase 1 quality gates and issue a corrected Phase 1 review report.
 
@@ -141,7 +142,7 @@ Do not jump to Phase 2 until Phase 1 exit criteria pass and the ingestion output
 
 The local repository uses the configured `origin` remote. Connector availability varies by session and must be verified rather than assumed.
 
-Use it where it reduces manual friction, but first verify what actions are actually available in the current environment.
+Use read-only remote inspection where it reduces manual friction, but first verify what actions are actually available in the current environment. The user performs repository `pull`, `fetch`, and `push` operations; give the user the exact command when one is required.
 
 ## Required first checks
 
@@ -149,7 +150,7 @@ Before making repository-history changes:
 
 1. inspect the local git status,
 2. inspect configured remotes,
-3. use the configured remote or an available authorized GitHub connection to verify the intended repository/branch,
+3. use local tracking information or an available read-only GitHub connection to verify the intended repository/branch,
 4. compare local staged/uncommitted work with the remote before pushing,
 5. do not overwrite unrelated remote changes.
 
@@ -157,7 +158,7 @@ Before making repository-history changes:
 
 Prefer milestone commits after tests pass.
 
-If an authorized GitHub connector is available and permits repository write operations, it may be used for the authorized repo/branch. Ordinary authenticated Git is also acceptable.
+Create tested local commits when appropriate. Do not run `git pull`, `git fetch`, or `git push`; tell the user which exact command to run and wait for them to perform the network operation.
 
 If local `git commit` is used and identity is missing:
 
@@ -178,14 +179,14 @@ Verified local history at the 2026-09-19 checkpoint:
 1. `5886ab5 chore(scaffold): establish keeper phase 0 baseline`
 2. `1c6f3d7 feat(ingestion): build evidence locker and stable source parsing`
 3. `1bb96b1 fix(ingestion): strip bullet numbering in single-bullet report sections`
+4. `c56c252 docs: record phase 1 checkpoint and handoff`
 
-The next milestone is a focused Phase 1 hardening change for high-confidence identity extraction and real embedding verification. Do not label Phase 2 complete or semantic retrieval ready until real embedding rows exist.
+The next milestone is focused Phase 1 hardening for high-confidence identity extraction and, once the organizers supply the API contract, the GPT adapter and real embedding verification. Do not label Phase 2 complete or semantic retrieval ready until real embedding rows exist.
 
-Use the GitHub connector primarily for:
+Use an available GitHub connection only for read-only work such as:
 
 - verifying remote repository state,
 - inspecting branch/history,
-- publishing tested milestone commits when permitted,
 - reviewing diffs.
 
 Do not let GitHub integration change the architecture or source-of-truth rules.
@@ -194,7 +195,8 @@ Do not let GitHub integration change the architecture or source-of-truth rules.
 
 The architecture version changes only when the frozen product or technical architecture changes. Updating implementation progress, repository state, test counts, or handoff notes does **not** create a new architecture version.
 
-- **v1.3 — current, frozen.** Audited architecture contract covering the Phase 0 checkpoint, GitHub workflow, stable source-locator manifest, canonical-source rebuild invariant, embedding resilience, citation-context invariant, Skeptic counter-retrieval behavior, deletion cleanup, and mandatory Phase 1 review gate.
+- **v1.4 — current, frozen.** Replaced the Google/Gemini provider choice with an organizer-provided GPT service. The API key, base URL, reasoning model, and embedding model remain environment placeholders until the organizers supply the exact contract. The provider-neutral offline ingestion path remains mandatory.
+- **v1.3 — previous frozen architecture.** Audited architecture contract covering the Phase 0 checkpoint, GitHub workflow, stable source-locator manifest, canonical-source rebuild invariant, embedding resilience, citation-context invariant, Skeptic counter-retrieval behavior, deletion cleanup, and mandatory Phase 1 review gate.
 - **2026-09-19 implementation checkpoint — no architecture version change.** Recorded the implemented Phase 1 Evidence Locker, verified offline ingestion/test counts, known identity-discovery false positives, missing real embeddings, and the decision to stop before Phase 2.
 
 Earlier architecture iterations are not reconstructed here because their authoritative change notes are not present in the repository. Do not invent retrospective version details.
@@ -399,7 +401,7 @@ No unresolved “X or Y” choices.
 - SQLite
 - SQLite FTS5
 - NumPy
-- Google GenAI SDK directly
+- organizer-provided GPT API directly; exact SDK/transport is added only after the organizers supply the endpoint contract
 - pytest
 - Ruff
 - python-dotenv
@@ -430,12 +432,15 @@ Do not add Zustand unless a concrete state problem requires it. Prefer local sta
 Use environment variables:
 
 ```env
-GOOGLE_API_KEY=
-GEMINI_MODEL=
-GEMINI_EMBEDDING_MODEL=
+GPT_API_KEY=
+GPT_BASE_URL=
+GPT_MODEL=
+GPT_EMBEDDING_MODEL=
 DATABASE_PATH=./data/keeper.db
 SOURCE_DATA_DIR=./data/source
 ```
+
+`.env.example` is a committed, secret-free template and must remain tracked. Real credentials belong only in the gitignored root `.env`.
 
 Do not hardcode model names in business logic.
 
@@ -1705,7 +1710,7 @@ Fail safely.
 Examples:
 
 - LLM JSON invalid → bounded retry using same structured schema, then return controlled error.
-- Gemini unavailable → API returns explicit temporary analysis failure, not fabricated answer.
+- Organizer GPT service unavailable → API returns explicit temporary analysis failure, not fabricated answer.
 - fabricated evidence ID → drop/reject claim.
 - retrieval returns no meaningful evidence → `INSUFFICIENT_EVIDENCE`.
 - deletion partial failure → transaction/recovery path; do not report success.
@@ -1880,7 +1885,7 @@ Exit:
 
 Tasks:
 
-- structured Gemini call,
+- structured GPT call through the organizer-provided API,
 - candidate claim schema,
 - receipt schema,
 - DB-hydrated citations,

@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import type { FindingCard as Card, RadarCheck } from '../../types/api'
-import { btnSecondary, formatDate } from '../../lib'
+import type { Citation, FindingCard as Card, RadarCheck } from '../../types/api'
+import { btnSecondary, card as cardClass, formatDate } from '../../lib'
 import { CitationList } from '../evidence/CitationList'
 import { EvidenceDrawer } from '../evidence/EvidenceDrawer'
-import { IconAlert, IconArrowRight, IconCheck, IconX } from '../icons'
+import { IconAlert, IconArrowRight, IconCheck, IconDotsVertical, IconFile, IconFolder, IconLink, IconMapPin, IconX } from '../icons'
 import { go } from '../../hooks/useRoute'
 import { ASSESSMENT } from './assessments'
 
@@ -55,6 +55,47 @@ function CheckPill({ index, result }: { index: number; result?: RadarCheck }) {
   )
 }
 
+function MiniLink({ citation, onOpen }: { citation?: Citation; onOpen: (id: string) => void }) {
+  if (!citation) return null
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(citation.evidence_id)}
+      className="mt-1.5 inline-flex max-w-full cursor-pointer items-center gap-1 text-left text-xs font-bold text-brand-ink"
+    >
+      <IconLink size={12} className="shrink-0" />
+      <span className="truncate">{citation.document_title ?? citation.filename} · {formatDate(citation.event_date)}</span>
+    </button>
+  )
+}
+
+function MiniColumn({
+  icon,
+  label,
+  body,
+  citation,
+  onOpen,
+  muted,
+}: {
+  icon: React.ReactNode
+  label: string
+  body: string
+  citation?: Citation
+  onOpen: (id: string) => void
+  muted?: boolean
+}) {
+  return (
+    <div className={`min-w-0 rounded-xl p-3 ${muted ? 'bg-surface-2' : ''}`}>
+      <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-ink-3">
+        {icon}
+        {label}
+      </p>
+      <p className="line-clamp-3 text-sm text-ink">{body}</p>
+      <MiniLink citation={citation} onOpen={onOpen} />
+    </div>
+  )
+}
+
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[2rem_1fr] gap-3">
@@ -69,21 +110,59 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 export function FindingCard({ card }: { card: Card }) {
   const [openId, setOpenId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const a = ASSESSMENT[card.assessment]
-  return (
-    <article className="anim-fade-up overflow-hidden rounded-3xl border border-line bg-surface shadow-lift">
-      <header className="flex flex-wrap items-start justify-between gap-3 bg-gradient-to-r from-deep to-[#1884c5] p-6 text-white">
-        <div className="min-w-0 space-y-1">
-          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-white/70">Reconsideration candidate</p>
-          <h2 className="text-balance text-xl font-extrabold leading-snug sm:text-2xl">{card.proposal}</h2>
-        </div>
-        <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-extrabold ${a.tone}`}>
-          {a.icon}
-          {a.label}
-        </span>
-      </header>
+  const changedBody = card.changed_condition ?? card.assessment_rationale
+  const changedCitation = card.internal_change_citations[0] ?? card.current_state_citations[0]
 
-      <div className="space-y-7 p-6">
+  return (
+    <article className={`${cardClass} anim-fade-up overflow-hidden`}>
+      <div className="p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-extrabold uppercase tracking-wide ${a.tone}`}>
+            {a.icon}
+            {a.label}
+          </span>
+          <div className="flex items-center gap-2">
+            <button type="button" className={btnSecondary} onClick={() => go.caseView(card.case_id)}>
+              Open Case <IconArrowRight size={16} />
+            </button>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={expanded ? 'Hide full analysis' : 'Show full analysis'}
+              onClick={() => setExpanded((v) => !v)}
+              className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full text-ink-3 transition-colors duration-200 hover:bg-surface-2 hover:text-ink"
+            >
+              <IconDotsVertical size={18} />
+            </button>
+          </div>
+        </div>
+
+        <h2 className="mt-3 text-balance text-xl font-extrabold leading-snug text-ink">{card.proposal}</h2>
+        <p className="mt-1 text-sm text-ink-2">
+          {card.outcome === 'REJECTED' ? 'Rejected' : 'Deferred'} · {card.blocker_category}
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <MiniColumn icon={<IconFile size={13} />} label="Original proposal" body={card.proposal} citation={card.proposal_citations[0]} onOpen={setOpenId} />
+          <MiniColumn icon={<IconX size={13} />} label="Why it was stopped" body={card.blocker} citation={card.blocker_citations[0]} onOpen={setOpenId} />
+          <MiniColumn icon={<IconArrowRight size={13} className="-rotate-45" />} label="What may have changed" body={changedBody} citation={changedCitation} onOpen={setOpenId} />
+          <MiniColumn icon={<IconMapPin size={13} />} label="Still unknown" body={card.unestablished[0] ?? 'Nothing flagged.'} onOpen={setOpenId} muted />
+        </div>
+
+        <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs font-semibold text-ink-3">
+          <span className="inline-flex items-center gap-1.5">
+            <IconFolder size={14} /> Case {card.case_id} · Last updated {formatDate(card.created_at)}
+          </span>
+          <button type="button" onClick={() => setExpanded((v) => !v)} className="cursor-pointer font-bold text-brand-ink">
+            {expanded ? 'Show less' : 'Show full analysis'}
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+      <div className="space-y-7 border-t border-line p-6">
         <p className="rounded-xl bg-surface-2 p-3 text-sm font-semibold text-ink-2">{a.meaning} This is a prompt to look again, not a recommendation.</p>
 
         <Step n={1} title="Original proposal">
@@ -164,11 +243,8 @@ export function FindingCard({ card }: { card: Card }) {
             ))}
           </ol>
         </details>
-
-        <button type="button" className={btnSecondary} onClick={() => go.caseView(card.case_id)}>
-          Open the validated Case <IconArrowRight size={16} />
-        </button>
       </div>
+      )}
       {openId && <EvidenceDrawer evidenceId={openId} onClose={() => setOpenId(null)} />}
     </article>
   )

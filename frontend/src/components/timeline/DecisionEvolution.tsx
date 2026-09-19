@@ -1,6 +1,7 @@
 import type { ReceiptTimelineEvent, Stance } from '../../types/api'
 import { formatDate } from '../../lib'
 import { ConfidenceMeter, StanceChip } from '../ui'
+import { IconCheck } from '../icons'
 
 const DOT: Record<Stance, string> = {
   PROPOSAL: 'bg-purple',
@@ -15,7 +16,8 @@ const DOT: Record<Stance, string> = {
 }
 
 /** How evidence-supported state changed over time. Every node has evidence and opens
- *  it; nothing is inferred to smooth the story. */
+ *  it; nothing is inferred to smooth the story. A short list reads as a left-to-right
+ *  timeline; a long one wraps and keeps each node fully readable. */
 export function DecisionEvolution({
   events,
   onOpen,
@@ -25,31 +27,29 @@ export function DecisionEvolution({
 }) {
   if (events.length === 0) return null
   return (
-    <ol className="relative space-y-4 pl-8 before:absolute before:bottom-2 before:left-[11px] before:top-2 before:w-0.5 before:bg-line">
+    <ol className="grid gap-x-4 gap-y-8 sm:grid-cols-2 lg:flex lg:items-start lg:gap-0">
       {events.map((event, index) => (
-        <li key={`${event.event_date}-${index}`} className="anim-fade-up relative" style={{ animationDelay: `${index * 70}ms` }}>
-          <span
-            aria-hidden="true"
-            className={`absolute -left-8 top-4 grid size-6 place-items-center rounded-full ring-4 ring-bg ${DOT[event.state]}`}
-          >
-            <span className="size-2 rounded-full bg-white" />
-          </span>
-          <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
-            <div className="flex flex-wrap items-center gap-2">
-              <time className="rounded-full bg-deep px-3 py-1 text-xs font-extrabold text-white">
-                {formatDate(event.event_date)}
-              </time>
+        <li key={`${event.event_date}-${index}`} className="anim-fade-up relative min-w-0 lg:flex-1 lg:px-2" style={{ animationDelay: `${index * 70}ms` }}>
+          <div className="flex items-center" aria-hidden="true">
+            <span className={`grid size-8 shrink-0 place-items-center rounded-full text-white ring-4 ring-bg ${DOT[event.state]}`}>
+              <IconCheck size={15} strokeWidth={3} />
+            </span>
+            <span className={`hidden h-0.5 flex-1 lg:block ${index < events.length - 1 ? 'bg-line' : 'bg-transparent'}`} />
+          </div>
+          <div className="mt-3 space-y-1.5 pr-2">
+            <time className="block text-xs font-extrabold uppercase tracking-wide text-ink-3">{formatDate(event.event_date)}</time>
+            <p className="text-sm font-extrabold leading-snug text-ink">{event.event_text}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
               <StanceChip stance={event.state} />
               <ConfidenceMeter confidence={event.confidence} />
             </div>
-            <p className="mt-2 text-base font-semibold leading-snug text-ink">{event.event_text}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 pt-1">
               {event.citations.map((c, i) => (
                 <button
                   key={c.evidence_id}
                   type="button"
                   onClick={() => onOpen(c.evidence_id)}
-                  className="min-h-11 cursor-pointer rounded-full border border-line px-4 text-sm font-semibold text-brand-ink transition-colors duration-200 hover:border-brand hover:bg-brand-soft"
+                  className="min-h-8 cursor-pointer rounded-full border border-line px-3 text-xs font-semibold text-brand-ink transition-colors duration-200 hover:border-brand hover:bg-brand-soft"
                 >
                   Source {i + 1} · {c.speaker_sender ?? 'unknown'}
                 </button>

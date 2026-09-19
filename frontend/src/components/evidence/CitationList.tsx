@@ -49,6 +49,27 @@ export function SourceChip({
   )
 }
 
+/** A compact two-line row (title + filename, date at right): denser than SourceChip,
+ *  used where a claim card has narrow columns and a quote preview would not fit. */
+export function SourceRow({ citation: c, onOpen }: { citation: Citation; onOpen: (id: string) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(c.evidence_id)}
+      className="group flex w-full cursor-pointer items-start gap-2.5 rounded-lg py-1.5 text-left transition-colors duration-200 hover:bg-surface-2"
+    >
+      <span className="mt-0.5 shrink-0 text-ink-3">
+        <DocIcon type={c.document_type} size={15} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-ink">{c.document_title ?? c.filename}</span>
+        <span className="block truncate text-xs text-ink-3">{c.speaker_sender ?? c.filename}</span>
+      </span>
+      <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-ink-3">{formatDate(c.event_date)}</span>
+    </button>
+  )
+}
+
 /** A list of sources; long lists collapse behind "show all" so a claim stays scannable. */
 export function CitationList({
   citations,

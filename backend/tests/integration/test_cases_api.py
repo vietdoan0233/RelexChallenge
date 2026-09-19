@@ -201,3 +201,17 @@ def test_recent_cases_lists_newest_first_and_hides_radar_cases(env):
     assert [c["case_id"] for c in listed] == [first["case_id"]]
     assert listed[0]["status"] == "SUPPORTED" and listed[0]["claims"] == 1
     assert client.get("/api/cases?limit=0").status_code == 200
+
+
+def test_recent_cases_lists_a_repeated_question_once_with_its_latest_case(env):
+    client, ids, holder, _ = env
+    holder["llm"] = ScriptedLLM([_reply([_claim([ids[2]])])])
+    first = client.post(
+        "/api/cases/query", json={"query": "Is bakery in the fresh workstream?"}
+    ).json()
+    second = client.post(
+        "/api/cases/query", json={"query": "is  bakery in the FRESH workstream?"}
+    ).json()
+    listed = client.get("/api/cases").json()
+    assert len(listed) == 1 and listed[0]["case_id"] == second["case_id"]
+    assert first["case_id"] != second["case_id"]

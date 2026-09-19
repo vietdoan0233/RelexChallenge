@@ -47,13 +47,22 @@ def query_case(
 def recent_cases(conn: Conn, limit: int = 8) -> list[dict]:
     """The most recent user Cases (Radar-linked Cases are excluded), with just
     enough to list them. Each opens through the ordinary Case endpoint."""
+    limit = max(1, min(limit, 30))
+    # Newest first; asking the same question again lists it once (its latest Case).
     rows = conn.execute(
         "SELECT case_id, query, receipt_json, created_at FROM cases "
-        "WHERE query NOT LIKE 'Reconsideration:%' ORDER BY created_at DESC LIMIT ?",
-        (max(1, min(limit, 30)),),
+        "WHERE query NOT LIKE 'Reconsideration:%' ORDER BY created_at DESC, rowid DESC LIMIT ?",
+        (limit * 6,),
     ).fetchall()
+    seen: set[str] = set()
     result = []
     for row in rows:
+        key = " ".join(row["query"].lower().split())
+        if key in seen:
+            continue
+        seen.add(key)
+        if len(result) >= limit:
+            break
         stored = json.loads(row["receipt_json"])
         result.append(
             {

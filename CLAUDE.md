@@ -1,6 +1,6 @@
 # CLAUDE.md — KEEPER: Evidence-First Organizational Memory Auditor
 
-> **Status:** Architecture v1.5 FROZEN — Phase 1 implementation checkpoint recorded; identity hardening is complete. Remaining before Phase 2: the organizer GPT transport/contract, a real embedding smoke test and corpus embedding generation, and a final Phase 1 review once those checks pass. v1.5 corrects the deletion strategy from default whole-Evidence-Unit removal to granular, irreversible redaction/anonymization with whole-unit deletion as the fallback; this is a documentation correction only — Phase 5 deletion/anonymization remains unimplemented.
+> **Status:** Architecture v1.5 FROZEN — Phase 1 implementation checkpoint recorded; identity hardening is complete. The organizer's OpenAI-compatible embedding contract has passed a one-text live smoke test. Remaining before Phase 2: full-corpus embedding generation and a final Phase 1 review once real rows are verified. v1.5 corrects the deletion strategy from default whole-Evidence-Unit removal to granular, irreversible redaction/anonymization with whole-unit deletion as the fallback; this is a documentation correction only — Phase 5 deletion/anonymization remains unimplemented.
 > **Challenge:** RELEX Solutions — “Memory With a Receipt”
 > **Project:** KEEPER
 > **Build model:** 1 developer, ~40 total working hours, AI-assisted implementation
@@ -65,6 +65,7 @@ This section reflects the verified repository state at the end of work on 2026-0
   - FTS5 population,
   - provider-neutral embedding interface, deterministic mock, and `--skip-embeddings`,
   - bounded embedding batches, exponential retry, vector validation, and a clear partial-failure report,
+  - OpenAI-compatible `/v1/embeddings` provider adapter with safe status/request-ID logging,
   - ingestion CLI/report,
   - unit and integration tests.
 - The latest verified offline ingestion parsed 45 documents into 2,517 Evidence Units:
@@ -72,7 +73,7 @@ This section reflects the verified repository state at the end of work on 2026-0
   - 110 email-message units,
   - 292 report units.
 - The latest verified FTS row count is 2,517.
-- The latest verified quality gate is 125 passing backend tests, clean Ruff checks, and a successful frontend typecheck/build.
+- The latest verified quality gate is 131 passing backend tests, clean Ruff checks, and a successful frontend typecheck/build.
 - Phase 1 identity hardening is complete: `people`/`person_aliases` are rebuilt every ingestion run from `data/source/` plus a human-reviewed identity manifest (`data/source/reviewed_identities.json`); a capitalized free-text span is never auto-promoted to `people`; short-form aliases (first name, last name, initials, nicknames, spelling variants) are promoted only through an explicit reviewed manifest entry with its own alias_type and source_reference, never from uniqueness or independent corpus usage alone.
 
 ## Important corpus discoveries already verified
@@ -122,16 +123,14 @@ Do not make parsing dependent on one exact placeholder token.
 
 ## Phase state
 
-**Phase 1 identity hardening is complete. Phase 1 otherwise remains at the mandatory review/hardening gate on real embeddings and the organizer GPT contract. Phase 2 has not started.**
+**Phase 1 identity hardening and the live embedding contract smoke test are complete. Phase 1 remains at the mandatory review/hardening gate on full-corpus real embeddings. Phase 2 has not started.**
 
 Identity hardening is resolved: capitalized free-text phrases can no longer become deletion-relevant identities, and the resulting people/alias/evidence-person counts have been reviewed against the corpus (see below). What still must be resolved before Phase 1 is fully accepted:
 
-- finalize the organizer-provided GPT API transport after its endpoint/SDK contract is supplied,
-- run one real GPT embedding smoke test,
 - generate and verify real embedding rows for the intended corpus before claiming semantic retrieval readiness,
 - rerun all Phase 1 quality gates and issue a corrected Phase 1 review report once real embeddings exist.
 
-The corrected offline ingestion produces 25 people and 39 aliases (25 FULL_NAME + 14 EMAIL; zero short-form aliases are currently promoted, because none have yet passed the explicit human-review path that is now the only route to a deletion-relevant first name, last name, initials, nickname, or spelling variant) against the real 45-document archive. All previously identified false identities (e.g. "Risk Fresh Phase", "This So", "Slight Delay Bakery"/"Bakery", "Not Nadia Öberg") are confirmed absent from both `people` and `person_aliases`, and all 9 reviewed text-only identities (Tobias Ekström, Nadia Öberg, Nils Ackermann, Osman Yildirim, Marika Lindqvist, Heidi Salminen, Martina Reuss, Ahmed Nasser, Elin Bergqvist) are confirmed present. Relationship counts: `AUTHOR` 402, `MENTIONED` 242, `SPEAKER` 1964. A local, gitignored `.env` has all four GPT fields populated, but the runtime database contains zero real embedding rows because the organizer's transport contract is still unknown and no endpoint call has been made.
+The corrected offline ingestion produces 25 people and 39 aliases (25 FULL_NAME + 14 EMAIL; zero short-form aliases are currently promoted, because none have yet passed the explicit human-review path that is now the only route to a deletion-relevant first name, last name, initials, nickname, or spelling variant) against the real 45-document archive. All previously identified false identities (e.g. "Risk Fresh Phase", "This So", "Slight Delay Bakery"/"Bakery", "Not Nadia Öberg") are confirmed absent from both `people` and `person_aliases`, and all 9 reviewed text-only identities (Tobias Ekström, Nadia Öberg, Nils Ackermann, Osman Yildirim, Marika Lindqvist, Heidi Salminen, Martina Reuss, Ahmed Nasser, Elin Bergqvist) are confirmed present. Relationship counts: `AUTHOR` 402, `MENTIONED` 242, `SPEAKER` 1964. A local, gitignored `.env` has all four GPT fields populated. One benign live smoke request to its HTTPS `/v1/embeddings` endpoint returned a valid 1,536-dimensional vector; the runtime database still has zero real embedding rows because full-corpus ingestion has not yet run.
 
 Do not jump to Phase 2 until the remaining Phase 1 exit criteria (real embeddings, organizer GPT contract) pass.
 
@@ -186,11 +185,7 @@ Verified local history at this checkpoint:
 
 At this checkpoint, `8c6b79b` is committed locally and currently unpushed. This is a point-in-time observation about repository state, not a standing architectural rule about where local history must sit relative to `origin/main`.
 
-Identity hardening is complete (section 0.1). The next Phase 1 work is:
-
-- the organizer GPT adapter, once the organizers supply the endpoint/SDK contract,
-- real embedding verification,
-- a corrected final Phase 1 review once those checks pass.
+Identity hardening and the provider adapter smoke test are complete (section 0.1). The next Phase 1 work is real full-corpus embedding verification followed by a corrected final Phase 1 review.
 
 Do not label Phase 2 complete or semantic retrieval ready until real embedding rows exist. The Architecture v1.5 deletion/anonymization documentation (section 0.3, section 18) is a separate contract correction for future Phase 5 work — it is not part of the remaining Phase 1 milestone above.
 

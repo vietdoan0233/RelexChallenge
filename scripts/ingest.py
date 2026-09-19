@@ -20,6 +20,7 @@ if str(_BACKEND_DIR) not in sys.path:
 
 from app.core.config import get_settings  # noqa: E402
 from app.db.connection import connect  # noqa: E402
+from app.ingestion.embeddings import OpenAICompatibleEmbeddingProvider  # noqa: E402
 from app.ingestion.service import ingest  # noqa: E402
 
 
@@ -35,10 +36,12 @@ def main() -> None:
     provider = None
     if not args.skip_embeddings:
         if settings.has_complete_embedding_configuration:
-            print(
-                "GPT embedding configuration is present, but the organizer API "
-                "transport is still a placeholder; skipping embeddings."
+            provider = OpenAICompatibleEmbeddingProvider(
+                api_key=settings.gpt_api_key,
+                base_url=settings.gpt_base_url,
+                model_name=settings.gpt_embedding_model,
             )
+            print("Generating embeddings with the configured organizer service.")
         elif settings.has_any_embedding_configuration:
             parser.error(
                 "Incomplete GPT embedding configuration; missing "

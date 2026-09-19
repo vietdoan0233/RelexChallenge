@@ -233,9 +233,9 @@ From the repository root, the parser and Evidence Locker can be rebuilt without 
 backend/.venv/Scripts/python.exe scripts/ingest.py --skip-embeddings
 ```
 
-The command parses the archive, rebuilds the evidence tables, creates the full-text search index, links people to evidence, and prints an ingestion report. The `--skip-embeddings` option is expected until the organizer GPT adapter exists.
+The command parses the archive, rebuilds the evidence tables, creates the full-text search index, links people to evidence, and prints an ingestion report. The `--skip-embeddings` option is for offline development without credentials.
 
-When the real adapter and credentials are available, real vectors can be generated with:
+The organizer service is verified as OpenAI-compatible at `/v1/embeddings` (bearer authentication, `{model, input}` requests, numeric vectors in the response). With `GPT_API_KEY`, `GPT_BASE_URL`, and `GPT_EMBEDDING_MODEL` configured in the gitignored root `.env`, real vectors can be generated with:
 
 ```bash
 backend/.venv/Scripts/python.exe scripts/ingest.py

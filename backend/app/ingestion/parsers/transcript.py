@@ -15,6 +15,19 @@ _DOUBLED_TIMESTAMP = re.compile(r"^(\d{1,2}:\d{2})\1$")
 _TIME_PHRASE = re.compile(r"^\s*(?:(\d+)\s+minutes?)?\s*(?:(\d+)\s+seconds?)?\s*$")
 _INTERNAL_LINE = re.compile(r"^(Me|Them):\s?(.*)$")
 
+# A participant absent from the Attendees header, which Teams can only
+# label by phone number ("+358 40 5512 097") or generically ("Guest 1").
+# The lazy phone group plus a mandatory minutes/seconds tail is what
+# splits "+358 40 5512 097 6 minutes 17 seconds" at the right place -- the
+# duration digits are otherwise indistinguishable from the number's own.
+_UNLISTED_MARKER = re.compile(
+    r"^(\+\d[\d ]*?\d|Guest \d+)\s+(\d+\s+minutes?(?:\s+\d+\s+seconds?)?|\d+\s+seconds?)$"
+)
+# The avatar chip Teams draws for such a participant on its own line: a
+# "+" and a short digit run for a number ("+4"), "G" and digits for a
+# guest ("G1").
+_UNLISTED_CHIP = re.compile(r"^(?:\+\d{1,3}|G\d+)$")
+
 _LENGTH_PRESERVING_MAP = str.maketrans({"ø": "o", "Ø": "O", "å": "a", "Å": "A"})
 
 
@@ -138,16 +151,30 @@ def _parse_teams(body_lines: list[str], attendees: list[str]) -> list[Transcript
                 )
             )
 
-    for raw_line in body_lines:
-        line = raw_line.strip()
+    lines = [raw_line.strip() for raw_line in body_lines]
+    previous_was_timestamp_chrome = False
+
+    for index, line in enumerate(lines):
         if not line:
             continue
+        follows_timestamp_chrome = previous_was_timestamp_chrome
+        previous_was_timestamp_chrome = False
+
         if _normalize_name(line) in name_by_normalized:
             continue  # bare speaker-name chrome from the Teams UI
         if _DOUBLED_TIMESTAMP.match(line):
+            previous_was_timestamp_chrome = True
             continue  # duplicated timestamp chrome
         if line in known_initials:
             continue  # bare initials chrome
+        # An unlisted participant's chrome is dropped only where its
+        # position proves it is chrome, never on shape alone: it has no
+        # roster name to match, so a lone "+..." or "G1" line that happens
+        # to be caption text must stay in the turn it belongs to.
+        if _is_bare_unlisted_label_chrome(line, lines, index):
+            continue
+        if follows_timestamp_chrome and _UNLISTED_CHIP.match(line):
+            continue
 
         marker = _match_marker(line, name_by_normalized)
         if marker:
@@ -163,17 +190,42 @@ def _parse_teams(body_lines: list[str], attendees: list[str]) -> list[Transcript
     return fragments
 
 
+def _is_bare_unlisted_label_chrome(line: str, lines: list[str], index: int) -> bool:
+    """A lone phone-number / "Guest N" line is UI chrome only when the
+    next non-blank line is the doubled timestamp that always follows a
+    bare name line."""
+    if not anonymous_labels.is_unlisted_participant_label(line):
+        return False
+    for following in lines[index + 1 :]:
+        if following:
+            return _DOUBLED_TIMESTAMP.match(following) is not None
+    return False
+
+
+def _duration_seconds(rest: str) -> int | None:
+    match = _TIME_PHRASE.match(rest)
+    if match and (match.group(1) or match.group(2)):
+        return int(match.group(1) or 0) * 60 + int(match.group(2) or 0)
+    return None
+
+
 def _match_marker(line: str, name_by_normalized: dict[str, str]) -> tuple[str, int, str] | None:
     normalized_line = _normalize_name(line)
     for normalized_name, canonical_name in name_by_normalized.items():
         if normalized_line.startswith(normalized_name):
             rest = line[len(normalized_name) :]
-            match = _TIME_PHRASE.match(rest)
-            if match and (match.group(1) or match.group(2)):
-                minutes = int(match.group(1) or 0)
-                seconds = int(match.group(2) or 0)
-                total = minutes * 60 + seconds
+            total = _duration_seconds(rest)
+            if total is not None:
                 return canonical_name, total, rest.strip()
+
+    unlisted = _UNLISTED_MARKER.match(line)
+    if unlisted:
+        # The speaker label is the literal number/"Guest N" from the
+        # source; nothing is inferred about who the participant is.
+        rest = line[len(unlisted.group(1)) :]
+        total = _duration_seconds(rest)
+        if total is not None:
+            return unlisted.group(1), total, rest.strip()
     return None
 
 

@@ -1,5 +1,10 @@
 # KEEPER — Evidence-First Organizational Memory Auditor
 
+*"KEEPER" is a temporary project codename, not a frozen brand — the final
+product will use a different name. Runtime surfaces read `APP_NAME` /
+`VITE_APP_NAME` (see `.env.example`) rather than hardcoding it; see
+`CLAUDE.md`/`AGENTS.md` section 0.4 for the branding-neutrality rule.*
+
 KEEPER is an AI organizational memory auditor built for the RELEX Solutions
 "Memory With a Receipt" challenge at AaltoAI Hackathon 2026. It answers
 questions over a small enterprise archive by retrieving evidence, reasoning
@@ -8,12 +13,15 @@ Skeptic role, and validating every citation against the database before it
 reaches the UI. The full architecture and implementation contract lives in
 [CLAUDE.md](CLAUDE.md); this file only covers running the project.
 
-**Status:** Phase 1 Evidence Locker implemented and paused at its mandatory
-hardening/review gate. Identity extraction must be tightened, the
-organizer-provided GPT API adapter must be finalized, and real embeddings must
-be generated before Phase 2 retrieval begins. See
-`docs/HANDOFF_2026-09-19.md` for the current checkpoint and `CLAUDE.md`
-section 24 for the frozen phase plan.
+**Status:** Phase 1 Evidence Locker implemented; identity hardening is
+complete (25 people / 39 aliases against the real archive, all previously
+identified false identities confirmed absent — see `CLAUDE.md` section 0.1).
+Phase 1 remains paused at its mandatory review gate because the
+organizer-provided GPT API adapter must still be finalized and real
+embeddings must still be generated before Phase 2 retrieval begins. See
+`CLAUDE.md` section 0.1 for the current checkpoint (`docs/HANDOFF_2026-09-19.md`
+is an earlier, now-superseded snapshot) and `CLAUDE.md` section 24 for the
+frozen phase plan.
 
 ## Archive
 
@@ -62,8 +70,8 @@ npm run dev -- --port 3000
 ```bash
 cd backend
 pytest -q
-ruff check app tests
-ruff format --check app tests
+ruff check app tests ../scripts
+ruff format --check app tests ../scripts
 ```
 
 ```bash

@@ -19,3 +19,5 @@ class AliasType(StrEnum):
     FIRST_NAME = "FIRST_NAME"
     LAST_NAME = "LAST_NAME"
     INITIALS = "INITIALS"
+    NICKNAME = "NICKNAME"
+    VARIANT = "VARIANT"

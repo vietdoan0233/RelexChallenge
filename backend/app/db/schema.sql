@@ -1,19 +1,29 @@
--- KEEPER schema.
+-- Evidence Locker schema.
 --
 -- Two classes of table, distinguished by how `rebuild` treats them:
 --
--- PERSISTENT (never dropped by rebuild; only shrink via explicit deletion):
---   people, person_aliases, source_locators
+-- PERSISTENT (never dropped by rebuild; only shrinks via explicit deletion):
+--   source_locators
 --
--- REBUILDABLE (dropped and regenerated from data/source/ + the persistent
--- tables above on every ingestion run):
---   documents, evidence_units, evidence_people, evidence_embeddings, evidence_fts
+-- REBUILDABLE (dropped and regenerated from data/source/ plus the reviewed
+-- identity manifest, data/source/reviewed_identities.json, on every
+-- ingestion run):
+--   documents, evidence_units, people, person_aliases, evidence_people,
+--   evidence_embeddings, evidence_fts
 --
--- This split exists so that deleting one person's evidence and then running
--- the normal rebuild command can never resurrect what was deleted: rebuild
--- only ever re-derives evidence_units from source_locators entries that
--- still exist, and never re-seeds a person who was explicitly removed from
--- `people`. See CLAUDE.md section 7.3 and 18.3.
+-- people/person_aliases are rebuildable, not persistent: identity is a
+-- pure function of two sanitizable inputs (data/source/ and the reviewed
+-- identity manifest), so regenerating it from scratch every run is safe --
+-- a deleted person's traces are already gone from both inputs by the time
+-- a rebuild runs -- and it is what stops a false identity from an earlier,
+-- looser extraction pass from surviving forever just because INSERT OR
+-- IGNORE never removes anything on its own.
+--
+-- source_locators stays persistent so that deleting one person's evidence
+-- and then running the normal rebuild command can never renumber or
+-- resurrect anything: rebuild only ever re-derives evidence_units for
+-- source_locators entries that still exist. See CLAUDE.md section 7.3
+-- and 18.3.
 
 CREATE TABLE IF NOT EXISTS documents (
     document_id TEXT PRIMARY KEY,

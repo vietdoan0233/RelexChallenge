@@ -1,7 +1,7 @@
 [project]
-name = "keeper-backend"
+name = "backend"
 version = "0.1.0"
-description = "KEEPER backend: evidence-first organizational memory auditor"
+description = "Evidence-first organizational memory auditor backend"
 requires-python = ">=3.11"
 
 [tool.ruff]

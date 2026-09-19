@@ -2,10 +2,31 @@
 assign stable identity (documents, evidence units, people/aliases), and
 populate FTS + embeddings.
 
-Safe to re-run: documents/evidence_units/evidence_people/evidence_fts are
-dropped and regenerated every time, while people/person_aliases/
-source_locators persist, so a rebuild after a deletion cannot resurrect
-what was removed (CLAUDE.md 7.3, 18.3).
+Safe to re-run: every ingestion-owned table (documents, evidence_units,
+people, person_aliases, evidence_people, evidence_embeddings,
+evidence_fts -- see migrations._REBUILDABLE_TABLES) is dropped and
+regenerated every time. That is not "every table except source_locators":
+Cases/Pulse tables (cases, case_evidence, pulse_findings, finding_evidence)
+are separate, not-yet-implemented Phase 2+ concerns and this reset does
+not touch them. Regenerating people/person_aliases fresh from data/source/
+plus the reviewed identity manifest on each run, rather than accumulating
+them across runs, is safe specifically because both of those inputs are
+sanitizable: a false identity from an earlier extraction pass cannot
+outlive the run that produced it, and a rebuild after a deletion cannot
+resurrect what was removed as long as both inputs stay sanitized
+(CLAUDE.md 7.3, 18.3).
+
+Failure safety: source files and the reviewed identity manifest are fully
+parsed and validated (see people.load_reviewed_identities) *before* the
+destructive reset runs, so a malformed manifest edit fails loudly without
+having dropped the existing database first. This does not make the reset
+itself atomic -- a failure partway through the write/repopulation phase
+that follows the reset (e.g. an unexpected exception while inserting
+evidence units) can still leave a partially-rebuilt database, because
+SQLite's DDL/DML transaction semantics in the sqlite3 stdlib module are
+not reliable enough on this project's supported Python versions to safely
+roll back a DROP TABLE. Re-running ingestion after fixing the underlying
+cause is the documented recovery path for that residual failure mode.
 """
 
 import sqlite3
@@ -35,10 +56,16 @@ class IngestionReport:
     evidence_units_by_type: dict[str, int] = field(default_factory=dict)
     parse_warnings: list[str] = field(default_factory=list)
     fts_row_count: int = 0
+    # people_count/alias_count/relation_counts are read back from the
+    # database after everything commits -- never from attempted-insert
+    # tallies, which can overstate what actually got stored.
     people_count: int = 0
     alias_count: int = 0
+    relation_counts: dict[str, int] = field(default_factory=dict)
     unresolved_alias_candidates: list[str] = field(default_factory=list)
-    text_only_mentions: list[str] = field(default_factory=list)
+    reviewed_text_only: list[str] = field(default_factory=list)
+    reviewed_short_aliases: list[str] = field(default_factory=list)
+    rejected_candidates: list[str] = field(default_factory=list)
     embeddings: EmbeddingRunReport = field(default_factory=EmbeddingRunReport)
 
 
@@ -70,8 +97,12 @@ def ingest(
     source_dir: Path,
     embedding_provider: EmbeddingProvider | None,
 ) -> IngestionReport:
+    # Non-destructive: ensures source_locators exists so locator assignment
+    # below can read/write it. The destructive reset is deliberately held
+    # off until every source file is parsed and the reviewed identity
+    # manifest has passed validation, so a malformed manifest edit raises
+    # ManifestValidationError before the existing database is dropped.
     migrations.initialize(conn)
-    migrations.reset_rebuildable_tables(conn)
 
     documents = parse_all(source_dir)
     for doc in documents:
@@ -79,6 +110,10 @@ def ingest(
             doc.units = transcript_parser.assign_locators_and_merge(
                 conn, doc.document_id, doc.fragments
             )
+
+    people.load_reviewed_identities(source_dir)
+
+    migrations.reset_rebuildable_tables(conn)
 
     report = IngestionReport()
 
@@ -134,11 +169,11 @@ def ingest(
                 report.evidence_units_by_type.get(doc.document_type, 0) + 1
             )
 
-    people_report = people.seed_and_discover(conn, documents)
-    report.people_count = people_report.people_count
-    report.alias_count = people_report.alias_count
-    report.unresolved_alias_candidates = people_report.unresolved_candidates
-    report.text_only_mentions = people_report.text_only_mentions
+    people_report = people.seed_and_discover(conn, documents, source_dir)
+    report.unresolved_alias_candidates = people_report.unresolved_alias_candidates
+    report.reviewed_text_only = people_report.reviewed_text_only
+    report.reviewed_short_aliases = people_report.reviewed_short_aliases
+    report.rejected_candidates = people_report.rejected_candidates
 
     _link_relations(conn, unit_records)
 
@@ -146,6 +181,15 @@ def ingest(
     report.embeddings = generate_embeddings(conn, evidence_rows_for_embedding, embedding_provider)
 
     conn.commit()
+
+    # Read actual stored counts back after commit rather than trusting
+    # attempted-insert tallies -- INSERT OR IGNORE silently no-ops on a
+    # duplicate, so "rows we tried to insert" and "rows that exist" can
+    # legitimately differ.
+    report.people_count = repository.people_row_count(conn)
+    report.alias_count = repository.alias_row_count(conn)
+    report.relation_counts = repository.relation_counts(conn)
+
     return report
 
 

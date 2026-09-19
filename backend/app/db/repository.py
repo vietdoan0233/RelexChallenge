@@ -149,6 +149,21 @@ def all_people(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def people_row_count(conn: sqlite3.Connection) -> int:
+    return conn.execute("SELECT COUNT(*) AS n FROM people").fetchone()["n"]
+
+
+def alias_row_count(conn: sqlite3.Connection) -> int:
+    return conn.execute("SELECT COUNT(*) AS n FROM person_aliases").fetchone()["n"]
+
+
+def relation_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    rows = conn.execute(
+        "SELECT relation, COUNT(*) AS n FROM evidence_people GROUP BY relation"
+    ).fetchall()
+    return {row["relation"]: row["n"] for row in rows}
+
+
 def all_aliases(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT alias_id, person_id, alias, alias_type FROM person_aliases "

@@ -1,11 +1,13 @@
 # Environment
 .env
 
-# Runtime database and generated artifacts (data/source/ IS tracked; this is not)
-data/keeper.db
-data/keeper.db-journal
-data/keeper.db-wal
-data/keeper.db-shm
+# Runtime database and generated artifacts (data/source/ IS tracked; this is
+# not). Wildcarded rather than named after one default filename, since
+# DATABASE_PATH is configurable.
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
 data/artifacts/
 data/cache/
 

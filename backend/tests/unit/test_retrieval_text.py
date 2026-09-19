@@ -1,0 +1,63 @@
+import re
+
+import pytest
+
+from app.retrieval import text
+
+
+def test_topic_terms_drop_scaffolding_and_duplicates():
+    terms = text.topic_terms("What did the master data assessment report as complete? Data data.")
+    assert terms == ["master", "data", "assessment", "report", "complete"]
+
+
+def test_temporal_cue_words_are_not_topic_terms():
+    assert "current" not in text.topic_terms("What is the current shelf life status?")
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "What is the current plan?",
+        "Is it still in scope?",
+        "How did this change over time?",
+        "Was the decision superseded?",
+        "Who is responsible now?",
+    ],
+)
+def test_temporal_queries_are_detected(query):
+    assert text.is_temporal_query(query)
+
+
+def test_plain_lookup_is_not_temporal():
+    assert not text.is_temporal_query("Who attended the kickoff meeting?")
+
+
+def test_light_stem_bridges_common_suffixes():
+    assert text.light_stem("agreed") == "agre"
+    assert text.light_stem("populated") == "populat"
+    # Doubled consonant from inflection is undone: committed -> commit.
+    assert text.light_stem("committed") == "commit"
+    assert text.light_stem("occurred") == "occur"
+    # Too short to stem safely.
+    assert text.light_stem("used") == "used"
+
+
+def test_irregular_derivations_are_expanded():
+    assert text.term_variants("decided") == ["decid", "decis"]
+
+
+def test_match_expression_quotes_every_term():
+    expr = text.fts_match_expression(["agreed", "id"])
+    assert expr == '"agre"* OR "id"'
+
+
+def test_match_expression_cannot_inject_fts_operators():
+    # Tokenisation strips every FTS5 metacharacter before quoting, so the
+    # result is only quoted terms joined by OR.
+    terms = text.topic_terms('NEAR("x" y) OR -z: * AND "unbalanced')
+    expr = text.fts_match_expression(terms)
+    assert re.fullmatch(r'("[^"\W_]+"\*? OR )*"[^"\W_]+"\*?', expr)
+
+
+def test_empty_terms_give_no_expression():
+    assert text.fts_match_expression([]) is None

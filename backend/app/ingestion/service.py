@@ -162,7 +162,13 @@ def ingest(
                     is_truncated=unit.is_truncated,
                 ),
             )
-            repository.insert_fts_row(conn, evidence_id, unit.raw_text)
+            repository.insert_fts_row(
+                conn,
+                evidence_id,
+                unit.raw_text,
+                thread_context=unit.thread_context or doc.thread_context,
+                speaker_sender=unit.speaker_sender,
+            )
             evidence_rows_for_embedding.append((evidence_id, unit.raw_text))
             unit_records.append((evidence_id, doc.document_type, unit))
 

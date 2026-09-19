@@ -25,8 +25,29 @@ _REBUILDABLE_TABLES = [
 
 
 def initialize(conn: sqlite3.Connection) -> None:
+    _ensure_fts_indexes_context(conn)
     apply_schema(conn)
     _ensure_source_locators_revoked_at_column(conn)
+
+
+def _ensure_fts_indexes_context(conn: sqlite3.Connection) -> None:
+    """Upgrade an FTS table created before thread_context/speaker_sender
+    were indexed. FTS5 cannot ALTER a column in, so the derived index is
+    dropped, recreated from schema.sql, and repopulated from
+    evidence_units. Only evidence_fts is touched: embeddings and every
+    other table are left exactly as they were, so no provider call is
+    needed. Positional PRAGMA access, as below, for row-factory safety."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(evidence_fts)")}
+    if not columns or "thread_context" in columns:
+        return
+    conn.execute("DROP TABLE evidence_fts")
+    apply_schema(conn)
+    conn.execute(
+        "INSERT INTO evidence_fts (evidence_id, raw_text, thread_context, speaker_sender) "
+        "SELECT evidence_id, raw_text, COALESCE(thread_context, ''), COALESCE(speaker_sender, '') "
+        "FROM evidence_units"
+    )
+    conn.commit()
 
 
 def _ensure_source_locators_revoked_at_column(conn: sqlite3.Connection) -> None:

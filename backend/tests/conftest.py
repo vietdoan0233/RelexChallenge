@@ -57,3 +57,62 @@ def isolated_instance(tmp_path):
         conn=connection,
     )
     connection.close()
+
+
+@pytest.fixture
+def seed_units():
+    """Insert a document and its evidence units (and matching FTS rows) into
+    a test database. Returns the evidence ids in order. Used by the
+    retrieval tests, which need small hand-built corpora with known
+    rankings rather than the full archive."""
+    from app.db import repository
+    from app.schemas.evidence import Document, EvidenceUnit
+
+    def _seed(
+        conn,
+        document_id,
+        units,
+        *,
+        document_type="TRANSCRIPT",
+        title=None,
+        date="2025-01-01",
+    ):
+        repository.upsert_document(
+            conn,
+            Document(
+                document_id=document_id,
+                filename=f"{document_id}.txt",
+                document_type=document_type,
+                title=title or document_id,
+                source_date=date,
+                thread_context=title or document_id,
+            ),
+        )
+        ids = []
+        for index, unit in enumerate(units):
+            text, speaker, event_date = (
+                (unit, "Speaker", date) if isinstance(unit, str) else (unit + (date,))[:3]
+            )
+            evidence_id = f"EV-{document_id}-{index}"
+            repository.insert_evidence_unit(
+                conn,
+                EvidenceUnit(
+                    evidence_id=evidence_id,
+                    document_id=document_id,
+                    source_locator=str(index),
+                    unit_index=index,
+                    speaker_sender=speaker,
+                    event_date=event_date,
+                    thread_context=title or document_id,
+                    raw_text=text,
+                    text_hash=repository.fingerprint(text),
+                ),
+            )
+            repository.insert_fts_row(
+                conn, evidence_id, text, thread_context=title or document_id, speaker_sender=speaker
+            )
+            ids.append(evidence_id)
+        conn.commit()
+        return ids
+
+    return _seed

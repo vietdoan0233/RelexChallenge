@@ -84,13 +84,17 @@ class RetrievalService:
         provider: EmbeddingProvider | None = None,
         *,
         fused_limit: int = FUSED_LIMIT,
+        index: SemanticIndex | None = None,
     ) -> None:
+        """``index`` lets a server share one loaded matrix across per-request
+        connections (SQLite connections are not shared across threads)."""
         self._conn = conn
         self._provider = provider
         self._fused_limit = fused_limit
-        self._index: SemanticIndex | None = None
+        self._index: SemanticIndex | None = index
         self._index_error: str | None = None
-        self.refresh()
+        if index is None:
+            self.refresh()
 
     @property
     def conn(self) -> sqlite3.Connection:

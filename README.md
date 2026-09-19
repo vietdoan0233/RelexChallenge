@@ -8,7 +8,7 @@ The temporary internal codename is **KEEPER**. It is only a project name; the fi
 2,517 stable Evidence Units, FTS has 2,517 rows, and the runtime database has
 2,517 real 1,536-dimensional embeddings. The completed gate is documented in
 [`docs/PHASE_1_REVIEW_2026-09-19.md`](docs/PHASE_1_REVIEW_2026-09-19.md).
-Phase 2 retrieval is complete (see [`docs/PHASE_2_REVIEW_2026-09-19.md`](docs/PHASE_2_REVIEW_2026-09-19.md)); run `python scripts/benchmark.py` to reproduce its benchmark. Phase 3 is next. `docs/HANDOFF_2026-09-19.md` is an earlier,
+Phase 2 retrieval is complete (see [`docs/PHASE_2_REVIEW_2026-09-19.md`](docs/PHASE_2_REVIEW_2026-09-19.md)); run `python scripts/benchmark.py` to reproduce its benchmark. Phase 3 (structured Cases and the validator) is complete — see [`docs/PHASE_3_REVIEW_2026-09-19.md`](docs/PHASE_3_REVIEW_2026-09-19.md); Phase 4 is next. `docs/HANDOFF_2026-09-19.md` is an earlier,
 superseded snapshot; use `CLAUDE.md` section 0.1 and section 24 for the current
 phase plan.
 

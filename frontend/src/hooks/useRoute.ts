@@ -7,6 +7,7 @@ export type Route =
   | { page: 'case'; caseId: string }
   | { page: 'privacy' }
   | { page: 'radar' }
+  | { page: 'evidence' }
 
 function parse(hash: string): Route {
   const [path, query = ''] = hash.replace(/^#/, '').split('?')
@@ -14,6 +15,7 @@ function parse(hash: string): Route {
   if (parts[0] === 'case' && parts[1]) return { page: 'case', caseId: parts[1] }
   if (parts[0] === 'privacy') return { page: 'privacy' }
   if (parts[0] === 'radar') return { page: 'radar' }
+  if (parts[0] === 'add-evidence') return { page: 'evidence' }
   return { page: 'ask', prefill: new URLSearchParams(query).get('q') ?? undefined }
 }
 

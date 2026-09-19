@@ -97,7 +97,14 @@ def ingest(
     conn: sqlite3.Connection,
     source_dir: Path,
     embedding_provider: EmbeddingProvider | None,
+    *,
+    reuse_existing_embeddings: bool = False,
 ) -> IngestionReport:
+    """``reuse_existing_embeddings`` is for adding evidence to a populated
+    archive: a vector is carried over only for a unit whose evidence_id *and*
+    text hash are unchanged (and whose model matches the provider's), so
+    changed text is never left with an old vector and only new units are sent
+    to the provider. Default False keeps the full-rebuild behaviour."""
     # Non-destructive: ensures source_locators exists so locator assignment
     # below can read/write it. The destructive reset is deliberately held
     # off until every source file is parsed and the reviewed identity
@@ -113,6 +120,9 @@ def ingest(
             )
 
     people.load_reviewed_identities(source_dir)
+
+    if reuse_existing_embeddings:
+        _stash_embeddings(conn)
 
     migrations.reset_rebuildable_tables(conn)
 
@@ -184,6 +194,13 @@ def ingest(
 
     _link_relations(conn, unit_records)
 
+    if reuse_existing_embeddings:
+        model_name = embedding_provider.model_name if embedding_provider else None
+        kept = _restore_stashed_embeddings(conn, model_name)
+        evidence_rows_for_embedding = [
+            row for row in evidence_rows_for_embedding if row[0] not in kept
+        ]
+
     report.fts_row_count = repository.fts_row_count(conn)
     migrations.mark_fts_current(conn)
     report.embeddings = generate_embeddings(conn, evidence_rows_for_embedding, embedding_provider)
@@ -199,6 +216,34 @@ def ingest(
     report.relation_counts = repository.relation_counts(conn)
 
     return report
+
+
+def _stash_embeddings(conn: sqlite3.Connection) -> None:
+    """Copy vectors (with the hash of the text they embed) into a TEMP table,
+    outside the tables the rebuild drops. SQL-side, so ~2,500 vectors are
+    never loaded into Python memory."""
+    conn.execute("DROP TABLE IF EXISTS temp.stashed_embeddings")
+    conn.execute(
+        "CREATE TEMP TABLE stashed_embeddings AS "
+        "SELECT e.evidence_id, e.model_name, e.vector_json, u.text_hash "
+        "FROM evidence_embeddings e JOIN evidence_units u USING (evidence_id)"
+    )
+
+
+def _restore_stashed_embeddings(conn: sqlite3.Connection, model_name: str | None) -> set[str]:
+    """Re-insert stashed vectors whose unit and text are unchanged. With no
+    provider (model_name None) every unchanged vector is kept, so a
+    lexical-only upload never destroys existing semantic coverage."""
+    conn.execute(
+        "INSERT INTO evidence_embeddings (evidence_id, model_name, vector_json) "
+        "SELECT s.evidence_id, s.model_name, s.vector_json FROM temp.stashed_embeddings s "
+        "JOIN evidence_units u ON u.evidence_id = s.evidence_id AND u.text_hash = s.text_hash "
+        "WHERE (? IS NULL OR s.model_name = ?)",
+        (model_name, model_name),
+    )
+    kept = {row[0] for row in conn.execute("SELECT evidence_id FROM evidence_embeddings")}
+    conn.execute("DROP TABLE temp.stashed_embeddings")
+    return kept
 
 
 def _assign_locators_for_document(conn: sqlite3.Connection, doc: ParsedDocument) -> list[str]:

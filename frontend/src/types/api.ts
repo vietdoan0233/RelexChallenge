@@ -192,3 +192,40 @@ export interface RecentCase {
   claims: number
   created_at: string
 }
+
+// POST /api/ingest/upload. A 200 means the files are in the canonical source
+// and the database has been rebuilt from it; anything else is an error body.
+export type UploadDocumentType = 'email' | 'transcript' | 'report'
+
+export interface UploadedFile {
+  original_filename: string
+  stored_filename: string
+  document_id: string
+  document_type: string
+  evidence_units: number
+  warnings: string[]
+}
+
+export interface UploadEmbeddings {
+  status: 'complete' | 'partial' | 'skipped'
+  message: string
+  new_units_embedded: number
+  total_embeddings: number
+  total_units: number
+}
+
+export interface UploadResult {
+  status: 'ingested'
+  uploaded_filenames: string[]
+  files: UploadedFile[]
+  documents_added: number
+  evidence_units_added: number
+  fts_row_count: number
+  embeddings: UploadEmbeddings
+  parse_warnings: string[]
+}
+
+export interface UploadFailure {
+  filename: string
+  error: string
+}

@@ -7,30 +7,39 @@ import type {
   PurgePreview,
   PurgeResult,
   RecentCase,
+  UploadDocumentType,
+  UploadResult,
 } from '../types/api'
 
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  // The parsed JSON error body, for endpoints that return more than `detail`.
+  body: unknown
+  constructor(status: number, message: string, body?: unknown) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // A FormData body needs the browser to set its own multipart boundary header.
+  const isForm = init?.body instanceof FormData
   const response = await fetch(path, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: isForm ? init?.headers : { 'Content-Type': 'application/json', ...init?.headers },
   })
   if (!response.ok) {
     let detail = `Request failed (${response.status})`
+    let parsed: unknown
     try {
-      const body = await response.json()
-      if (typeof body?.detail === 'string') detail = body.detail
+      parsed = await response.json()
+      const message = (parsed as { detail?: unknown } | null)?.detail
+      if (typeof message === 'string') detail = message
     } catch {
       /* non-JSON error body: keep the generic message */
     }
-    throw new ApiError(response.status, detail)
+    throw new ApiError(response.status, detail, parsed)
   }
   return response.json() as Promise<T>
 }
@@ -47,6 +56,12 @@ export const api = {
     request<PurgePreview>('/api/privacy/preview', post({ person_id: personId })),
   stats: () => request<ArchiveStats>('/api/stats'),
   recentCases: () => request<RecentCase[]>('/api/cases?limit=6'),
+  uploadEvidence: (documentType: UploadDocumentType, files: File[]) => {
+    const form = new FormData()
+    form.append('document_type', documentType)
+    for (const file of files) form.append('files', file, file.name)
+    return request<UploadResult>('/api/ingest/upload', { method: 'POST', body: form })
+  },
   radar: () => request<FindingCard[]>('/api/radar'),
   purge: (personId: string) =>
     request<PurgeResult>('/api/privacy/purge', post({ person_id: personId, confirm: true })),

@@ -4,6 +4,7 @@ import { IconAlert, IconCheck, IconChevronDown, IconFlag, IconUser } from './com
 import { Logo } from './components/Logo'
 import { useRoute } from './hooks/useRoute'
 import { CasePage } from './pages/CasePage'
+import { AddEvidencePage } from './pages/AddEvidencePage'
 import { HomePage } from './pages/HomePage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { RadarPage } from './pages/RadarPage'
@@ -43,7 +44,7 @@ function ArchiveStatus() {
 
 function PrivacyBadge() {
   return (
-    <span className="hidden items-center gap-1.5 rounded-full border border-brand/20 bg-brand-soft px-3 py-1.5 text-xs font-bold text-brand-ink md:inline-flex">
+    <span className="hidden items-center gap-1.5 rounded-full border border-brand/20 bg-brand-soft px-3 py-1.5 text-xs font-bold text-brand-ink xl:inline-flex">
       <IconFlag size={14} />
       EU privacy controls
     </span>
@@ -91,6 +92,9 @@ function App() {
             <NavLink href="#/radar" current={route.page === 'radar'}>
               Radar
             </NavLink>
+            <NavLink href="#/add-evidence" current={route.page === 'evidence'}>
+              Add Evidence
+            </NavLink>
             <NavLink href="#/privacy" current={route.page === 'privacy'}>
               Privacy
             </NavLink>
@@ -108,6 +112,9 @@ function App() {
           <NavLink href="#/radar" current={route.page === 'radar'}>
             Radar
           </NavLink>
+          <NavLink href="#/add-evidence" current={route.page === 'evidence'}>
+            Add Evidence
+          </NavLink>
           <NavLink href="#/privacy" current={route.page === 'privacy'}>
             Privacy
           </NavLink>
@@ -119,6 +126,7 @@ function App() {
         {route.page === 'case' && <CasePage caseId={route.caseId} />}
         {route.page === 'privacy' && <PrivacyPage />}
         {route.page === 'radar' && <RadarPage />}
+        {route.page === 'evidence' && <AddEvidencePage />}
       </main>
 
       <footer className="no-print border-t border-line bg-surface">

@@ -6,6 +6,8 @@
  * (#80C5EF -> #E8F3FF, #063961 -> #1884C5), with purple and orange accents.
  * Colors are semantic variables so light and dark share one set of classes.
  */
+/* The product ships one theme: white and blue. It deliberately does not follow the
+   system dark setting, so every reviewer sees the same UI. */
 :root {
   color-scheme: light;
   --bg: #f7fafd;
@@ -38,42 +40,6 @@
   --neutral-soft: #e6edf3;
   --shadow: 0 1px 2px rgb(13 44 77 / 0.04), 0 4px 14px -8px rgb(13 44 77 / 0.1);
   --shadow-lg: 0 1px 3px rgb(13 44 77 / 0.05), 0 12px 32px -14px rgb(13 44 77 / 0.16);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --bg: #041f36;
-    --surface: #08294a;
-    --surface-2: #0d3557;
-    --ink: #eaf4fc;
-    --ink-2: #bcd1e3;
-    --ink-3: #93aec8;
-    --line: #1a4468;
-    --brand: #177abf;
-    --brand-strong: #2a90d6;
-    --brand-ink: #7cc4f2;
-    --brand-soft: #0d3c62;
-    --deep: #063961;
-    --purple: #c5a9da;
-    --purple-soft: #2a2350;
-    --orange: #f2a468;
-    --orange-soft: #3a2614;
-    --ok: #4fd1a1;
-    --ok-soft: #0b3a2e;
-    --warn: #f1c265;
-    --warn-soft: #3a2c0a;
-    --bad: #ff9c94;
-    --bad-soft: #43171a;
-    --neutral-soft: #12385a;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px -14px rgb(0 0 0 / 0.6);
-    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 24px 48px -20px rgb(0 0 0 / 0.7);
-    --title: #eaf4fc;
-    --logo-navy: #cfe6f8;
-    --blob: #0a3557;
-    --blob-2: #072d4c;
-    --dots: #2a90d6;
-  }
 }
 
 @theme inline {

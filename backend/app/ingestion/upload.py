@@ -27,6 +27,7 @@ from app.db.connection import connect
 from app.ingestion import service
 from app.ingestion.embeddings import EmbeddingProvider
 from app.privacy import ops
+from app.privacy.gate import gate
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -319,7 +320,13 @@ def add_evidence(
     if not _ingest_lock.acquire(blocking=False):
         raise UploadRejected(409, "Another ingestion is already running; try again shortly.")
     try:
-        return _add_evidence_locked(uploads, document_type, paths, provider)
+        with gate.write_lease():
+            # Re-check after acquiring the in-process write lease: a privacy
+            # operation may have started after the first file-lock check.
+            ops.assert_unlocked(paths.ops_dir)
+            return _add_evidence_locked(uploads, document_type, paths, provider)
+    except ops.ArchiveWriteBusyError:
+        raise UploadRejected(409, "Another archive write is running; try again shortly.") from None
     finally:
         _ingest_lock.release()
 

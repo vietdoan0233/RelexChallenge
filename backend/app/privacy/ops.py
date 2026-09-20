@@ -42,6 +42,10 @@ class PrivacyLockedError(RuntimeError):
     """A privacy operation is active or unresolved; serving is blocked."""
 
 
+class ArchiveWriteBusyError(TimeoutError):
+    """An in-process archive writer could not acquire the write lease."""
+
+
 class PrivacyOperationError(RuntimeError):
     """The operation failed and left the application locked. Message is
     generic on purpose: it must never carry personal data."""

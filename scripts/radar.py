@@ -6,7 +6,9 @@
 Sends retrieved evidence excerpts and curated signals to the configured
 organizer reasoning service, then stores validated findings in the runtime
 database. Never run per page load: findings are precomputed so the Radar view
-opens with candidates already surfaced. Replaces any earlier Radar findings.
+opens with candidates already surfaced. Replaces earlier findings only after
+the refresh produces at least one usable candidate; a failed refresh preserves
+the previous cards.
 """
 
 import argparse
@@ -17,14 +19,14 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from app.core.config import get_settings  # noqa: E402
-from app.db import migrations  # noqa: E402
-from app.db.connection import connect  # noqa: E402
-from app.ingestion.embeddings import OpenAICompatibleEmbeddingProvider  # noqa: E402
-from app.privacy import ops  # noqa: E402
-from app.radar import service  # noqa: E402
-from app.reasoning.llm import OpenAICompatibleChatClient  # noqa: E402
-from app.retrieval.service import RetrievalService  # noqa: E402
+from app.core.config import get_settings
+from app.db import migrations
+from app.db.connection import connect
+from app.ingestion.embeddings import OpenAICompatibleEmbeddingProvider
+from app.privacy import ops
+from app.radar import service
+from app.reasoning.llm import OpenAICompatibleChatClient
+from app.retrieval.service import RetrievalService
 
 
 def main() -> int:

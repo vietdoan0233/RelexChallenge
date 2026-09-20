@@ -344,6 +344,19 @@ def test_a_failed_model_call_surfaces_nothing_rather_than_something_invented(con
     assert result.surfaced == [] and _rows(conn) == []
 
 
+def test_a_failed_refresh_preserves_existing_findings_and_cases(conn, world, tmp_path):
+    planning, later, _ = world
+    _run(conn, _llm([_candidate(planning)], _assess(later)), tmp_path)
+    before_findings = [row[0] for row in _rows(conn)]
+    before_cases = conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
+
+    failed = _run(conn, _llm([_candidate(planning)], "not json at all"), tmp_path)
+
+    assert failed.surfaced == []
+    assert [row[0] for row in _rows(conn)] == before_findings
+    assert conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0] == before_cases
+
+
 def test_guard_finalize_directly():
     assessed = AssessmentOut(
         assessment=Assessment.WORTH_REASSESSING, assessment_rationale="r", next_check="n"

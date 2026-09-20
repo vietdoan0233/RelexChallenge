@@ -20,7 +20,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from app.privacy.ops import PrivacyLockedError
+from app.privacy.ops import ArchiveWriteBusyError, PrivacyLockedError
 
 
 class ReadWriteGate:
@@ -46,19 +46,29 @@ class ReadWriteGate:
 
     @contextmanager
     def write_lease(self, drain_timeout: float = 30.0) -> Iterator[None]:
-        with self._lock:
+        # Writers must serialize with one another as well as with readers.
+        # The old boolean only blocked readers; a second writer could enter
+        # while the first one was still mutating source/database state.
+        with self._drained:
+            writer_available = self._drained.wait_for(
+                lambda: not self._write_active, timeout=drain_timeout
+            )
+            if not writer_available:
+                raise ArchiveWriteBusyError("timed out waiting for another archive write to finish")
             self._write_active = True
-        try:
-            with self._drained:
-                drained = self._drained.wait_for(lambda: self._readers == 0, timeout=drain_timeout)
+            drained = self._drained.wait_for(lambda: self._readers == 0, timeout=drain_timeout)
             if not drained:
-                raise TimeoutError(
-                    "timed out waiting for in-flight reads to finish before pseudonymising"
+                self._write_active = False
+                self._drained.notify_all()
+                raise ArchiveWriteBusyError(
+                    "timed out waiting for in-flight archive reads to finish"
                 )
+        try:
             yield
         finally:
-            with self._lock:
+            with self._drained:
                 self._write_active = False
+                self._drained.notify_all()
 
     def reset_for_tests(self) -> None:
         """Test-only escape hatch: a failed test can otherwise leave
@@ -66,6 +76,7 @@ class ReadWriteGate:
         with self._lock:
             self._readers = 0
             self._write_active = False
+            self._drained.notify_all()
 
 
 gate = ReadWriteGate()

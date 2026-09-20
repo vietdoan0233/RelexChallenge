@@ -49,7 +49,10 @@ def refresh_if_needed(settings: Settings) -> None:
         return
 
     try:
-        with gate.write_lease():
+        # Radar performs slow provider calls. Keep it compatible with normal
+        # readers while preventing privacy/ingestion writers from overlapping
+        # the evidence snapshot and derived-record writes.
+        with gate.read_lease():
             ops.assert_unlocked(settings.privacy_ops_dir_resolved)
             _refresh_locked(settings, db_path, source_dir)
     except Exception as exc:

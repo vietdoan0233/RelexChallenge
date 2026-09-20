@@ -84,6 +84,14 @@ async def _locked(_request: Request, _exc: ops.PrivacyLockedError) -> JSONRespon
     )
 
 
+@app.exception_handler(ops.ArchiveWriteBusyError)
+async def _archive_write_busy(_request: Request, _exc: ops.ArchiveWriteBusyError) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "Another archive write is running; please try again shortly."},
+    )
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     # Never the filesystem path (CLAUDE.md hardening item): "configured" is

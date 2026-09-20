@@ -123,53 +123,70 @@ def run_radar(
     *,
     limit: int = 5,
 ) -> RadarRun:
-    """Precompute findings. Replaces any previous Radar findings and their Cases."""
+    """Precompute findings, replacing old cards only after a usable result.
+
+    A provider outage or a fully rejected candidate set must not erase the
+    previous derived Radar. The savepoint also rolls back any partial Case or
+    finding created by an interrupted run.
+    """
     curated = signals.load_signals(source_dir)
-    _clear_previous(conn)
     result = RadarRun()
+    conn.execute("SAVEPOINT radar_refresh")
 
-    evidence = EvidenceSet()  # every id any pass showed a model: what may be cited
-    discovered: list[DiscoveredCandidate] = []
-    for queries in DISCOVERY_PASSES:
-        batch = EvidenceSet()
-        for query in queries:
-            found = retrieval.retrieve(query, temporal_sweep=False)
-            batch.add(found, top_hits=_DISCOVERY_TOP_HITS)
-            evidence.add(found, top_hits=_DISCOVERY_TOP_HITS)
-        try:
-            found_here = structured(
-                llm,
-                prompts.DISCOVER_SYSTEM,
-                f"EVIDENCE\n{format_evidence_set(batch)}",
-                Discovery,
-            )
-        except AnalysisUnavailableError:
-            continue  # one failed pass must not lose the other passes' candidates
-        discovered.extend(found_here.candidates)
-    discovery = Discovery(candidates=discovered)
+    try:
+        evidence = EvidenceSet()  # every id any pass showed a model: what may be cited
+        discovered: list[DiscoveredCandidate] = []
+        for queries in DISCOVERY_PASSES:
+            batch = EvidenceSet()
+            for query in queries:
+                found = retrieval.retrieve(query, temporal_sweep=False)
+                batch.add(found, top_hits=_DISCOVERY_TOP_HITS)
+                evidence.add(found, top_hits=_DISCOVERY_TOP_HITS)
+            try:
+                found_here = structured(
+                    llm,
+                    prompts.DISCOVER_SYSTEM,
+                    f"EVIDENCE\n{format_evidence_set(batch)}",
+                    Discovery,
+                )
+            except AnalysisUnavailableError:
+                continue  # one failed pass must not lose the other passes' candidates
+            discovered.extend(found_here.candidates)
+        discovery = Discovery(candidates=discovered)
 
-    seen: set[str] = set()
-    for candidate in discovery.candidates:
-        if len(result.surfaced) >= limit:
-            break
-        key = candidate.proposal.strip().lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        checked = _validated_candidate(conn, candidate, set(evidence.visible_ids))
-        if checked is None:
-            result.dropped_unsupported += 1
-            continue
-        try:
-            finding_id, rejection = _evaluate(conn, retrieval, llm, checked, curated)
-        except AnalysisUnavailableError:
-            result.rejected.append((candidate.proposal, "the check could not be completed"))
-            continue
-        if finding_id is None:
-            result.rejected.append((candidate.proposal, rejection or "rejected by the Skeptic"))
-            continue
-        result.surfaced.append(finding_id)
-    conn.commit()
+        seen: set[str] = set()
+        for candidate in discovery.candidates:
+            if len(result.surfaced) >= limit:
+                break
+            key = candidate.proposal.strip().lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            checked = _validated_candidate(conn, candidate, set(evidence.visible_ids))
+            if checked is None:
+                result.dropped_unsupported += 1
+                continue
+            try:
+                finding_id, rejection = _evaluate(conn, retrieval, llm, checked, curated)
+            except AnalysisUnavailableError:
+                result.rejected.append((candidate.proposal, "the check could not be completed"))
+                continue
+            if finding_id is None:
+                result.rejected.append((candidate.proposal, rejection or "rejected by the Skeptic"))
+                continue
+            result.surfaced.append(finding_id)
+
+        if result.surfaced:
+            _clear_previous(conn, keep_finding_ids=set(result.surfaced))
+        else:
+            conn.execute("ROLLBACK TO SAVEPOINT radar_refresh")
+        conn.execute("RELEASE SAVEPOINT radar_refresh")
+        conn.commit()
+    except BaseException:
+        conn.execute("ROLLBACK TO SAVEPOINT radar_refresh")
+        conn.execute("RELEASE SAVEPOINT radar_refresh")
+        conn.rollback()
+        raise
     return result
 
 
@@ -507,17 +524,21 @@ def _store_finding(conn: sqlite3.Connection, stored: StoredFinding, when: str | 
     return finding_id
 
 
-def _clear_previous(conn: sqlite3.Connection) -> None:
+def _clear_previous(
+    conn: sqlite3.Connection, *, keep_finding_ids: set[str] | None = None
+) -> None:
+    keep_finding_ids = keep_finding_ids or set()
     for row in conn.execute(
         "SELECT finding_id, finding_json FROM pulse_findings WHERE category = ?", (CATEGORY,)
     ).fetchall():
+        if row["finding_id"] in keep_finding_ids:
+            continue
         case_id = json.loads(row["finding_json"]).get("case_id")
         if case_id:
             conn.execute("DELETE FROM case_evidence WHERE case_id = ?", (case_id,))
             conn.execute("DELETE FROM cases WHERE case_id = ?", (case_id,))
         conn.execute("DELETE FROM finding_evidence WHERE finding_id = ?", (row["finding_id"],))
         conn.execute("DELETE FROM pulse_findings WHERE finding_id = ?", (row["finding_id"],))
-    conn.commit()
 
 
 # --------------------------------------------------------------- serving

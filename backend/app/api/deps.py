@@ -56,7 +56,12 @@ def get_conn_for_privacy_write() -> Iterator:
     ops.assert_unlocked(get_settings().privacy_ops_dir_resolved)
     conn = connect(str(get_settings().database_path_resolved))
     try:
-        migrations.initialize(conn)
+        # Schema initialization can rebuild FTS, so it is an archive write.
+        # Serialize that short setup phase before the handler acquires its
+        # own write lease for the actual privacy operation.
+        with gate.write_lease():
+            ops.assert_unlocked(get_settings().privacy_ops_dir_resolved)
+            migrations.initialize(conn)
         yield conn
     finally:
         conn.close()

@@ -124,8 +124,12 @@ def pseudonymise(
     artifact_dirs: list[Path] | None = None,
     provider: EmbeddingProvider | None = None,
 ) -> PseudonymisationResult:
-    """Run one full operation. Any failure leaves the lock in place and
-    raises PrivacyOperationError; success is reported only after verification."""
+    """Run one full operation.
+
+    Once the persistent operation lock is acquired, any failure leaves it in
+    place for recovery; contention before that point fails without locking the
+    archive. Success is reported only after verification.
+    """
     artifact_dirs = artifact_dirs or []
     ops.assert_unlocked(ops_dir)
     target = targets.resolve_active_target(conn, subject_id)
@@ -133,9 +137,14 @@ def pseudonymise(
         raise PrivacyOperationError("subject not found, or not currently ACTIVE")
 
     op_id = uuid.uuid4().hex[:12]
-    ops.acquire(ops_dir, op_id)  # from here on, a failure must leave the lock held
     try:
+        # Wait for any in-process archive work before creating the persistent
+        # privacy lock. A timeout must not leave a lock behind that makes the
+        # entire archive appear unavailable on the next request.
         with gate.write_lease():
+            ops.assert_unlocked(ops_dir)
+            ops.acquire(ops_dir, op_id)
+            # From here on, a failure must leave the lock held for recovery.
             migrations.initialize(conn)
 
             bundle = vault.IdentityBundle(
@@ -185,7 +194,7 @@ def pseudonymise(
                 artifact_dirs,
                 provider,
             )
-    except PrivacyOperationError:
+    except (PrivacyOperationError, ops.ArchiveWriteBusyError):
         raise
     except Exception as exc:
         _LOGGER.error("pseudonymisation failed op_id=%s error_type=%s", op_id, type(exc).__name__)

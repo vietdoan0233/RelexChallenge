@@ -117,9 +117,14 @@ def reverse_pseudonymisation(
     )
 
     op_id = uuid.uuid4().hex[:12]
-    ops.acquire(ops_dir, op_id)  # from here on, a failure must leave the lock held
     try:
+        # Acquire the in-process write lease before creating the persistent
+        # lock, so contention with Radar/ingestion cannot strand the archive
+        # behind a lock for an operation that never started.
         with gate.write_lease():
+            ops.assert_unlocked(ops_dir)
+            ops.acquire(ops_dir, op_id)
+            # From here on, a failure must leave the lock held for recovery.
             plan = {
                 "op_kind": OP_KIND,
                 "op_id": op_id,
@@ -143,7 +148,7 @@ def reverse_pseudonymisation(
                 artifact_dirs,
                 provider,
             )
-    except PrivacyOperationError:
+    except (PrivacyOperationError, ops.ArchiveWriteBusyError):
         raise
     except Exception as exc:
         _LOGGER.error("reversal failed op_id=%s error_type=%s", op_id, type(exc).__name__)

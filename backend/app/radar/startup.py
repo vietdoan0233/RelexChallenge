@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def refresh_if_needed(settings: Settings) -> None:
-    """Generate Radar findings when the current instance has none.
+    """Generate Radar findings while the current instance is below target.
 
     This function is intended to run in a background thread from the FastAPI
     lifespan. It owns its SQLite connection and uses the same privacy gate as
@@ -65,11 +65,13 @@ def _refresh_locked(settings: Settings, db_path: Path, source_dir: Path) -> None
     conn = connect(str(db_path))
     try:
         migrations.initialize(conn)
-        # Valid stored cards are already the precomputed Radar for this
-        # session. In particular, do not spend provider calls or clear them on
-        # every server restart.
-        if service.load_findings(conn, source_dir):
-            _LOGGER.info("radar startup refresh skipped: findings already available")
+        findings = service.load_findings(conn, source_dir)
+        if len(findings) >= settings.radar_startup_target:
+            _LOGGER.info(
+                "radar startup refresh skipped: target reached findings=%s target=%s",
+                len(findings),
+                settings.radar_startup_target,
+            )
             return
 
         llm = OpenAICompatibleChatClient(
@@ -89,7 +91,7 @@ def _refresh_locked(settings: Settings, db_path: Path, source_dir: Path) -> None
             RetrievalService(conn, embedder),
             llm,
             source_dir,
-            limit=settings.radar_startup_limit,
+            limit=min(settings.radar_startup_maximum, service.MAX_FINDINGS),
         )
         _LOGGER.info(
             "radar startup refresh finished surfaced=%s rejected=%s dropped_unsupported=%s",

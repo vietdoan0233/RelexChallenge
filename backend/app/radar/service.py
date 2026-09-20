@@ -46,6 +46,7 @@ from app.validation import receipt_validator
 
 _LOGGER = logging.getLogger(__name__)
 CATEGORY = "RECONSIDERATION_CANDIDATE"
+MAX_FINDINGS = 10
 
 # Vocabulary-diverse discovery searches in three focused passes. One broad pass
 # makes the model conservative; separate passes for rejection, deferral and
@@ -129,6 +130,8 @@ def run_radar(
     previous derived Radar. The savepoint also rolls back any partial Case or
     finding created by an interrupted run.
     """
+    # Keep every caller, including the CLI, inside the product-wide cap.
+    limit = min(limit, MAX_FINDINGS)
     curated = signals.load_signals(source_dir)
     result = RadarRun()
     conn.execute("SAVEPOINT radar_refresh")

@@ -34,7 +34,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Precompute Radar findings")
     parser.add_argument("--db-path", default=str(settings.database_path_resolved))
     parser.add_argument("--source", default=str(settings.source_data_dir_resolved))
-    parser.add_argument("--limit", type=int, default=4)
+    parser.add_argument("--limit", type=int, default=settings.radar_startup_maximum)
     args = parser.parse_args()
 
     if not (settings.gpt_api_key and settings.gpt_base_url and settings.gpt_model):

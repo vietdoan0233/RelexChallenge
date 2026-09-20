@@ -63,8 +63,11 @@ class Settings(BaseSettings):
     # Radar findings are normally precomputed, but a fresh application session
     # can initialize an empty runtime database automatically. The work runs in
     # the background so the API remains available while the provider responds.
+    # A session retries generation while it has fewer than the target number
+    # of valid cards, but one refresh can never store more than the maximum.
     radar_startup_refresh: bool = True
-    radar_startup_limit: int = 5
+    radar_startup_target: int = 5
+    radar_startup_maximum: int = 10
 
     @property
     def app_name_display(self) -> str:

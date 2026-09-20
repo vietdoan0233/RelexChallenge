@@ -113,7 +113,9 @@ def _stats(client) -> dict:
 
 
 def _source_files(paths) -> set[str]:
-    return {str(p.relative_to(paths.source_dir)) for p in paths.source_dir.rglob("*.txt")}
+    # API/source manifests use POSIX-style relative paths on every platform;
+    # normalize Windows' separator before comparing the set in tests.
+    return {p.relative_to(paths.source_dir).as_posix() for p in paths.source_dir.rglob("*.txt")}
 
 
 def test_valid_email_upload_is_persisted_and_ingested(env):

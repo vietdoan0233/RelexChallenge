@@ -52,6 +52,12 @@ class PreviewResult:
     files_to_rewrite: int
     cases_to_invalidate: int
     findings_to_invalidate: int = 0
+    # Strict first-name basis (app/ingestion/name_resolution.py): the bare first name that
+    # will be rewritten along with the full name, and -- if the person has a first name that
+    # was NOT safe to assign -- which one and why (shared | ordinary-word | too-short | reserved).
+    first_name: str | None = None
+    unassigned_first_name: str | None = None
+    unassigned_reason: str | None = None
 
 
 @dataclass
@@ -93,6 +99,9 @@ def preview(conn: sqlite3.Connection, source_dir: Path, subject_id: str) -> Prev
         files_to_rewrite=len(files),
         cases_to_invalidate=len(_dependent_case_ids_by(conn, affected, identifiers)),
         findings_to_invalidate=len(_dependent_findings(conn, affected, identifiers)),
+        first_name=target.first_name,
+        unassigned_first_name=target.unassigned_first_name,
+        unassigned_reason=target.unassigned_reason,
     )
 
 

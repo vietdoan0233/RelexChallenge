@@ -1,15 +1,22 @@
 """Resolve a pseudonymisation target (AGENTS.md/CLAUDE.md 18.0.1).
 
-The target is exactly what the hardened identity layer already tracks for
-an ACTIVE subject: their display name and every person_aliases row (full
-name variants, email, reviewed short forms). Nothing fuzzy is added here --
-a first name that was never reviewed into the manifest is deliberately
-*not* rewritten, because it may belong to someone else.
+The target is what the hardened identity layer tracks for an ACTIVE subject:
+their display name, every person_aliases row (full-name variants, email,
+reviewed short forms), and -- on the strict first-name basis -- the bare first
+name when it safely stands for them alone (app/ingestion/name_resolution.py).
+"Ana Duarte" and "Ana" are one participant, so both are rewritten to the alias.
+
+A first name is still never *guessed*: when another participant shares it
+("Nadia" with two Nadias), it is an everyday word, or it is too short, it is
+left out of the target and reported on the Target so the operator can see what
+was deliberately left unchanged and why.
 """
 
 import re
 import sqlite3
 from dataclasses import dataclass
+
+from app.ingestion import name_resolution
 
 
 @dataclass(frozen=True)
@@ -17,8 +24,13 @@ class Target:
     subject_id: str
     display_name: str
     display_alias: str
-    names: tuple[str, ...]  # display_name + every non-email alias
+    names: tuple[str, ...]  # display_name + every non-email alias + safe first name
     emails: tuple[str, ...]
+    # The bare first name included in `names` on the strict first-name basis, or
+    # None; and, if a first name exists but was NOT safe to assign, what and why.
+    first_name: str | None = None
+    unassigned_first_name: str | None = None
+    unassigned_reason: str | None = None
 
     @property
     def identifiers(self) -> tuple[str, ...]:
@@ -58,6 +70,13 @@ def resolve_active_target(conn: sqlite3.Connection, subject_id: str) -> Target |
     emails: list[str] = []
     for row in aliases:
         (emails if row["alias_type"] == "EMAIL" else names).append(row["alias"])
+
+    index = name_resolution.build_index(conn)
+    first_name = index.first_name_of(subject_id)
+    unassigned = index.unassigned_first_name(subject_id)
+    already = {n.casefold() for n in names}
+    if first_name and first_name.casefold() not in already:
+        names.append(first_name)
     # Longest first so a full name is replaced before any shorter alias inside it.
     return Target(
         subject_id=subject_id,
@@ -65,6 +84,9 @@ def resolve_active_target(conn: sqlite3.Connection, subject_id: str) -> Target |
         display_alias=person["display_alias"],
         names=tuple(sorted(dict.fromkeys(names), key=len, reverse=True)),
         emails=tuple(dict.fromkeys(emails)),
+        first_name=first_name,
+        unassigned_first_name=unassigned.token if unassigned else None,
+        unassigned_reason=unassigned.reason if unassigned else None,
     )
 
 

@@ -465,19 +465,90 @@ def test_reviewed_identity_manifest_entry_is_removed(inst):
     assert data["entries"] == []
 
 
-def test_an_unreviewed_first_name_is_not_rewritten_because_it_may_be_someone_else(tmp_path):
-    root = tmp_path
-    instance = Instance(root)
-    manifest = {"description": "x", "entries": []}  # no reviewed 'Kwame' alias
+def test_a_unique_first_name_is_rewritten_with_the_full_name_even_if_never_reviewed(tmp_path):
+    """ "Kwame Boateng" and "Kwame" are one participant: with no reviewed alias at all, the
+    strict first-name basis still rewrites the bare first name because nobody else has it."""
+    instance = Instance(tmp_path)
     (instance.source / "reviewed_identities.json").write_text(
-        json.dumps(manifest), encoding="utf-8"
+        json.dumps({"description": "x", "entries": []}), encoding="utf-8"
     )
     ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Kwame Boateng")
+
+    preview = pseudonymise.preview(instance.conn, instance.source, subject_id)
+    assert preview is not None and preview.first_name == "Kwame"
+    assert preview.unassigned_first_name is None
+
     result = instance.pseudonymise()
+
     email = (instance.source / "emails" / "01_extract-status.txt").read_text(encoding="utf-8")
-    # The full name is gone; the bare, unreviewed first name is left alone.
-    assert "Kwame Boateng" not in email and "Kwame is checking" in email
-    assert result.display_alias in email
+    assert "Kwame" not in email and "Boateng" not in email
+    assert f"{result.display_alias} is checking" in email
+    assert result.verified
+    from app.privacy import verify
+
+    assert verify.scan_files(instance.source, NEEDLES) == 0
+    instance.conn.close()
+
+
+def test_a_pseudonymised_first_name_survives_the_vault_round_trip(tmp_path):
+    """The first-name basis rides in the vault bundle like any other alias, so an admin
+    reversal verifies cleanly and the original identity is attributable again. (Reversal
+    restores every occurrence to the vault's one canonical name; it cannot know which short
+    form stood at each position -- the documented, non-guessing limitation.)"""
+    instance = Instance(tmp_path)
+    (instance.source / "reviewed_identities.json").write_text(
+        json.dumps({"description": "x", "entries": []}), encoding="utf-8"
+    )
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Kwame Boateng")
+    done = instance.pseudonymise()
+    assert done.verified
+
+    reversed_result = instance.reverse(subject_id)
+
+    assert reversed_result.verified
+    email = (instance.source / "emails" / "01_extract-status.txt").read_text(encoding="utf-8")
+    assert done.display_alias not in email and "Kwame Boateng" in email
+    assert (
+        instance.conn.execute(
+            "SELECT privacy_state FROM people WHERE subject_id = ?", (subject_id,)
+        ).fetchone()["privacy_state"]
+        == "ACTIVE"
+    )
+    instance.conn.close()
+
+
+def test_a_first_name_shared_by_two_participants_is_never_guessed(tmp_path):
+    """A bare "Kwame" could be either Kwame: it must be left alone, and the console must be
+    able to say so. The full name is still rewritten."""
+    instance = Instance(tmp_path)
+    (instance.source / "reviewed_identities.json").write_text(
+        json.dumps({"description": "x", "entries": []}), encoding="utf-8"
+    )
+    (instance.source / "emails" / "02_second-kwame.txt").write_text(
+        "Subject: Access list\n"
+        "From: Kwame Mensah <k.mensah@acme-org.example>\n"
+        "Date: Friday, October 31, 2025 09:00 AM\n"
+        "To: Lena Fischer <lena.fischer@acme-org.example>\n"
+        "Messages in thread: 1\n\n"
+        "Access list attached.\n",
+        encoding="utf-8",
+    )
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Kwame Boateng")
+
+    preview = pseudonymise.preview(instance.conn, instance.source, subject_id)
+    assert preview is not None
+    assert preview.first_name is None
+    assert (preview.unassigned_first_name, preview.unassigned_reason) == ("Kwame", "shared")
+
+    result = instance.pseudonymise()
+
+    email = (instance.source / "emails" / "01_extract-status.txt").read_text(encoding="utf-8")
+    assert "Kwame Boateng" not in email and "Boateng" not in email
+    assert "Kwame is checking" in email  # ambiguous: deliberately untouched
+    assert result.verified
     instance.conn.close()
 
 

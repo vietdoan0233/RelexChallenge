@@ -39,7 +39,7 @@ from pathlib import Path
 from app.core import anonymous_labels
 from app.core.enums import DocumentType, PersonRelation
 from app.db import migrations, repository
-from app.ingestion import locator_manifest, people, text_utils
+from app.ingestion import locator_manifest, name_resolution, people, text_utils
 from app.ingestion.embeddings import EmbeddingProvider, EmbeddingRunReport, generate_embeddings
 from app.ingestion.models import ParsedDocument, ParsedUnit
 from app.ingestion.parsers import email as email_parser
@@ -195,7 +195,9 @@ def ingest(
     report.reviewed_short_aliases = people_report.reviewed_short_aliases
     report.rejected_candidates = people_report.rejected_candidates
 
-    _link_relations(conn, unit_records)
+    # One strict name index for the whole run: linking and pseudonymisation must
+    # agree on which full and first-name forms belong to which subject.
+    _link_relations(conn, unit_records, name_resolution.build_index(conn))
     repository.prune_orphaned_active_people(conn)
 
     if reuse_existing_embeddings:
@@ -286,7 +288,9 @@ def _assign_locators_for_document(conn: sqlite3.Connection, doc: ParsedDocument)
 
 
 def _link_relations(
-    conn: sqlite3.Connection, unit_records: list[tuple[str, str, ParsedUnit]]
+    conn: sqlite3.Connection,
+    unit_records: list[tuple[str, str, ParsedUnit]],
+    index: name_resolution.NameIndex,
 ) -> None:
     for evidence_id, document_type, unit in unit_records:
         exclude: set[str] = set()
@@ -294,6 +298,10 @@ def _link_relations(
         is_anonymous_speaker = anonymous_labels.is_non_person_label(unit.speaker_sender)
         if unit.speaker_sender and not is_anonymous_speaker:
             subject_id = repository.find_subject_id_by_structural_name(conn, unit.speaker_sender)
+            if not subject_id:
+                # A bare "Ana" speaker/sender resolves to the one Ana Duarte, never a new person.
+                assignment = index.resolve(unit.speaker_sender)
+                subject_id = assignment.subject_id if assignment else None
             if subject_id:
                 relation = (
                     PersonRelation.AUTHOR
@@ -303,4 +311,4 @@ def _link_relations(
                 repository.link_evidence_person(conn, evidence_id, subject_id, relation)
                 exclude.add(subject_id)
 
-        people.link_mentions(conn, evidence_id, unit.raw_text, exclude)
+        people.link_mentions(conn, evidence_id, unit.raw_text, exclude, index)

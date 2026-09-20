@@ -156,9 +156,7 @@ def readiness() -> JSONResponse:
                     embedding_rows = repository.embedding_row_count(conn)
                     valid_embeddings, invalid_embeddings = _validate_embedding_vectors(conn)
 
-                    checks["database_not_empty"] = (
-                        document_count > 0 and len(evidence_units) > 0
-                    )
+                    checks["database_not_empty"] = document_count > 0 and len(evidence_units) > 0
                     checks["fts_matches_evidence_units"] = fts_rows == len(evidence_units)
                     # Embeddings are "ready" only when every evidence unit has
                     # one; a partially-embedded archive is reported, not

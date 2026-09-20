@@ -37,6 +37,7 @@ from pathlib import Path
 from app.core import anonymous_labels
 from app.core.enums import AliasType, PersonRelation
 from app.db import repository
+from app.ingestion import name_resolution
 from app.ingestion.models import ParsedDocument
 from app.ingestion.text_utils import strip_image_placeholders
 
@@ -267,6 +268,15 @@ def seed_and_discover(
                 if unit.speaker_email:
                     email_by_name.setdefault(unit.speaker_sender, unit.speaker_email)
 
+    # "Ana" as a speaker/sender is the participant "Ana Duarte" when exactly one
+    # full name starts with it: fold it in *before* minting subjects, so one
+    # person never becomes two subjects (and two aliases) for want of a surname.
+    folded = name_resolution.fold_single_word_names(structural_names)
+    for bare, full in folded.items():
+        structural_names.discard(bare)
+        if bare in email_by_name:
+            email_by_name.setdefault(full, email_by_name[bare])
+
     reviewed = load_reviewed_identities(source_dir)
     reviewed_names = {entry.canonical_name for entry in reviewed}
 
@@ -429,7 +439,9 @@ def _observed_independently(candidate: str, full_name: str, all_text: str) -> bo
     return False
 
 
-def _unique_short_name_owners(people_rows: list[sqlite3.Row]) -> dict[str, str]:
+def _unique_short_name_owners(
+    people_rows: list[sqlite3.Row], include_first: bool = True
+) -> dict[str, str]:
     """First/last/initials derived from each confirmed person's display
     name, keeping a token only when it resolves to exactly one person.
 
@@ -444,7 +456,11 @@ def _unique_short_name_owners(people_rows: list[sqlite3.Row]) -> dict[str, str]:
     there. A token is still never guessed here when it is ambiguous between
     two confirmed people (e.g. "Nadia"), matching the same caution applied
     to alias promotion. A person with no display_name (PSEUDONYMISED) has
-    nothing to derive a short form from and is skipped."""
+    nothing to derive a short form from and is skipped.
+
+    `include_first=False` leaves first names out of the result (they are counted
+    for collisions all the same): the caller supplies them from the strict
+    first-name index instead."""
     owners: dict[str, set[str]] = {}
     for row in people_rows:
         if not row["display_name"]:
@@ -454,11 +470,28 @@ def _unique_short_name_owners(people_rows: list[sqlite3.Row]) -> dict[str, str]:
             continue
         for token in (parts[0], parts[-1], "".join(p[0] for p in parts).upper()):
             owners.setdefault(token, set()).add(row["subject_id"])
-    return {token: next(iter(ids)) for token, ids in owners.items() if len(ids) == 1}
+    first_words = (
+        set()
+        if include_first
+        else {
+            r["display_name"].split()[0]
+            for r in people_rows
+            if r["display_name"] and len(r["display_name"].split()) >= 2
+        }
+    )
+    return {
+        token: next(iter(ids))
+        for token, ids in owners.items()
+        if len(ids) == 1 and token not in first_words
+    }
 
 
 def link_mentions(
-    conn: sqlite3.Connection, evidence_id: str, raw_text: str, exclude: set[str]
+    conn: sqlite3.Connection,
+    evidence_id: str,
+    raw_text: str,
+    exclude: set[str],
+    index: "name_resolution.NameIndex | None" = None,
 ) -> int:
     """Tag every known subject whose alias appears in raw_text as MENTIONED,
     except those already linked with a stronger relation (AUTHOR/SPEAKER) on
@@ -489,7 +522,20 @@ def link_mentions(
             seen_people.add(subject_id)
             linked += 1
 
-    for token, subject_id in _unique_short_name_owners(repository.all_people(conn)).items():
+    people_rows = repository.all_people(conn)
+    if index is None:
+        short_names = _unique_short_name_owners(people_rows)
+    else:
+        # The strict first-name basis (app/ingestion/name_resolution.py) replaces the
+        # loose "unique first word" rule, so linking and pseudonymisation agree on
+        # exactly which bare first names belong to whom. Last names and initials keep
+        # their existing unique-owner rule.
+        short_names = _unique_short_name_owners(people_rows, include_first=False)
+        for subject_id in index.first_name_tokens().values():
+            token = index.first_name_of(subject_id)
+            if token:
+                short_names[token] = subject_id
+    for token, subject_id in short_names.items():
         if subject_id in exclude or subject_id in seen_people:
             continue
         if re.search(r"\b" + re.escape(token) + r"\b", raw_text):

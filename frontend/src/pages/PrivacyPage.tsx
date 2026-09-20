@@ -212,7 +212,7 @@ export function PrivacyPage() {
           <p className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-ink-3">Privacy console</p>
           <h1 className="mt-[2px] text-balance text-[30px] font-bold leading-9 tracking-tight text-ink">Erase a person. Prove it held.</h1>
           <p className="mx-auto mt-[3px] max-w-[470px] text-[13.5px] leading-[19px] text-ink-2">
-            Irreversibly anonymize one person from the archive, search index, embeddings, and dependent Cases while
+            Irreversibly anonymize one person's tracked names, aliases and emails across the archive, search index, embeddings, and dependent Cases while
             preserving unrelated evidence.
           </p>
           <span className="mt-[6px] inline-flex h-[21px] items-center gap-2 rounded-full border border-line bg-surface/80 px-3 text-[10px] font-medium text-ink-2">
@@ -240,7 +240,7 @@ export function PrivacyPage() {
               <h2 id="choose" className="text-[17px] font-bold leading-6">Choose a person</h2>
               <p className="mb-[13px] -mt-px text-[11px] text-ink-2">Search for a person to see their impact across your organization's memory.</p>
               <label htmlFor="filter" className="sr-only">Filter people</label>
-              <div className="relative mb-[8px]">
+              <div className="relative mb-[17px]">
                 <IconSearch size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-2" />
                 <input id="filter" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search by name, email, or alias…" className="h-[31px] w-full rounded-full border border-line bg-surface pl-9 pr-4 text-[11px] placeholder:text-ink-3" />
               </div>
@@ -251,12 +251,12 @@ export function PrivacyPage() {
                   const own = p.author_units + p.speaker_units
                   const on = selected?.person_id === p.person_id
                   return (
-                    <li key={p.person_id}>
+                    <li key={p.person_id} className="py-[2px]">
                       <button
                         type="button"
                         aria-pressed={on}
                         onClick={() => { setSelected(p); setTyped('') }}
-                        className={`grid h-[54px] w-full cursor-pointer grid-cols-[14px_36px_minmax(0,1fr)_88px_80px_68px] items-center gap-x-3 rounded-lg border px-[15px] text-left transition-colors duration-200 ${on ? 'border-brand bg-brand-soft/60' : 'my-[2px] border-transparent hover:bg-surface-2'} ${on ? '' : ''}`}
+                        className={`grid h-[54px] w-full cursor-pointer grid-cols-[14px_36px_minmax(0,1fr)_88px_80px_68px] items-center gap-x-3 rounded-lg border px-[15px] text-left transition-colors duration-200 ${on ? 'border-brand bg-brand-soft/60' : 'border-transparent hover:bg-surface-2'}`}
                       >
                         <span className={`grid size-[14px] place-items-center rounded-full border ${on ? 'border-brand bg-brand' : 'border-ink-3'}`} aria-hidden="true">
                           {on && <span className="size-[5px] rounded-full bg-white" />}
@@ -318,7 +318,7 @@ export function PrivacyPage() {
                       ))}
                     </div>
 
-                    <div className="mt-[12px] rounded-lg border border-[#f3c9c6] bg-bad-soft px-[13px] py-[9px]">
+                    <div className="mt-[12px] rounded-lg border border-[#f3c9c6] bg-bad-soft px-[13px] py-[10px]">
                       <p className="flex items-center gap-2 text-[11px] font-bold text-bad"><IconAlert size={15} /> What will happen</p>
                       <p className="mt-1 pl-[23px] text-[9.5px] leading-[13px] text-ink">
                         We will anonymize this person in source files, rebuild the search index and embeddings, purge
@@ -351,16 +351,16 @@ export function PrivacyPage() {
 
               <section className={`${card} px-[17px] pb-4 pt-[10px]`} aria-labelledby="verified">
                 <h2 id="verified" className="text-[15px] font-bold leading-[18px]">What gets verified</h2>
-                <p className="mb-2 text-[10px] leading-[14px] text-ink-2">We check these surfaces to make sure the person is fully removed.</p>
-                <ul className="flex flex-wrap justify-between gap-x-3 gap-y-2">
+                <p className="mb-2 text-[10px] leading-[14px] text-ink-2">We check these surfaces for the person's tracked identifiers. This is not cryptographic erasure.</p>
+                <ul className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-[1fr_1.35fr_1.1fr_1fr]">
                   {VERIFIED_SURFACES.map((v) => (
-                    <li key={v.title} className="flex max-w-[132px] items-start gap-1.5">
+                    <li key={v.title} className="flex min-w-0 items-start gap-1.5">
                       <span className="mt-px grid size-4 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-ink">
                         <IconCheck size={10} strokeWidth={3.5} />
                       </span>
                       <span className="leading-[12px]">
                         <span className="block text-[9px] font-bold text-ink">{v.title}</span>
-                        <span className="block text-[8px] leading-[11px] text-ink-3">{v.body}</span>
+                        <span className="block truncate text-[8px] leading-[11px] text-ink-3" title={v.body}>{v.body}</span>
                       </span>
                     </li>
                   ))}

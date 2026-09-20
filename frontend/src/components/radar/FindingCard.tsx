@@ -61,7 +61,7 @@ function MiniLink({ citation, onOpen }: { citation?: Citation; onOpen: (id: stri
     <button
       type="button"
       onClick={() => onOpen(citation.evidence_id)}
-      className="mt-1.5 inline-flex max-w-full cursor-pointer items-center gap-1 text-left text-[10px] font-medium text-brand-ink hover:underline"
+      className="mt-1 inline-flex max-w-full cursor-pointer items-center gap-1 text-left text-[10px] font-medium text-brand-ink hover:underline"
     >
       <IconLink size={11} className="shrink-0" />
       <span className="truncate underline decoration-brand/30 underline-offset-2">
@@ -90,8 +90,8 @@ function MiniColumn({
     <div className={`flex min-w-0 gap-2 ${muted ? 'rounded-lg bg-surface-2 px-3 py-2.5' : 'px-1'}`}>
       <span className="grid size-5 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-ink">{icon}</span>
       <div className="min-w-0">
-        <p className="text-[10.5px] font-bold leading-5 text-ink">{label}</p>
-        <p className="line-clamp-3 text-[10px] leading-[13.5px] text-ink-2">{body}</p>
+        <p className="text-[10.5px] font-bold leading-[18px] text-ink">{label}</p>
+        <p className="line-clamp-3 text-[10px] leading-[13px] text-ink-2">{body}</p>
         <MiniLink citation={citation} onOpen={onOpen} />
       </div>
     </div>
@@ -127,7 +127,7 @@ export function FindingCard({ card }: { card: Card }) {
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="line-clamp-1 text-[17px] font-bold leading-[22px] text-ink">{card.proposal}</h2>
-            <p className="mt-px text-[11px] text-ink-2">
+            <p className="text-[11px] leading-[14px] text-ink-2">
               {card.outcome === 'REJECTED' ? 'Rejected' : 'Deferred'} · {card.blocker_category}
             </p>
           </div>
@@ -151,7 +151,7 @@ export function FindingCard({ card }: { card: Card }) {
           </div>
         </div>
 
-        <div className="mt-[14px] grid gap-y-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_170px] lg:divide-x lg:divide-line">
+        <div className="mt-3 grid gap-y-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_170px] lg:divide-x lg:divide-line">
           <MiniColumn icon={<IconFile size={11} />} label="Original proposal" body={card.proposal} citation={card.proposal_citations[0]} onOpen={setOpenId} />
           <div className="lg:pl-3">
             <MiniColumn icon={<IconX size={11} />} label="Why it was stopped" body={card.blocker} citation={card.blocker_citations[0]} onOpen={setOpenId} />
@@ -164,7 +164,7 @@ export function FindingCard({ card }: { card: Card }) {
           </div>
         </div>
 
-        <div className="mt-[11px] flex items-center justify-between border-t border-line pt-2 text-[10px] text-ink-3">
+        <div className="mt-[9px] flex items-center justify-between border-t border-line pt-2 text-[10px] text-ink-3">
           <span className="inline-flex items-center gap-1.5">
             <IconFolder size={12} /> Case {card.case_id} · Last updated {formatDate(card.created_at)}
           </span>

@@ -5,8 +5,9 @@ This project is our solution to the RELEX Solutions **“Memory With a Receipt�
 The temporary internal codename is **KEEPER**. It is only a project name; the final product name has not been chosen. The application can use a different display name through `APP_NAME` and `VITE_APP_NAME`.
 
 **Status:** Phase 1 Evidence Locker is complete: all 45 documents ingest into
-2,517 stable Evidence Units, FTS has 2,517 rows, and the runtime database has
-2,517 real 1,536-dimensional embeddings. The completed gate is documented in
+2,534 stable Evidence Units (2,517 at the Phase 1 gate; a later parser fix that keeps Teams
+"Guest N" captions as their own anonymous speaker split out 17 more), FTS has 2,534 rows,
+and the runtime database has 2,534 real 1,536-dimensional embeddings. The completed gate is documented in
 [`docs/PHASE_1_REVIEW_2026-09-19.md`](docs/PHASE_1_REVIEW_2026-09-19.md).
 Phase 2 retrieval is complete (see [`docs/PHASE_2_REVIEW_2026-09-19.md`](docs/PHASE_2_REVIEW_2026-09-19.md)); run `python scripts/benchmark.py` to reproduce its benchmark. Phase 3 (structured Cases and the validator) is complete — see [`docs/PHASE_3_REVIEW_2026-09-19.md`](docs/PHASE_3_REVIEW_2026-09-19.md); Phase 4 (risk routing, Skeptic, reconciliation) is complete — see [`docs/PHASE_4_REVIEW_2026-09-19.md`](docs/PHASE_4_REVIEW_2026-09-19.md); Phase 5 (deletion/anonymization) is complete with disclosed deviations — see [`docs/PHASE_5_REVIEW_2026-09-19.md`](docs/PHASE_5_REVIEW_2026-09-19.md); Phase 6 (the judge-facing UI) is complete — see [`docs/PHASE_6_REVIEW_2026-09-19.md`](docs/PHASE_6_REVIEW_2026-09-19.md); Phase 7 (hardening and the Reconsideration Radar) is complete — see [`docs/PHASE_7_REVIEW_2026-09-19.md`](docs/PHASE_7_REVIEW_2026-09-19.md). `docs/HANDOFF_2026-09-19.md` is an earlier,
 superseded snapshot; use `CLAUDE.md` section 0.1 and section 24 for the current
@@ -98,9 +99,9 @@ We do not treat an entire transcript or report as one giant block. We split the 
 
 Small units make search and citations clearer. They also reduce collateral damage if one person’s data later needs to be removed: unrelated facts should not disappear just because they were stored beside that person in a huge text block.
 
-The latest verified ingestion produced **2,517 Evidence Units**:
+The latest verified ingestion produced **2,534 Evidence Units** (2,517 at the Phase 1 gate; the Guest N caption fix added 17 transcript units):
 
-- 2,115 transcript units;
+- 2,132 transcript units;
 - 110 email-message units; and
 - 292 report units.
 
@@ -144,9 +145,9 @@ This conservative rule protects the deletion feature. If the system mistakenly t
 
 ### 6. Keyword search is ready
 
-The Evidence Locker has an SQLite full-text search index containing **2,517 rows**, one for each Evidence Unit. This gives us a dependable offline way to find evidence using words from the user’s question.
+The Evidence Locker has an SQLite full-text search index containing **2,534 rows**, one for each Evidence Unit. This gives us a dependable offline way to find evidence using words from the user’s question.
 
-We have also created a provider-neutral embedding interface. Embeddings are numerical summaries that help find passages with similar meaning even when they do not use exactly the same words. The interface is ready, and tests use a deterministic local mock, but real embeddings are not yet available because the organizer-provided GPT service details have not been supplied.
+We have also created a provider-neutral embedding interface. Embeddings are numerical summaries that help find passages with similar meaning even when they do not use exactly the same words. Tests use a deterministic local mock, and the runtime database holds real 1,536-dimensional embeddings for all 2,534 units, generated with the organizer-provided GPT embedding service. Without that service configured, ingestion still completes with keyword search only and reports the embeddings as skipped.
 
 ### 7. Ingestion can be rerun safely for development
 

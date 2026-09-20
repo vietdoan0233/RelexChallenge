@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from './api/client'
 import { IconAlert, IconCheck, IconChevronDown, IconUser } from './components/icons'
 import { EuFlag, Logo, PageArt } from './components/Logo'
+import { ParticlesBackground } from './components/ParticlesBackground'
 import { useRoute } from './hooks/useRoute'
 import { CasePage } from './pages/CasePage'
 import { AddEvidencePage } from './pages/AddEvidencePage'
@@ -61,7 +62,7 @@ function AccountMenu() {
   return (
     <button
       type="button"
-      title="Signed in as reviewer"
+      title="Demo profile. Sign-in is not part of this build."
       className="flex cursor-pointer items-center gap-1.5 rounded-full transition-opacity duration-200 hover:opacity-80"
     >
       <span className="grid size-[26px] place-items-center rounded-full bg-gradient-to-br from-[#f2c9b0] to-[#d99a7e] text-white">
@@ -122,6 +123,7 @@ function App() {
 
       <main id="main" className="relative isolate flex-1">
         <PageArt />
+        {route.page === 'ask' && <ParticlesBackground />}
         {route.page === 'ask' && <HomePage key={route.prefill} prefill={route.prefill} />}
         {route.page === 'case' && <CasePage caseId={route.caseId} />}
         {route.page === 'privacy' && <PrivacyPage />}

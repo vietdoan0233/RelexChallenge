@@ -84,14 +84,14 @@ export function RadarPage() {
                 <IconSpark size={15} className="text-brand" /> Found before you asked
               </p>
               <p className="text-[10px] leading-[14px] text-ink-2">
-                The Reconsideration Radar continuously analyses past decisions across your organization to find
+                The Reconsideration Radar analyses past decisions across your organization ahead of time (findings are precomputed) to find
                 opportunities that may be worth a fresh look — so valuable ideas don't stay buried.
               </p>
             </div>
 
             <div className={`${card} px-[14px] py-[12px]`}>
-              <p className="mb-[14px] text-[12px] font-bold text-ink">Assessment types</p>
-              <ul className="space-y-[15px]">
+              <p className="mb-[17px] text-[12px] font-bold text-ink">Assessment types</p>
+              <ul className="space-y-[21px]">
                 {[ASSESSMENT.WORTH_REASSESSING, ASSESSMENT.PARTIALLY_CHANGED, ASSESSMENT.STILL_BLOCKED, ASSESSMENT.INSUFFICIENT_EVIDENCE].map((a) => (
                   <li key={a.label} className="flex items-start gap-3">
                     <span className={`mt-px shrink-0 [&>svg]:size-5 ${a.ink}`}>{a.icon}</span>

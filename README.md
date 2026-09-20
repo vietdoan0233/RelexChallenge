@@ -4,14 +4,75 @@ This project is our solution to the RELEX Solutions **“Memory With a Receipt�
 
 The temporary internal codename is **KEEPER**. It is only a project name; the final product name has not been chosen. The application can use a different display name through `APP_NAME` and `VITE_APP_NAME`.
 
-**Status:** Phase 1 Evidence Locker is complete: all 45 documents ingest into
-2,534 stable Evidence Units (2,517 at the Phase 1 gate; a later parser fix that keeps Teams
-"Guest N" captions as their own anonymous speaker split out 17 more), FTS has 2,534 rows,
-and the runtime database has 2,534 real 1,536-dimensional embeddings. The completed gate is documented in
-[`docs/PHASE_1_REVIEW_2026-09-19.md`](docs/PHASE_1_REVIEW_2026-09-19.md).
-Phase 2 retrieval is complete (see [`docs/PHASE_2_REVIEW_2026-09-19.md`](docs/PHASE_2_REVIEW_2026-09-19.md)); run `python scripts/benchmark.py` to reproduce its benchmark. Phase 3 (structured Cases and the validator) is complete — see [`docs/PHASE_3_REVIEW_2026-09-19.md`](docs/PHASE_3_REVIEW_2026-09-19.md); Phase 4 (risk routing, Skeptic, reconciliation) is complete — see [`docs/PHASE_4_REVIEW_2026-09-19.md`](docs/PHASE_4_REVIEW_2026-09-19.md); Phase 5 (deletion/anonymization) is complete with disclosed deviations — see [`docs/PHASE_5_REVIEW_2026-09-19.md`](docs/PHASE_5_REVIEW_2026-09-19.md); Phase 6 (the judge-facing UI) is complete — see [`docs/PHASE_6_REVIEW_2026-09-19.md`](docs/PHASE_6_REVIEW_2026-09-19.md); Phase 7 (hardening and the Reconsideration Radar) is complete — see [`docs/PHASE_7_REVIEW_2026-09-19.md`](docs/PHASE_7_REVIEW_2026-09-19.md). `docs/HANDOFF_2026-09-19.md` is an earlier,
-superseded snapshot; use `CLAUDE.md` section 0.1 and section 24 for the current
-phase plan.
+**Status:** The core demo is implemented end to end. The 45-document archive produces
+2,534 stable Evidence Units, an SQLite FTS5 index, and a runtime database prepared for
+1,536-dimensional embeddings. The application now includes hybrid retrieval, structured
+Cases with validated receipts, risk-based Skeptic checking, Decision Evolution, participant
+profiles, Architecture v1.6 pseudonymisation with an isolated encrypted reversal vault,
+plain-text evidence upload, and the precomputed Reconsideration Radar.
+
+The dated phase reviews document historical quality gates and live checks. [`AGENTS.md`](AGENTS.md)
+is the authoritative current implementation contract, especially for the v1.6 privacy
+workflow. The current build is demo-ready when the organizer GPT credentials are present;
+without them the archive, ingestion, lexical retrieval, UI, and tests still work, but live
+Case generation and Radar precomputation are unavailable.
+
+## Five-minute localhost demo
+
+Prerequisites: Python 3.11+, Node.js/npm, and the repository's prepared `data/app.db`.
+For the full experience, configure the organizer's OpenAI-compatible GPT service in the
+root `.env`. The reasoning fields are required for Ask and Radar; the embedding fields enable
+semantic retrieval and complete readiness checks.
+
+From the repository root:
+
+```powershell
+# One-time setup
+Copy-Item .env.example .env
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+cd ..\frontend
+npm ci
+npm run build
+
+# Start the one-process demo server
+cd ..\backend
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+Open [http://localhost:8000](http://localhost:8000). When `frontend/dist` exists, FastAPI
+serves the built React UI and the `/api` endpoints from the same origin.
+
+For macOS/Linux, activate the virtual environment with `source .venv/bin/activate` and use
+the same `npm ci`, `npm run build`, and `python -m uvicorn app.main:app --reload --port 8000`
+commands from the equivalent directories.
+
+Suggested five-minute walkthrough:
+
+1. On **Ask**, try `Did Acme sign off UAT, and what exactly was the scope?` or
+   `How did the bakery scope change over time?`.
+2. Open the generated **Case**. Show the verdict, claim-level support, conflicts,
+   confidence, uncertainty, the risk/review panel, and the exact evidence drawer.
+3. Scroll to **Decision Evolution** to show how a proposal, agreement, implementation
+   update, and later change are separated instead of flattened into one answer.
+4. Open **Radar** to show precomputed rejected/deferred ideas, their original blockers,
+   later evidence, and the bounded `STILL_BLOCKED`/`PARTIALLY_CHANGED`/
+   `WORTH_REASSESSING`/`INSUFFICIENT_EVIDENCE` assessment.
+5. Open **Privacy** to preview a participant's impact. Only run the destructive
+   pseudonymisation step against a disposable copy; instructions are below.
+
+The browser development mode is also available. Keep the backend on port 8000, then run:
+
+```bash
+cd frontend
+npm run dev -- --port 3000
+```
+
+Open [http://localhost:3000](http://localhost:3000); Vite proxies `/api` to the backend.
 
 ## The challenge in simple terms
 
@@ -31,7 +92,7 @@ The challenge asks us to build a small organizational memory system that can ans
 - which exact source passages support each important statement;
 - which evidence disagrees;
 - how certain the answer is; and
-- what happens to the memory if a person’s data is deleted.
+- what happens to the memory when a person is pseudonymised.
 
 The archive is intentionally small enough to inspect, but complicated enough to expose these problems:
 
@@ -43,7 +104,7 @@ The archive is intentionally small enough to inspect, but complicated enough to 
 - dates from March 2024 to July 2026; and
 - conversations about the fictional retailer **Acme Org**.
 
-The judges can ask questions that we have not seen beforehand. They can also request the deletion of a person’s data while watching whether the system really removes that person from its stored memory and recalculates affected conclusions.
+The judges can ask questions that we have not seen beforehand. They can also request a participant pseudonymisation while watching whether the system removes the original identity from ordinary application surfaces, preserves attributable history, and recalculates affected conclusions.
 
 ## What we are building
 
@@ -117,7 +178,7 @@ Known transcript formatting noise, repeated interface text, and image placeholde
 
 ### 4. Evidence IDs remain stable
 
-Each Evidence Unit receives a stable identifier and a source locator. The locator acts like a permanent address inside the original document. If a person’s material is removed later, the remaining evidence should not receive confusing new addresses or accidentally bring deleted material back during a rebuild.
+Each Evidence Unit receives a stable identifier and a source locator. The locator acts like a permanent address inside the original document. If a participant is pseudonymised later, the surviving evidence keeps its address and the alias-bearing rebuild must not resurrect the original identity.
 
 This is important for receipts: a citation should continue to point to the same source location, not merely to “whatever happens to be item 17 after the next import.”
 
@@ -141,7 +202,7 @@ This part required extra care. A capitalized phrase inside a sentence can look l
 
 Real people found only in text are added through a human-reviewed identity file, `data/source/reviewed_identities.json`. Short forms such as first names, last names, initials, nicknames, and spelling variants are also added only when explicitly reviewed. A name being unique in the archive is not enough to *promote* it into the alias table. Pseudonymisation is stricter in a different way: it treats a person's full name and their bare first name as the same participant, rewriting both, whenever that first name belongs to nobody else (`backend/app/ingestion/name_resolution.py`). A first name shared by two people, such as the two Nadias, is never guessed and is reported as left unchanged.
 
-This conservative rule protects the deletion feature. If the system mistakenly turns an ordinary phrase into a person, it could later erase or hide unrelated organizational memory.
+This conservative rule protects the privacy operation. If the system mistakenly turns an ordinary phrase into a person, it could later rewrite or hide unrelated organizational memory.
 
 ### 6. Keyword search is ready
 
@@ -153,13 +214,29 @@ We have also created a provider-neutral embedding interface. Embeddings are nume
 
 The ingestion process can rebuild the derived evidence tables from the canonical source. It validates the source files and reviewed identity file before clearing rebuildable data. People and aliases are regenerated from the sanitized inputs so stale or false identities do not live forever in the database.
 
-The source-locator manifest is kept separately so normal rebuilding does not renumber old source locations. This is the foundation needed for reliable future deletion and recalculation.
+The source-locator manifest is kept separately so normal rebuilding does not renumber old source locations. This is the foundation needed for reliable pseudonymisation and recalculation.
 
-### 8. The basic application scaffold exists
+### 8. The judge-facing product flow is implemented
 
-The backend has a FastAPI health/configuration scaffold and a SQLite database/repository layer. The frontend has a React, Vite, TypeScript, and Tailwind scaffold with configurable neutral branding.
+The backend exposes the archive, retrieval, Cases, evidence context, people,
+privacy, readiness, ingestion, and Radar APIs. The frontend is a React, Vite,
+TypeScript, and Tailwind application with configurable neutral branding and a
+single-origin production mode served by FastAPI.
 
-The current frontend is intentionally only a starting screen. The full Case page, evidence receipts, Decision Evolution view, and privacy page are future build phases.
+The UI includes:
+
+- **Ask:** archive stats, example questions, recent Cases, and a guided thinking state;
+- **Case:** verdict, claim-level stance/confidence, support and conflict receipts,
+  review/Skeptic details, uncertainty, related questions, and Decision Evolution;
+- **Evidence drawer:** the cited unit plus neighbouring context, document/thread/date/
+  speaker metadata, and preserved truncation warnings;
+- **People:** a participant's complete attributable evidence history;
+- **Privacy:** searchable participants, impact preview, typed confirmation, progress,
+  verification, pseudonymisation, and the authenticated admin-only reversal path;
+- **Add Evidence:** bounded `.txt` upload for email, transcript, and report sources;
+  live Slack/Teams/Drive connectors are intentionally not part of this build; and
+- **Radar:** precomputed reconsideration findings with internal evidence, external
+  signals, assessment, missing information, and links back to validated Cases.
 
 ## Current progress at a glance
 
@@ -174,79 +251,97 @@ The current frontend is intentionally only a starting screen. The full Case page
 | People, aliases, and relationship linking | Complete; identity hardening finished |
 | SQLite Evidence Locker and full-text search | Complete |
 | Offline ingestion and deterministic mock embeddings | Complete |
-| Real GPT embedding generation | Waiting for organizer API details |
-| Primary question answering | Not started |
-| Semantic retrieval and hybrid retrieval | Not started as a real production path |
-| Skeptic and risk-based checking | Not started |
-| Case UI and Decision Evolution | Not started |
-| Personal-data deletion/anonymization | Designed, not implemented |
-| Project Pulse | Optional future work; not started |
+| Real GPT embedding generation | Supported when organizer credentials are configured; runtime database is prepared with 1,536-dimensional vectors |
+| Primary question answering | Complete: structured, receipt-backed Case generation |
+| Semantic retrieval and hybrid retrieval | Complete: FTS5 + NumPy cosine + deterministic rank fusion + context/later-evidence sweep |
+| Skeptic and risk-based checking | Complete: deterministic risk routing, counter-retrieval, objections, reconciliation |
+| Case UI and Decision Evolution | Complete and browser-verified |
+| Participant profiles | Complete: full attributable history survives pseudonymisation |
+| Pseudonymisation and reversal | Complete in the v1.6 implementation; isolated encrypted vault and authenticated admin reversal |
+| Evidence upload | Complete for bounded plain-text email, transcript, and report uploads |
+| Reconsideration Radar | Complete as a precomputed, evidence-bounded feature; live discovery may surface only a small number of findings |
 
-The current quality gate is **71 passing backend tests**, clean Ruff checks, and a successful frontend typecheck/build. Phase 0 is complete. Phase 1 is implemented enough to pause at its required review gate, but we should not call the system “semantic retrieval ready” or start Phase 2 until real embeddings have been generated and checked.
+The project has backend unit/integration/evaluation coverage plus Ruff, frontend
+typecheck, lint, and production-build checks. Run the commands below before a
+judge rehearsal. Live model wording is intentionally non-deterministic; the
+important guarantees are valid citations, bounded claims, explicit uncertainty,
+and safe degradation when a provider is unavailable.
 
-## What remains before the next phase
+## Current directions and remaining work
 
-The immediate remaining Phase 1 work is:
+The core architecture is intentionally frozen: keep the Evidence Locker as the
+source of truth, keep the LLM in the interpreter role, and prefer deterministic
+validation over extra agent frameworks. The highest-value next work is demo
+hardening rather than adding infrastructure:
 
-1. Configure a local `.env` without committing secrets.
-2. Receive and implement the organizer-provided GPT endpoint, authentication, and request/response contract.
-3. Run one real embedding smoke test.
-4. Generate real embedding rows for the intended 45-document corpus.
-5. Rerun the complete Phase 1 checks and record the final review.
-
-After that, Phase 2 can implement retrieval, structured reasoning, conflict handling, receipts, and the Case UI.
-
-The privacy requirement is important but is not secretly finished. The target design is to remove or irreversibly anonymize a requested person from every application-owned surface while preserving unrelated organizational facts where possible. That includes source files, database text, names and metadata, search indexes, embeddings, cached answers, and generated artifacts. A whole Evidence Unit is deleted only when a smaller redaction would still leave the person identifiable. This work belongs to a later phase and currently has no purge implementation.
+1. Rebuild and gate the runtime database from the canonical source before a
+   rehearsal; `/api/readiness` and `python scripts/smoke.py` are the release checks.
+2. Re-run the live practice questions against the exact organizer model and keep
+   the demo questions focused on decisions, current state, conflicts, and UAT.
+3. Curate a few real external signals if the Radar needs a stronger live story;
+   `data/source/external_signals.json` is empty on purpose and the system never
+   scrapes the web or invents outside evidence.
+4. Add automated frontend tests and, if time allows, improve retrieval for broad
+   enumerative questions and varied model phrasing.
+5. Treat the privacy operation as pseudonymisation, not irreversible anonymisation:
+   known identifiers are rewritten to a stable participant alias, relationships and
+   Evidence IDs survive, derived Cases/findings are invalidated, and the original
+   identity is recoverable only through the authenticated admin workflow.
 
 ## Running the project locally
 
-### Backend setup
+### Configuration
 
-The backend uses Python 3.11 or newer.
+Copy `.env.example` to `.env` at the repository root. The real `.env` is ignored by Git
+and is the only place for credentials.
 
-```bash
-cd backend
-python -m venv .venv
+For a full live demo, configure `GPT_API_KEY`, `GPT_BASE_URL`, `GPT_MODEL`, and
+`GPT_EMBEDDING_MODEL`. Configure `PSEUDONYM_VAULT_KEY` with a fresh Fernet key and set
+`PRIVACY_ADMIN_TOKEN` if you want to exercise the authenticated Privacy action. The UI
+can load the archive without GPT credentials, but Ask returns a clear unavailable response
+until the reasoning service is configured.
 
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
-
-# macOS/Linux
-# source .venv/bin/activate
-
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-Copy `.env.example` to `.env` at the repository root. The real `.env` is ignored by Git and is the only place for credentials. The GPT fields (`GPT_API_KEY`, `GPT_BASE_URL`, `GPT_MODEL`, `GPT_EMBEDDING_MODEL`) are needed for asking questions, semantic search and the Radar; ingestion and the tests work without them.
-
-Start the backend with:
+Generate a vault key with:
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-### The interface
-
-A RELEX-themed UI (Figtree, navy and blue palette, pill buttons; light and dark, responsive, keyboard and screen-reader friendly, reduced-motion aware): a hero **Ask** page with live archive stats, example questions and recent Cases; a **thinking** screen with phased progress and rotating status text while a Case is built; a **Case** page with a verdict hero, claim cards with collapsible sources, a decision timeline, a "how this was checked" pipeline and a sticky side rail; the **Radar**; and a guided four-step **Privacy console**.
-
-### Run the whole app (one process)
-
-```bash
-cd frontend && npm install && npm run build      # once
-cd ../backend && source .venv/bin/activate       # Windows: .venv\Scripts\Activate.ps1
-uvicorn app.main:app --port 8000
-```
-
-Open <http://localhost:8000>. When `frontend/dist` exists, the API server serves the UI too. It works on the repository's own `data/app.db` and `data/source/`. **The Privacy console's removal is real and permanent for that data** (restore the source with `git checkout data/source`; the database then needs a re-ingest). To rehearse deletion safely, copy `data/` somewhere and start the server with `DATABASE_PATH=<copy>/app.db SOURCE_DATA_DIR=<copy>/source`.
-
-### Frontend setup (development, with hot reload)
+### Frontend development with hot reload
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev -- --port 3000
 ```
+
+Keep the backend running on port 8000. Vite proxies `/api` to it, so open
+<http://localhost:3000>.
+
+### Safe privacy rehearsal
+
+Pseudonymisation rewrites the configured canonical source and invalidates dependent
+derived records. It is intentionally persistent for that instance. Before showing it
+live, use a disposable copy of the source and database. In Windows PowerShell:
+
+```powershell
+$demoRoot = Join-Path (Get-Location) ".demo-data"
+New-Item -ItemType Directory -Force $demoRoot | Out-Null
+Copy-Item data\source (Join-Path $demoRoot "source") -Recurse
+Copy-Item data\app.db (Join-Path $demoRoot "app.db")
+
+$env:DATABASE_PATH = Join-Path $demoRoot "app.db"
+$env:SOURCE_DATA_DIR = Join-Path $demoRoot "source"
+$env:PSEUDONYM_VAULT_PATH = Join-Path $demoRoot "private-vault\vault.db.enc"
+$env:PSEUDONYM_VAULT_KEY = (python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+$env:PRIVACY_ADMIN_TOKEN = "demo-admin-token"
+```
+
+Start the backend after setting those variables. Enter `demo-admin-token` in the Privacy
+console when it asks for the admin credential. If the copied database is missing or stale,
+rebuild only the copy with `python scripts/ingest.py --source $env:SOURCE_DATA_DIR --db-path $env:DATABASE_PATH`
+and the configured embedding provider; never point a destructive rehearsal at the repository
+source unless that persistence is intentional.
 
 ### Run the current offline ingestion
 
@@ -266,7 +361,7 @@ The organizer service is verified as OpenAI-compatible at `/v1/embeddings` (bear
 python scripts/ingest.py
 ```
 
-Do not claim semantic retrieval is ready until the ingestion report confirms real embedding rows for the intended corpus.
+Do not claim semantic retrieval is ready until the ingestion report confirms real embedding rows for the intended corpus. The API's `/api/readiness` endpoint performs the same kind of runtime gate and returns HTTP 503 when the archive is stale, incomplete, or missing valid embeddings.
 
 ### Run checks
 
@@ -324,12 +419,16 @@ developments go in `data/source/external_signals.json`, which ships empty: the
 system never scrapes the web or invents an external signal. The findings appear
 under **Radar** in the UI. See [docs/RECONSIDERATION_RADAR.md](docs/RECONSIDERATION_RADAR.md).
 
-## Innovation roadmap
+## Innovation and product direction
 
-After the core phases are complete, Phase 7 includes a small, precomputed
-**Reconsideration Radar** demonstration. It surfaces previously rejected or
-deferred ideas whose original blocker may have changed, while keeping internal
-evidence, external signals, assessment, and missing information separate. The
-feature is deliberately bounded: it says only **worth reassessing**, never that
-the organization should pursue an idea. See
-[docs/RECONSIDERATION_RADAR.md](docs/RECONSIDERATION_RADAR.md).
+The product's differentiator is not a larger chat window. It is an auditable
+memory loop: retrieve the relevant record, model the competing interpretations,
+validate every cited receipt against the database, preserve the decision's
+evolution, and show what changed later. The Radar extends that loop proactively
+by surfacing old rejected or deferred ideas whose blocker may have changed, while
+deliberately refusing to turn weak evidence into a recommendation.
+
+The next product layer would be richer evidence connectors and stronger automated
+evaluation, but the architecture should remain small: SQLite, deterministic
+retrieval/validation, two bounded AI roles, and a source archive that stays under
+application control. See [docs/RECONSIDERATION_RADAR.md](docs/RECONSIDERATION_RADAR.md).

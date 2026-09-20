@@ -208,7 +208,7 @@ def build():
     # 1. Cover
     slide = prs.slides[0]
     textbox(slide, 1.0, 4.82, 8.7, 0.62, "MEMORY WITH A RECEIPT", 34, WHITE, True)
-    textbox(slide, 1.02, 5.46, 8.2, 0.42, "Organizational Memory Auditor", 20, WHITE)
+    textbox(slide, 1.02, 5.46, 8.2, 0.42, "ENGRAM", 20, WHITE)
     textbox(slide, 1.03, 6.18, 7.0, 0.25,
             "Every answer carries the evidence, the conflict, and the way back.",
             11, WHITE, italic=True)

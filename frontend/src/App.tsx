@@ -11,7 +11,7 @@ import { PersonPage } from './pages/PersonPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { RadarPage } from './pages/RadarPage'
 
-const APP_NAME = import.meta.env.VITE_APP_NAME || 'Organizational Memory Auditor'
+const APP_NAME = import.meta.env.VITE_APP_NAME || 'ENGRAM'
 
 function NavLink({ href, current, children }: { href: string; current: boolean; children: string }) {
   return (

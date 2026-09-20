@@ -1,4 +1,4 @@
-# Organizational Memory Auditor — Feature Inventory for the Pitch Deck
+# ENGRAM — Feature Inventory for the Pitch Deck
 
 *RELEX "Memory With a Receipt" challenge · AaltoAI Hackathon 2026 · compiled 2026-09-20 from the code and the running app.*
 

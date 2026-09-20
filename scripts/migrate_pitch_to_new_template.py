@@ -121,7 +121,7 @@ def build():
     # 1. Cover — keep the template's landscape image and editorial title treatment.
     slide = prs.slides[0]
     text_box(slide, 0.25, 4.62, 5.3, 0.30,
-             "ORGANIZATIONAL MEMORY AUDITOR", 11, MUTED, True)
+             "ENGRAM", 11, MUTED, True)
     text_box(slide, 5.90, 4.62, 3.8, 0.30,
              "AALTOAI HACKATHON 2026", 11, MUTED, align=PP_ALIGN.CENTER)
     text_box(slide, 0.20, 5.50, 10.4, 1.85,

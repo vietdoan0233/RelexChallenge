@@ -1,8 +1,8 @@
-# Organizational Memory Auditor
+# ENGRAM
 
 This project is our solution to the RELEX Solutions **“Memory With a Receipt”** challenge at the AaltoAI Hackathon 2026.
 
-The temporary internal codename is **KEEPER**. It is only a project name; the final product name has not been chosen. The application can use a different display name through `APP_NAME` and `VITE_APP_NAME`.
+**ENGRAM** is the product name. The running app reads it from `APP_NAME` (backend) and `VITE_APP_NAME` (frontend); keep both values in sync in `.env`.
 
 **Status:** The core demo is implemented end to end. The 45-document archive produces
 2,534 stable Evidence Units, an SQLite FTS5 index, and a runtime database prepared for

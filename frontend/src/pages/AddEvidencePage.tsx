@@ -245,7 +245,7 @@ export function AddEvidencePage() {
         <div className="anim-fade-up">
           <h1 className="text-balance text-[34px] font-bold leading-[42px] tracking-tight text-title">Add your organizational knowledge</h1>
           <p className="mt-[14px] max-w-[640px] text-pretty text-[15px] leading-[22px] text-ink-2">
-            Give the Organizational Memory Auditor access to your organization's emails, meetings, documents and
+            Give ENGRAM access to your organization's emails, meetings, documents and
             conversations. Everything you add is saved to the archive, indexed and structured, so it can be searched,
             cited and reasoned over like the original evidence.
           </p>

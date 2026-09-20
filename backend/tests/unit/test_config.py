@@ -1,6 +1,10 @@
 from app.core.config import Settings
 
 
+def test_default_display_name_is_engram() -> None:
+    assert Settings(app_name="").app_name_display == "ENGRAM"
+
+
 def test_settings_expose_organizer_gpt_placeholders_without_google_fields() -> None:
     fields = Settings.model_fields
 

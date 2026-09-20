@@ -12,16 +12,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-_DEFAULT_APP_NAME = "Organizational Memory Auditor"
+_DEFAULT_APP_NAME = "ENGRAM"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_REPO_ROOT / ".env", extra="ignore")
 
-    # "KEEPER" is a temporary project codename, not a frozen brand: runtime
-    # surfaces (API title, CLI text, generated artifacts) must read this
-    # instead of hardcoding it, so renaming later is a config change, not
-    # a code change.
+    # Runtime surfaces (API title, CLI text, generated artifacts) read this
+    # setting so the product name remains a configuration change, not a code
+    # change.
     app_name: str = ""
 
     # Organizer-provided GPT connection details. These remain empty placeholders

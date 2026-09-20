@@ -116,9 +116,13 @@ def _parse_teams(body_lines: list[str], attendees: list[str]) -> list[Transcript
     # "Guest 1 3 minutes 57 seconds" line -- would be appended to whichever
     # named speaker came before, misattributing what a guest said.
     guests = sorted({ln.strip() for ln in body_lines if anonymous_labels.is_guest_label(ln)})
+    # A redacted speaker may carry the person's organisation ("[REDACTED
+    # SPEAKER: RELEX]"), so those labels are discovered from the body too.
+    redacted = sorted({ln.strip() for ln in body_lines if anonymous_labels.is_redaction_marker(ln)})
     canonical_names = [
         *attendees,
         *guests,
+        *redacted,
         anonymous_labels.ANONYMOUS_SPEAKER_LABEL_UNKNOWN,
         anonymous_labels.REDACTED_SPEAKER,
     ]

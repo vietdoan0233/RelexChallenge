@@ -44,6 +44,31 @@ REDACTED_SPEAKER = "[REDACTED SPEAKER]"
 REDACTED_SENDER = "[REDACTED SENDER]"
 REDACTION_MARKERS = frozenset({REDACTED_PERSON, REDACTED_SPEAKER, REDACTED_SENDER})
 
+# A marker may carry the redacted person's *organisation* ("[REDACTED SPEAKER:
+# RELEX]"): who spoke for the customer versus the vendor changes what a turn
+# means (a suggestion from the vendor is not the customer's agreement), and
+# "someone from company X" is not personal data about a named individual. Only
+# the organisation is kept -- never a name, role, or job title -- and nothing
+# maps the marker back to a specific person.
+_ORG_MARKER = re.compile(r"\[REDACTED (?:PERSON|SPEAKER|SENDER)(?:: [^\[\]\n]{1,60})?\]")
+
+
+def redaction_marker(base: str, organization: str | None = None) -> str:
+    """`base` is one of REDACTED_PERSON / REDACTED_SPEAKER / REDACTED_SENDER."""
+    if not organization:
+        return base
+    return f"{base[:-1]}: {organization}]"
+
+
+def is_redaction_marker(value: str | None) -> bool:
+    """Exact match on a (possibly organisation-tagged) reserved marker."""
+    return value is not None and _ORG_MARKER.fullmatch(value.strip()) is not None
+
+
+def redaction_marker_pattern() -> re.Pattern[str]:
+    return _ORG_MARKER
+
+
 NON_PERSON_LABELS = ANONYMOUS_SPEAKER_LABELS | REDACTION_MARKERS
 
 
@@ -63,4 +88,4 @@ def is_non_person_label(value: str | None) -> bool:
     word like "redacted" is never caught by this."""
     if value is None:
         return False
-    return value.strip() in NON_PERSON_LABELS or is_guest_label(value)
+    return value.strip() in NON_PERSON_LABELS or is_guest_label(value) or is_redaction_marker(value)

@@ -5,11 +5,19 @@
       "canonical_name": "Tobias Ekström",
       "verified_aliases": [],
       "review_note": "Named once by the current account contact as a departed colleague who previously held a role now split between two people. A departed employee; never a speaker, attendee, or sender anywhere in the archive.",
-      "source_documents": ["transcripts/01_2024-03-20_solution-demo-value-workshop.txt"]
+      "source_documents": [
+        "transcripts/01_2024-03-20_solution-demo-value-workshop.txt"
+      ]
     },
     {
       "canonical_name": "Nadia Öberg",
-      "verified_aliases": [],
+      "verified_aliases": [
+        {
+          "alias": "Nadia (Öberg",
+          "alias_type": "VARIANT",
+          "source_reference": "emails/01_shelf-life-field-mapping.txt: 'Adding Nadia (Öberg, not Haddad)' -- the only bare first-name use of this person; the surrounding text disambiguates them from the other Nadia"
+        }
+      ],
       "review_note": "Named and explicitly distinguished from a different, unrelated same-first-name person in two independent places. Kept as a separate identity so a bare first name alone stays ambiguous between them.",
       "source_documents": [
         "emails/01_shelf-life-field-mapping.txt",
@@ -20,7 +28,9 @@
       "canonical_name": "Nils Ackermann",
       "verified_aliases": [],
       "review_note": "Named as the external system owner of a specific referenced platform, outside the vendor/customer core teams. Never a speaker or sender.",
-      "source_documents": ["emails/20_chain-wide-proposal.txt"]
+      "source_documents": [
+        "emails/20_chain-wide-proposal.txt"
+      ]
     },
     {
       "canonical_name": "Osman Yildirim",
@@ -33,15 +43,25 @@
     },
     {
       "canonical_name": "Marika Lindqvist",
-      "verified_aliases": [],
+      "verified_aliases": [
+        {
+          "alias": "Marika",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
       "review_note": "Named as an example operator-ID record cited while scoping which individual-identifying fields to exclude from a data extract. Never a speaker or sender.",
-      "source_documents": ["emails/07_op-id-field-exclusion.txt"]
+      "source_documents": [
+        "emails/07_op-id-field-exclusion.txt"
+      ]
     },
     {
       "canonical_name": "Heidi Salminen",
       "verified_aliases": [],
       "review_note": "Named as an example operator-ID record cited alongside other examples while scoping which individual-identifying fields to exclude from a data extract. Never a speaker or sender.",
-      "source_documents": ["emails/07_op-id-field-exclusion.txt"]
+      "source_documents": [
+        "emails/07_op-id-field-exclusion.txt"
+      ]
     },
     {
       "canonical_name": "Martina Reuss",
@@ -53,7 +73,9 @@
         }
       ],
       "review_note": "Named with an associated email address on a go-live user-access list. Never a speaker or sender.",
-      "source_documents": ["emails/14_go-live-user-access.txt"]
+      "source_documents": [
+        "emails/14_go-live-user-access.txt"
+      ]
     },
     {
       "canonical_name": "Ahmed Nasser",
@@ -65,7 +87,9 @@
         }
       ],
       "review_note": "Named with an associated email address on a go-live user-access list. Never a speaker or sender.",
-      "source_documents": ["emails/14_go-live-user-access.txt"]
+      "source_documents": [
+        "emails/14_go-live-user-access.txt"
+      ]
     },
     {
       "canonical_name": "Elin Bergqvist",
@@ -97,7 +121,202 @@
         }
       ],
       "review_note": "Already identified structurally as a speaker and sender. This entry only reviews two extra identifiers for this person: the bare first name, and an employee number spoken in words that identifies them just as directly as a name does.",
-      "source_documents": ["transcripts/05_2024-07-15_implementation-kickoff.txt"]
+      "source_documents": [
+        "transcripts/05_2024-07-15_implementation-kickoff.txt"
+      ]
+    },
+    {
+      "canonical_name": "Ana Duarte",
+      "verified_aliases": [
+        {
+          "alias": "Ana",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Charlotte Meyer",
+      "verified_aliases": [
+        {
+          "alias": "Charlotte",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Henrik Sørensen",
+      "verified_aliases": [
+        {
+          "alias": "Henrik",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Ivan Petrov",
+      "verified_aliases": [
+        {
+          "alias": "Ivan",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Jonas Weiss",
+      "verified_aliases": [
+        {
+          "alias": "Jonas",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Katarina Voss",
+      "verified_aliases": [
+        {
+          "alias": "Katarina",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Lena Fischer",
+      "verified_aliases": [
+        {
+          "alias": "Lena",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Marco Rossi",
+      "verified_aliases": [
+        {
+          "alias": "Marco",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Priya Nair",
+      "verified_aliases": [
+        {
+          "alias": "Priya",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Ruth Oyelaran",
+      "verified_aliases": [
+        {
+          "alias": "Ruth",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Tomas Lindholm",
+      "verified_aliases": [
+        {
+          "alias": "Tomas",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Robert Kahn",
+      "verified_aliases": [
+        {
+          "alias": "Robert",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        },
+        {
+          "alias": "Kahn",
+          "alias_type": "LAST_NAME",
+          "source_reference": "surname is unique among every named person; used bare in INTERNAL transcripts 04, 09 and 23 for this person (the customer CFO)"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Sofia Almeida",
+      "verified_aliases": [
+        {
+          "alias": "Sofia",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "first name is unique among every named person in data/source/; each bare use across transcripts and emails (vocatives, hand-offs, third-person mentions) was read in context and refers to this person"
+        },
+        {
+          "alias": "Almeida",
+          "alias_type": "LAST_NAME",
+          "source_reference": "surname is unique among every named person; spoken bare in transcripts/01_2024-03-20_solution-demo-value-workshop.txt"
+        },
+        {
+          "alias": "A-L-M-E-I-D-A",
+          "alias_type": "VARIANT",
+          "source_reference": "transcripts/01_2024-03-20_solution-demo-value-workshop.txt: this person's surname spelled out letter by letter; occurs once"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
+    },
+    {
+      "canonical_name": "Nadia Haddad",
+      "verified_aliases": [
+        {
+          "alias": "Nadia",
+          "alias_type": "FIRST_NAME",
+          "source_reference": "AMBIGUOUS first name shared with a different person (see that entry). Every bare use was read in context: transcripts 05/23 and the shelf-life emails address or describe this RELEX Solution Consultant; the single exception (emails/01, 'Nadia (Öberg, not Haddad)') is the other person and is protected by that entry's own variant. Over-redacting that one mention is the safe direction."
+        },
+        {
+          "alias": "four four two nine",
+          "alias_type": "VARIANT",
+          "source_reference": "transcripts/05_2024-07-15_implementation-kickoff.txt: this person's employee number, spoken in words; occurs once"
+        },
+        {
+          "alias": "employee four",
+          "alias_type": "VARIANT",
+          "source_reference": "transcripts/23_2026-07-02_INTERNAL-renewal-resourcing.txt: shortened employee number next to this person's name; occurs once"
+        }
+      ],
+      "review_note": "Already identified structurally. This entry only reviews extra identifiers for this person so that removing them leaves no bare first name, surname or spoken/spelled identifier behind.",
+      "source_documents": []
     }
   ]
 }

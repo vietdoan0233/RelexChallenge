@@ -113,6 +113,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 export function FindingCard({ card }: { card: Card }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
+  const isDemo = card.finding_id.startsWith('DEMO-')
   const a = ASSESSMENT[card.assessment]
   const changedBody = card.changed_condition ?? card.assessment_rationale
   const changedCitation = card.internal_change_citations[0] ?? card.current_state_citations[0]
@@ -135,9 +136,9 @@ export function FindingCard({ card }: { card: Card }) {
             <button
               type="button"
               className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full bg-brand px-[18px] text-[11px] font-bold text-white transition-colors duration-200 hover:bg-brand-strong"
-              onClick={() => go.caseView(card.case_id)}
+              onClick={() => (isDemo ? setExpanded(true) : go.caseView(card.case_id))}
             >
-              Open Case <IconArrowRight size={14} />
+              {isDemo ? 'View Analysis' : 'Open Case'} <IconArrowRight size={14} />
             </button>
             <button
               type="button"

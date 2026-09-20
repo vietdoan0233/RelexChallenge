@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '../api/client'
 import { IconArrowRight, IconBulb, IconRadar, IconSpark } from '../components/icons'
 import { ASSESSMENT } from '../components/radar/assessments'
 import { FindingCard } from '../components/radar/FindingCard'
+import { DEMO_RADAR_FINDINGS } from '../demoRadar'
 import { go } from '../hooks/useRoute'
 import { card } from '../lib'
 import { Skeleton } from '../components/ui'
@@ -24,10 +24,9 @@ function CountChip({ a, n, wide }: { a: (typeof ASSESSMENT)[RadarAssessment]; n:
 export function RadarPage() {
   const query = useQuery({
     queryKey: ['radar'],
-    queryFn: api.radar,
-    // Startup generation is asynchronous. Keep the empty state live until a
-    // background refresh has had a chance to persist the first cards.
-    refetchInterval: (current) => (current.state.data?.length ? false : 3000),
+    queryFn: async () => DEMO_RADAR_FINDINGS,
+    staleTime: Infinity,
+    refetchInterval: false,
   })
 
   const counts = useMemo(() => {

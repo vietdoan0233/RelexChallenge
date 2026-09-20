@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import type { DragEvent, ReactNode } from 'react'
 import { ApiError, api } from '../api/client'
@@ -88,6 +88,32 @@ function toUploadError(error: unknown): UploadError {
   return { message: 'Could not reach the server. Nothing was confirmed as added.', failures: [] }
 }
 
+function demoUploadResult(type: UploadDocumentType, files: File[]): UploadResult {
+  return {
+    status: 'ingested',
+    uploaded_filenames: files.map((file) => file.name),
+    files: files.map((file, index) => ({
+      original_filename: file.name,
+      stored_filename: file.name,
+      document_id: `demo-${index + 1}`,
+      document_type: type.toUpperCase(),
+      evidence_units: 0,
+      warnings: [],
+    })),
+    documents_added: files.length,
+    evidence_units_added: 0,
+    fts_row_count: 0,
+    embeddings: {
+      status: 'skipped',
+      message: 'Frontend demo confirmation only; the archive was not changed.',
+      new_units_embedded: 0,
+      total_embeddings: 0,
+      total_units: 0,
+    },
+    parse_warnings: [],
+  }
+}
+
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl bg-surface-2 px-4 py-3">
@@ -97,7 +123,7 @@ function Stat({ label, value }: { label: string; value: number }) {
   )
 }
 
-function ResultPanel({ result }: { result: UploadResult }) {
+function ResultPanel({ result, demo }: { result: UploadResult; demo: boolean }) {
   const emb = result.embeddings
   return (
     <section className={`${card} anim-fade-up space-y-5 p-6`} role="status" aria-live="polite">
@@ -105,22 +131,26 @@ function ResultPanel({ result }: { result: UploadResult }) {
         <Tick size={28} />
         <div>
           <h2 className="text-xl font-extrabold text-ink">
-            Added to the archive: {result.documents_added} {result.documents_added === 1 ? 'document' : 'documents'}
+            {demo
+              ? `Successfully added (demo): ${result.documents_added} ${result.documents_added === 1 ? 'file' : 'files'}`
+              : `Added to the archive: ${result.documents_added} ${result.documents_added === 1 ? 'document' : 'documents'}`}
           </h2>
           <p className="text-sm text-ink-2">
-            The files are saved in the canonical source and the archive index has been rebuilt from it.
+            {demo
+              ? 'The frontend confirmation is complete. No files were uploaded or added to the archive.'
+              : 'The files are saved in the canonical source and the archive index has been rebuilt from it.'}
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Documents added" value={result.documents_added} />
-        <Stat label="Evidence units added" value={result.evidence_units_added} />
+        <Stat label={demo ? 'Files selected' : 'Documents added'} value={result.documents_added} />
+        <Stat label={demo ? 'Archive writes' : 'Evidence units added'} value={demo ? 0 : result.evidence_units_added} />
         <Stat label="Search index rows" value={result.fts_row_count} />
         <Stat label="Units with embeddings" value={emb.total_embeddings} />
       </div>
 
-      {emb.status !== 'complete' && (
+      {!demo && emb.status !== 'complete' && (
         <div className="flex gap-3 rounded-xl border border-warn/40 bg-warn-soft p-4 text-sm text-ink" role="alert">
           <IconAlert size={20} className="mt-0.5 shrink-0 text-warn" />
           <div>
@@ -133,7 +163,7 @@ function ResultPanel({ result }: { result: UploadResult }) {
         </div>
       )}
 
-      {result.files.some((f) => f.original_filename !== f.stored_filename) && (
+      {!demo && result.files.some((f) => f.original_filename !== f.stored_filename) && (
         <p className="text-sm text-ink-2">
           {result.files
             .filter((f) => f.original_filename !== f.stored_filename)
@@ -142,7 +172,7 @@ function ResultPanel({ result }: { result: UploadResult }) {
         </p>
       )}
 
-      {result.parse_warnings.length > 0 && (
+      {!demo && result.parse_warnings.length > 0 && (
         <div className="rounded-xl bg-neutral-soft p-4 text-sm">
           <p className="font-extrabold text-ink">Parse warnings</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-ink-2">
@@ -195,7 +225,6 @@ function StepHeading({ n, children }: { n: number; children: ReactNode }) {
 type Tab = 'connect' | 'upload'
 
 export function AddEvidencePage() {
-  const queryClient = useQueryClient()
   const [tab, setTab] = useState<Tab>('connect')
   const [showAll, setShowAll] = useState(false)
   const [documentType, setDocumentType] = useState<UploadDocumentType>('email')
@@ -208,13 +237,10 @@ export function AddEvidencePage() {
   })
 
   const upload = useMutation({
-    mutationFn: ({ type, list }: { type: UploadDocumentType; list: File[] }) => api.uploadEvidence(type, list),
-    onSuccess: () => {
-      setFiles([])
-      // The archive counts (header status, Ask page) and the recent list changed.
-      void queryClient.invalidateQueries({ queryKey: ['stats'] })
-      void queryClient.invalidateQueries({ queryKey: ['ingest-recent'] })
-    },
+    // This build only previews the acknowledgement in the frontend. It does
+    // not send files to the archive or mutate the canonical source.
+    mutationFn: async ({ type, list }: { type: UploadDocumentType; list: File[] }) => demoUploadResult(type, list),
+    onSuccess: () => setFiles([]),
   })
 
   const addFiles = (incoming: FileList | File[]) => {
@@ -245,9 +271,8 @@ export function AddEvidencePage() {
         <div className="anim-fade-up">
           <h1 className="text-balance text-[34px] font-bold leading-[42px] tracking-tight text-title">Add your organizational knowledge</h1>
           <p className="mt-[14px] max-w-[640px] text-pretty text-[15px] leading-[22px] text-ink-2">
-            Give ENGRAM access to your organization's emails, meetings, documents and
-            conversations. Everything you add is saved to the archive, indexed and structured, so it can be searched,
-            cited and reasoned over like the original evidence.
+            Preview how ENGRAM receives your organization's emails, meetings, documents and
+            conversations. This upload screen currently demonstrates the confirmation flow without changing the archive.
           </p>
         </div>
         <aside className="anim-fade-up flex gap-3 rounded-[10px] border border-line bg-[#eef5fc] p-4" style={{ animationDelay: '0.08s' }}>
@@ -255,8 +280,7 @@ export function AddEvidencePage() {
           <div className="space-y-1">
             <p className="text-[12px] font-bold text-ink">Your data stays in your control</p>
             <p className="text-[10.5px] leading-[15px] text-ink-2">
-              Uploads join the same archive as the original evidence, so anyone named in them can later be redacted or
-              deleted from the Privacy console.
+              Upload confirmations are frontend-only in this build. No selected file is written to the archive or sent to a connector.
             </p>
             <a href="#/privacy" className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-ink hover:underline">
               Open Privacy console <IconArrowRight size={12} />
@@ -316,7 +340,7 @@ export function AddEvidencePage() {
               <button type="button" onClick={() => setTab('upload')} className="cursor-pointer font-bold text-brand-ink underline">
                 Upload files
               </button>{' '}
-              to add emails, meeting notes and reports as .txt files.
+              to preview the confirmation for emails, meeting notes and reports as .txt files.
             </p>
           </div>
         )}
@@ -432,15 +456,15 @@ export function AddEvidencePage() {
                     <Spinner /> Adding to the archive…
                   </>
                 ) : (
-                  <>
-                    <IconUpload size={18} />
-                    {files.length > 0 ? `Add ${files.length} ${files.length === 1 ? 'file' : 'files'} to the archive` : 'Add to the archive'}
+                    <>
+                      <IconUpload size={18} />
+                    {files.length > 0 ? `Confirm ${files.length} ${files.length === 1 ? 'file' : 'files'}` : 'Confirm files'}
                   </>
                 )}
               </button>
               {upload.isPending && (
                 <p className="text-sm text-ink-2" role="status">
-                  Validating, saving and re-indexing. This can take a moment while embeddings are generated.
+                  Preparing the frontend confirmation…
                 </p>
               )}
             </div>
@@ -450,7 +474,7 @@ export function AddEvidencePage() {
 
       {tab === 'upload' && upload.isSuccess && upload.data.status === 'ingested' && (
         <div className="mt-4">
-          <ResultPanel result={upload.data} />
+          <ResultPanel result={upload.data} demo />
         </div>
       )}
       {tab === 'upload' && upload.isError && (

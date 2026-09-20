@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_SHAPE, MSO_SHAPE_TYPE
+from pptx.enum.shapes import MSO_SHAPE, MSO_SHAPE_TYPE, PP_PLACEHOLDER
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
@@ -33,6 +33,16 @@ def clear_text(shape):
 def clear_slide_text(slide):
     for shape in slide.shapes:
         clear_text(shape)
+
+
+def remove_text_placeholders(slide):
+    """Remove empty template prompts while retaining any template photo slot."""
+    for shape in list(slide.shapes):
+        if not getattr(shape, "is_placeholder", False):
+            continue
+        if shape.placeholder_format.type == PP_PLACEHOLDER.PICTURE:
+            continue
+        shape.element.getparent().remove(shape.element)
 
 
 def delete_slide(prs, index):
@@ -176,6 +186,7 @@ def build():
         prs.slides._sldIdLst.append(child)
     for slide in prs.slides:
         clear_slide_text(slide)
+        remove_text_placeholders(slide)
 
     # 1. Cover
     slide = prs.slides[0]

@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import type { Citation } from '../../types/api'
 import { btnSecondary, formatDate } from '../../lib'
 import { IconAlert, IconX } from '../icons'
+import { PersonLink } from '../PersonLink'
 import { Skeleton } from '../ui'
 import { DocIcon } from './CitationList'
 
@@ -18,7 +19,13 @@ function Unit({ unit, highlight }: { unit: Citation; highlight?: boolean }) {
       }
     >
       <div className="mb-1.5 flex flex-wrap items-center gap-x-2 text-xs font-bold">
-        <span className={highlight ? 'text-ink' : ''}>{unit.speaker_sender ?? 'Unknown sender'}</span>
+        <span className={highlight ? 'text-ink' : ''}>
+          {unit.speaker_sender ? (
+            <PersonLink subjectId={unit.subject_id} name={unit.speaker_sender} />
+          ) : (
+            'Unknown sender'
+          )}
+        </span>
         {unit.timestamp_text && <span className="font-medium opacity-80">{unit.timestamp_text}</span>}
         <span
           className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${

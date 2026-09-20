@@ -5,6 +5,7 @@ import { Logo } from './components/Logo'
 import { useRoute } from './hooks/useRoute'
 import { CasePage } from './pages/CasePage'
 import { HomePage } from './pages/HomePage'
+import { PersonPage } from './pages/PersonPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { RadarPage } from './pages/RadarPage'
 
@@ -119,6 +120,7 @@ function App() {
         {route.page === 'case' && <CasePage caseId={route.caseId} />}
         {route.page === 'privacy' && <PrivacyPage />}
         {route.page === 'radar' && <RadarPage />}
+        {route.page === 'person' && <PersonPage subjectId={route.subjectId} />}
       </main>
 
       <footer className="no-print border-t border-line bg-surface">

@@ -3,7 +3,7 @@ import logging
 import sqlite3
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app.api import deps
@@ -23,6 +23,11 @@ Llm = Annotated[LLMClient | None, Depends(deps.get_llm)]
 Embedder = Annotated[EmbeddingProvider | None, Depends(deps.get_embedding_provider)]
 Index = Annotated[SemanticIndex | None, Depends(deps.get_shared_index)]
 
+# A Case receipt quotes evidence text and can name pseudonymised/active
+# participants; never cached by a browser or intermediate proxy (matches
+# app/api/privacy.py, app/api/people.py, and app/api/evidence.py's header).
+_NO_STORE = {"Cache-Control": "private, no-store, max-age=0"}
+
 
 class QueryRequest(BaseModel):
     query: str = Field(min_length=3, max_length=1000)
@@ -30,8 +35,9 @@ class QueryRequest(BaseModel):
 
 @router.post("/query", response_model=CaseReceipt)
 def query_case(
-    body: QueryRequest, conn: Conn, llm: Llm, embedder: Embedder, index: Index
+    body: QueryRequest, conn: Conn, llm: Llm, embedder: Embedder, index: Index, response: Response
 ) -> CaseReceipt:
+    response.headers.update(_NO_STORE)
     if llm is None:
         raise HTTPException(503, "The reasoning service is not configured.")
     retrieval = RetrievalService(conn, embedder, index=index)
@@ -44,9 +50,10 @@ def query_case(
 
 
 @router.get("")
-def recent_cases(conn: Conn, limit: int = 8) -> list[dict]:
+def recent_cases(conn: Conn, response: Response, limit: int = 8) -> list[dict]:
     """The most recent user Cases (Radar-linked Cases are excluded), with just
     enough to list them. Each opens through the ordinary Case endpoint."""
+    response.headers.update(_NO_STORE)
     limit = max(1, min(limit, 30))
     # Newest first; asking the same question again lists it once (its latest Case).
     rows = conn.execute(
@@ -77,7 +84,8 @@ def recent_cases(conn: Conn, limit: int = 8) -> list[dict]:
 
 
 @router.get("/{case_id}", response_model=CaseReceipt)
-def get_case(case_id: str, conn: Conn) -> CaseReceipt:
+def get_case(case_id: str, conn: Conn, response: Response) -> CaseReceipt:
+    response.headers.update(_NO_STORE)
     receipt = load_case_receipt(conn, case_id)
     if receipt is None:
         raise HTTPException(404, "Case not found.")

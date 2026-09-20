@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Citation } from '../../types/api'
 import { formatDate } from '../../lib'
 import { IconChevronDown, IconFile, IconMail, IconMic } from '../icons'
+import { PersonLink } from '../PersonLink'
 
 export function DocIcon({ type, size = 16 }: { type: string; size?: number }) {
   if (type === 'TRANSCRIPT') return <IconMic size={size} />
@@ -38,7 +39,11 @@ export function SourceChip({
         </span>
         <span className="text-ink-2">{c.document_title ?? c.document_id}</span>
         <span>· {formatDate(c.event_date)}</span>
-        {c.speaker_sender && <span>· {c.speaker_sender}</span>}
+        {c.speaker_sender && (
+          <span>
+            · <PersonLink subjectId={c.subject_id} name={c.speaker_sender} />
+          </span>
+        )}
       </span>
       <span className="mt-1.5 line-clamp-3 block text-sm leading-relaxed text-ink">{c.raw_text}</span>
       <span className="mt-1 flex items-center justify-between text-xs font-bold text-brand-ink">
@@ -63,7 +68,9 @@ export function SourceRow({ citation: c, onOpen }: { citation: Citation; onOpen:
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-bold text-ink">{c.document_title ?? c.filename}</span>
-        <span className="block truncate text-xs text-ink-3">{c.speaker_sender ?? c.filename}</span>
+        <span className="block truncate text-xs text-ink-3">
+          {c.speaker_sender ? <PersonLink subjectId={c.subject_id} name={c.speaker_sender} /> : c.filename}
+        </span>
       </span>
       <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-ink-3">{formatDate(c.event_date)}</span>
     </button>

@@ -57,7 +57,7 @@ def test_reserved_markers_never_become_people_aliases_or_relations(tmp_path, con
     report = ingest(conn, source, embedding_provider=None)
 
     for marker in anonymous_labels.REDACTION_MARKERS:
-        assert repository.find_person_id_by_canonical_name(conn, marker) is None
+        assert repository.find_subject_id_by_structural_name(conn, marker) is None
         assert marker not in {row["alias"] for row in repository.all_aliases(conn)}
         assert marker not in report.rejected_candidates
         assert marker not in report.unresolved_alias_candidates
@@ -76,25 +76,25 @@ def test_reserved_markers_never_become_people_aliases_or_relations(tmp_path, con
         assert relations == [], f"marker unit got a person relation: {list(relations)}"
 
     # Named people elsewhere in the same corpus are unaffected.
-    marco_id = repository.find_person_id_by_canonical_name(conn, "Marco Rossi")
-    lena_id = repository.find_person_id_by_canonical_name(conn, "Lena Fischer")
+    marco_id = repository.find_subject_id_by_structural_name(conn, "Marco Rossi")
+    lena_id = repository.find_subject_id_by_structural_name(conn, "Lena Fischer")
     assert marco_id is not None
     assert lena_id is not None
 
     marco_turn = units["Let's start the weekly sync."]
     lena_turn = units["Thanks, moving on."]
     assert (marco_id, PersonRelation.SPEAKER.value) in [
-        (r["person_id"], r["relation"])
+        (r["subject_id"], r["relation"])
         for r in repository.evidence_people_for(conn, marco_turn["evidence_id"])
     ]
     assert (lena_id, PersonRelation.SPEAKER.value) in [
-        (r["person_id"], r["relation"])
+        (r["subject_id"], r["relation"])
         for r in repository.evidence_people_for(conn, lena_turn["evidence_id"])
     ]
 
     email_author_unit = units["Hi All, hereby the weekly update."]
     assert (marco_id, PersonRelation.AUTHOR.value) in [
-        (r["person_id"], r["relation"])
+        (r["subject_id"], r["relation"])
         for r in repository.evidence_people_for(conn, email_author_unit["evidence_id"])
     ]
 
@@ -107,6 +107,6 @@ def test_reserved_markers_stay_absent_after_rebuild(tmp_path, conn):
     ingest(conn, source, embedding_provider=None)
 
     for marker in anonymous_labels.REDACTION_MARKERS:
-        assert repository.find_person_id_by_canonical_name(conn, marker) is None
+        assert repository.find_subject_id_by_structural_name(conn, marker) is None
     people_count = repository.people_row_count(conn)
     assert people_count == 2  # Marco Rossi, Lena Fischer -- never grows from re-ingestion

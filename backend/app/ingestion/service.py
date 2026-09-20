@@ -2,19 +2,22 @@
 assign stable identity (documents, evidence units, people/aliases), and
 populate FTS + embeddings.
 
-Safe to re-run: every ingestion-owned table (documents, evidence_units,
-people, person_aliases, evidence_people, evidence_embeddings,
-evidence_fts -- see migrations._REBUILDABLE_TABLES) is dropped and
-regenerated every time. That is not "every table except source_locators":
-Cases/Pulse tables (cases, case_evidence, pulse_findings, finding_evidence)
-are separate, not-yet-implemented Phase 2+ concerns and this reset does
-not touch them. Regenerating people/person_aliases fresh from data/source/
-plus the reviewed identity manifest on each run, rather than accumulating
-them across runs, is safe specifically because both of those inputs are
-sanitizable: a false identity from an earlier extraction pass cannot
-outlive the run that produced it, and a rebuild after a deletion cannot
-resurrect what was removed as long as both inputs stay sanitized
-(CLAUDE.md 7.3, 18.3).
+Safe to re-run: every REBUILDABLE table (documents, evidence_units,
+evidence_people, evidence_embeddings, evidence_fts -- see
+migrations._REBUILDABLE_TABLES) is dropped and regenerated every time. That
+is not "every table except source_locators": Cases/Pulse tables (cases,
+case_evidence, pulse_findings, finding_evidence) are separate concerns and
+this reset does not touch them, and neither does it touch people/
+person_aliases, which moved to persistent under Architecture v1.6 (CLAUDE.md
+18.0) -- a subject's subject_id and display_alias must survive a rebuild.
+Instead, seed_and_discover matches each structural name it finds against
+the persistent table (see app/ingestion/people.py) and prune_orphaned_
+active_people below removes only the ACTIVE rows that matched nothing this
+run, which is what still lets a false identity from an earlier, looser
+extraction pass -- or a name a source edit removed -- fail to survive a
+rebuild, without weakening identity stability for anyone still genuinely
+present or ever pseudonymising a person to make them disappear (CLAUDE.md
+7.3, 18.3).
 
 Failure safety: source files and the reviewed identity manifest are fully
 parsed and validated (see people.load_reviewed_identities) *before* the
@@ -183,6 +186,7 @@ def ingest(
     report.rejected_candidates = people_report.rejected_candidates
 
     _link_relations(conn, unit_records)
+    repository.prune_orphaned_active_people(conn)
 
     report.fts_row_count = repository.fts_row_count(conn)
     migrations.mark_fts_current(conn)
@@ -244,14 +248,14 @@ def _link_relations(
 
         is_anonymous_speaker = anonymous_labels.is_non_person_label(unit.speaker_sender)
         if unit.speaker_sender and not is_anonymous_speaker:
-            person_id = repository.find_person_id_by_canonical_name(conn, unit.speaker_sender)
-            if person_id:
+            subject_id = repository.find_subject_id_by_structural_name(conn, unit.speaker_sender)
+            if subject_id:
                 relation = (
                     PersonRelation.AUTHOR
                     if document_type in (DocumentType.EMAIL.value, DocumentType.REPORT.value)
                     else PersonRelation.SPEAKER
                 )
-                repository.link_evidence_person(conn, evidence_id, person_id, relation)
-                exclude.add(person_id)
+                repository.link_evidence_person(conn, evidence_id, subject_id, relation)
+                exclude.add(subject_id)
 
         people.link_mentions(conn, evidence_id, unit.raw_text, exclude)

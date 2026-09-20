@@ -9,3 +9,8 @@ python-dotenv==1.2.3
 httpx==0.28.1
 pytest==9.1.1
 ruff==0.16.8
+
+# Architecture v1.6 (CLAUDE.md 18.0.3): authenticated encryption for the
+# isolated reversal vault (app/privacy/vault.py). Vetted library, no
+# homemade cryptography. Pinned against 50.0.1 on 2026-09-20.
+cryptography==50.0.1

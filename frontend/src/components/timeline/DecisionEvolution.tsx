@@ -2,6 +2,7 @@ import type { ReceiptTimelineEvent, Stance } from '../../types/api'
 import { formatDate } from '../../lib'
 import { ConfidenceMeter, StanceChip } from '../ui'
 import { IconCheck } from '../icons'
+import { PersonLink } from '../PersonLink'
 
 const DOT: Record<Stance, string> = {
   PROPOSAL: 'bg-purple',
@@ -51,7 +52,12 @@ export function DecisionEvolution({
                   onClick={() => onOpen(c.evidence_id)}
                   className="min-h-8 cursor-pointer rounded-full border border-line px-3 text-xs font-semibold text-brand-ink transition-colors duration-200 hover:border-brand hover:bg-brand-soft"
                 >
-                  Source {i + 1} · {c.speaker_sender ?? 'unknown'}
+                  Source {i + 1} ·{' '}
+                  {c.speaker_sender ? (
+                    <PersonLink subjectId={c.subject_id} name={c.speaker_sender} />
+                  ) : (
+                    'unknown'
+                  )}
                 </button>
               ))}
             </div>

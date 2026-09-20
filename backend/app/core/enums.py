@@ -13,6 +13,15 @@ class PersonRelation(StrEnum):
     MENTIONED = "MENTIONED"
 
 
+class PrivacyState(StrEnum):
+    """A participant's public identity state (CLAUDE.md 18.0.1). There is no
+    DELETED/ANONYMISED state in Architecture v1.6: the participant row and
+    every evidence_people relationship always survive."""
+
+    ACTIVE = "ACTIVE"
+    PSEUDONYMISED = "PSEUDONYMISED"
+
+
 class AliasType(StrEnum):
     FULL_NAME = "FULL_NAME"
     EMAIL = "EMAIL"

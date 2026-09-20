@@ -3,9 +3,12 @@ import type {
   CaseReceipt,
   FindingCard,
   EvidenceView,
+  PersonProfile,
   PersonSummary,
-  PurgePreview,
-  PurgeResult,
+  PseudonymisePreview,
+  PseudonymiseResult,
+  ContributionEntry,
+  ReversalResult,
   RecentCase,
 } from '../types/api'
 
@@ -37,17 +40,38 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 const post = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) })
 
+// The admin token gates POST /api/privacy/pseudonymise and the admin
+// reversal endpoint only; it is never persisted (no localStorage/
+// sessionStorage) and lives only in the current page's memory, cleared on
+// reload -- consistent with treating it as a credential, not a preference.
+const withAdmin = (body: unknown, token: string): RequestInit => ({
+  method: 'POST',
+  body: JSON.stringify(body),
+  headers: { Authorization: `Bearer ${token}` },
+})
+
 export const api = {
   ask: (query: string) => request<CaseReceipt>('/api/cases/query', post({ query })),
   getCase: (caseId: string) => request<CaseReceipt>(`/api/cases/${encodeURIComponent(caseId)}`),
   getEvidence: (evidenceId: string) =>
     request<EvidenceView>(`/api/evidence/${encodeURIComponent(evidenceId)}`),
   people: () => request<PersonSummary[]>('/api/privacy/people'),
-  preview: (personId: string) =>
-    request<PurgePreview>('/api/privacy/preview', post({ person_id: personId })),
+  preview: (subjectId: string) =>
+    request<PseudonymisePreview>('/api/privacy/preview', post({ subject_id: subjectId })),
   stats: () => request<ArchiveStats>('/api/stats'),
   recentCases: () => request<RecentCase[]>('/api/cases?limit=6'),
   radar: () => request<FindingCard[]>('/api/radar'),
-  purge: (personId: string) =>
-    request<PurgeResult>('/api/privacy/purge', post({ person_id: personId, confirm: true })),
+  pseudonymise: (subjectId: string, adminToken: string) =>
+    request<PseudonymiseResult>(
+      '/api/privacy/pseudonymise',
+      withAdmin({ subject_id: subjectId }, adminToken)
+    ),
+  getPerson: (subjectId: string) => request<PersonProfile>(`/api/people/${encodeURIComponent(subjectId)}`),
+  getPersonHistory: (subjectId: string) =>
+    request<ContributionEntry[]>(`/api/people/${encodeURIComponent(subjectId)}/history`),
+  reversePseudonymisation: (subjectId: string, adminToken: string, confirm: boolean) =>
+    request<ReversalResult>(
+      `/api/admin/people/${encodeURIComponent(subjectId)}/reverse-pseudonymisation`,
+      withAdmin({ confirm }, adminToken)
+    ),
 }

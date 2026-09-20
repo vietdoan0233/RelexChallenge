@@ -31,6 +31,10 @@ export interface Citation {
   thread_context: string | null
   raw_text: string
   is_truncated: boolean
+  // The AUTHOR/SPEAKER participant for this unit, or null for an anonymous
+  // label ("Me", "Them", a Teams guest) or unresolved free text. Lets
+  // speaker_sender link to that participant's profile (#/people/:subjectId).
+  subject_id: string | null
 }
 
 export interface ReceiptClaim {
@@ -95,35 +99,81 @@ export interface EvidenceView {
   context_after: Citation[]
 }
 
+export type PrivacyState = 'ACTIVE' | 'PSEUDONYMISED'
+
 export interface PersonSummary {
-  person_id: string
-  canonical_name: string
+  subject_id: string
+  display_alias: string
+  privacy_state: PrivacyState
+  display_name: string | null
   author_units: number
   speaker_units: number
   mentioned_units: number
 }
 
-export interface PurgePreview {
-  person_id: string
+export interface PseudonymisePreview {
+  subject_id: string
+  display_alias: string
   author_units: number
   speaker_units: number
   mentioned_units: number
-  units_to_anonymize: number
-  files_to_sanitize: number
+  units_to_rewrite: number
+  files_to_rewrite: number
   cases_to_invalidate: number
   findings_to_invalidate?: number
 }
 
-export interface PurgeResult {
+export interface PseudonymiseResult {
   operation_id: string
-  files_sanitized: number
-  units_anonymized: number
+  subject_id: string
+  display_alias: string
+  privacy_state: PrivacyState
+  files_rewritten: number
+  units_rewritten: number
   cases_invalidated: number
   findings_invalidated?: number
   embeddings_regenerated: number
   embeddings_pending: number
   verification: Record<string, number>
+  checks: Record<string, boolean>
   verified: boolean
+  pseudonymised_at: string | null
+}
+
+export interface ReversalResult {
+  operation_id: string
+  subject_id: string
+  display_alias: string
+  privacy_state: PrivacyState
+  files_restored: number
+  verified: boolean
+  verification: Record<string, number>
+}
+
+export interface ContributionEntry {
+  evidence_id: string
+  document_id: string
+  document_type: string
+  filename: string
+  document_title: string | null
+  relation: 'AUTHOR' | 'SPEAKER' | 'MENTIONED'
+  event_date: string | null
+  timestamp_text: string | null
+  thread_context: string | null
+  raw_text: string
+  is_truncated: boolean
+}
+
+export interface PersonProfile {
+  subject_id: string
+  display_alias: string
+  privacy_state: PrivacyState
+  display_name: string | null
+  author_units: number
+  speaker_units: number
+  mentioned_units: number
+  pseudonymised_at: string | null
+  verification_result: { counts?: Record<string, number>; checks?: Record<string, boolean> } | null
 }
 
 export type RadarAssessment =

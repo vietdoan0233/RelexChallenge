@@ -90,7 +90,7 @@ function MiniColumn({
     <div className={`flex min-w-0 gap-2 ${muted ? 'rounded-lg bg-surface-2 px-3 py-2.5' : 'px-1'}`}>
       <span className="grid size-5 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-ink">{icon}</span>
       <div className="min-w-0">
-        <p className="text-[10.5px] font-bold leading-[18px] text-ink">{label}</p>
+        <p className="text-[10.5px] font-bold leading-[16px] text-ink">{label}</p>
         <p className="line-clamp-3 text-[10px] leading-[13px] text-ink-2">{body}</p>
         <MiniLink citation={citation} onOpen={onOpen} />
       </div>
@@ -119,15 +119,15 @@ export function FindingCard({ card }: { card: Card }) {
 
   return (
     <article className={`${cardClass} anim-fade-up overflow-hidden`}>
-      <div className="px-3 pb-[10px] pt-[13px]">
+      <div className="px-3 pb-[8px] pt-[13px]">
         <div className="flex items-start gap-[17px]">
           <span className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[9px] font-bold uppercase tracking-wide ${a.tone}`}>
             {a.icon}
             {a.label}
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="line-clamp-1 text-[17px] font-bold leading-[22px] text-ink">{card.proposal}</h2>
-            <p className="text-[11px] leading-[14px] text-ink-2">
+            <h2 className="line-clamp-1 text-[17px] font-bold leading-[19px] text-ink">{card.proposal}</h2>
+            <p className="text-[11px] leading-[13px] text-ink-2">
               {card.outcome === 'REJECTED' ? 'Rejected' : 'Deferred'} · {card.blocker_category}
             </p>
           </div>
@@ -164,7 +164,7 @@ export function FindingCard({ card }: { card: Card }) {
           </div>
         </div>
 
-        <div className="mt-[9px] flex items-center justify-between border-t border-line pt-2 text-[10px] text-ink-3">
+        <div className="mt-2 flex items-center justify-between border-t border-line pt-[7px] text-[10px] text-ink-3">
           <span className="inline-flex items-center gap-1.5">
             <IconFolder size={12} /> Case {card.case_id} · Last updated {formatDate(card.created_at)}
           </span>

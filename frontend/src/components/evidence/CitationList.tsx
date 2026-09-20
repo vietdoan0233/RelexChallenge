@@ -56,7 +56,7 @@ export function SourceRow({ citation: c, onOpen }: { citation: Citation; onOpen:
     <button
       type="button"
       onClick={() => onOpen(c.evidence_id)}
-      className="group flex w-full cursor-pointer items-start gap-2 rounded-md py-1.5 text-left transition-colors duration-200 hover:bg-surface-2"
+      className="group flex w-full cursor-pointer items-start gap-2 rounded-md py-[7px] text-left transition-colors duration-200 hover:bg-surface-2"
     >
       <span className="mt-0.5 shrink-0 text-ink-3">
         <DocIcon type={c.document_type} size={14} />

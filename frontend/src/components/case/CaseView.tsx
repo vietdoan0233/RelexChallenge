@@ -25,7 +25,7 @@ import {
   IconBulb,
 } from '../icons'
 import { DecisionEvolution } from '../timeline/DecisionEvolution'
-import { ConfidenceMeter, Section, StanceChip, StatusBadge } from '../ui'
+import { Section, StatusBadge } from '../ui'
 
 // ------------------------------------------------------------------ claim
 
@@ -54,23 +54,23 @@ function ClaimCard({ claim, index, onOpen }: { claim: ReceiptClaim; index: numbe
   const v = claimVerdict(claim)
   return (
     <article
-      className={`anim-fade-up flex h-full flex-col gap-2 rounded-[10px] border bg-surface px-[13px] pb-[10px] pt-[11px] shadow-card ${
+      className={`anim-fade-up flex flex-col gap-[10px] rounded-[10px] border bg-surface px-[13px] pb-[14px] pt-[10px] shadow-card ${
         claim.stance === 'UNCERTAIN' ? 'border-warn/40' : 'border-line'
       }`}
       style={{ animationDelay: `${Math.min(index, 6) * 60}ms` }}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11.5px] font-bold text-ink">Claim {index + 1}</p>
-        <span className={`inline-flex h-5 items-center gap-1 rounded-full border px-2 text-[8.5px] font-bold uppercase tracking-wide ${v.tone}`}>
+        <p className="min-w-0 truncate text-[10.5px] font-bold text-ink">
+          Claim {index + 1}
+          <span className="ml-1.5 text-[10px] font-medium text-ink-3">{claim.stance.replaceAll('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}</span>
+        </p>
+        <span className={`inline-flex h-5 shrink-0 items-center gap-1 rounded-full border px-2 text-[8.5px] font-bold uppercase tracking-wide ${v.tone}`}>
           {v.icon}
           {v.label}
+          <span className="font-semibold opacity-80">· {claim.confidence.toLowerCase()}</span>
         </span>
       </div>
-      <p className="text-[11.5px] leading-[16px] text-ink">{claim.claim_text}</p>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <StanceChip stance={claim.stance} />
-        <ConfidenceMeter confidence={claim.confidence} />
-      </div>
+      <p className="text-[10px] leading-[14px] text-ink">{claim.claim_text}</p>
       {claim.uncertainty && !claim.conflicts.length && (
         <p className="flex gap-1.5 rounded-lg bg-warn-soft p-2 text-[10px] leading-[14px] text-warn">
           <IconAlert size={13} className="mt-px shrink-0" />
@@ -89,16 +89,14 @@ function ClaimCard({ claim, index, onOpen }: { claim: ReceiptClaim; index: numbe
       )}
 
       {claim.conflicts.length > 0 && (
-        <div className="mt-auto border-t border-line pt-2">
+        <div>
           <SourceGroup title={`Conflicting evidence (${claim.conflicts.length})`} tone="bad">
             {claim.conflicts.map((c) => (
               <SourceRow key={c.evidence_id} citation={c} onOpen={onOpen} />
             ))}
           </SourceGroup>
           {claim.uncertainty && (
-            <p className="mt-1.5 rounded-md bg-bad-soft p-2 text-[9.5px] leading-[13px] text-ink">
-              <strong>Notes:</strong> {claim.uncertainty}
-            </p>
+            <p className="mt-0.5 pl-[22px] text-[9px] leading-[12px] text-ink-3">{claim.uncertainty}</p>
           )}
         </div>
       )}
@@ -328,7 +326,7 @@ export function CaseView({ receipt, onAsk }: { receipt: CaseReceipt; onAsk: (que
             {receipt.claims.length > 0 && (
               <section id="claims" className="scroll-mt-24">
                 <h2 className="sr-only">Claims and evidence</h2>
-                <div className="grid gap-2 md:grid-cols-3">
+                <div className="grid items-start gap-2 md:grid-cols-3">
                   {receipt.claims.map((claim, i) => (
                     <ClaimCard key={i} claim={claim} index={i} onOpen={setOpenId} />
                   ))}
@@ -344,24 +342,24 @@ export function CaseView({ receipt, onAsk }: { receipt: CaseReceipt; onAsk: (que
             )}
 
             {receipt.timeline_events.length > 0 && (
-              <section id="evolution" className={`${card} scroll-mt-24 p-[15px]`}>
-                <h2 className="flex items-center gap-2 text-[13px] font-bold text-ink">
+              <section id="evolution" className={`${card} scroll-mt-24 px-[15px] pb-[12px] pt-[10px]`}>
+                <h2 className="flex items-center gap-2 text-[13px] font-bold leading-[18px] text-ink">
                   <IconGitBranch size={15} className="text-brand-ink" /> Decision Evolution
                 </h2>
-                <p className="mb-3 text-[10px] text-ink-2">Key events from proposal to now. Only states the evidence supports, in date order.</p>
+                <p className="mb-[5px] text-[10px] leading-[14px] text-ink-2">Key events from proposal to now. Only states the evidence supports, in date order.</p>
                 <DecisionEvolution events={receipt.timeline_events} onOpen={setOpenId} />
               </section>
             )}
 
             {receipt.missing_information.length > 0 && (
-              <section id="missing" className={`${card} flex scroll-mt-24 flex-col gap-3 px-[14px] py-[11px] sm:flex-row sm:items-start`}>
-                <p className="flex shrink-0 items-center gap-2 text-[12px] font-bold text-ink sm:w-60">
+              <section id="missing" className={`${card} flex scroll-mt-24 flex-col gap-3 px-[14px] py-[5px] sm:flex-row sm:items-center`}>
+                <p className="flex shrink-0 items-center gap-2 text-[12px] font-bold text-ink sm:mr-10">
                   <span className="grid size-6 place-items-center rounded-full bg-brand-soft text-brand-ink">
                     <IconBulb size={13} />
                   </span>
                   What the archive does not establish
                 </p>
-                <ul className="min-w-0 flex-1 list-disc gap-x-8 space-y-1 pl-4 text-[10px] leading-[14px] text-ink-2 lg:columns-2">
+                <ul className="min-w-0 flex-1 list-disc pl-4 text-[10px] leading-[14px] text-ink-2">
                   {receipt.missing_information.map((m) => (
                     <li key={m}>{m}</li>
                   ))}
@@ -414,7 +412,7 @@ export function CaseView({ receipt, onAsk }: { receipt: CaseReceipt; onAsk: (que
                     <button
                       type="button"
                       onClick={() => onAsk(q)}
-                      className="group flex w-full cursor-pointer items-center justify-between gap-2 py-[9px] text-left text-[10.5px] font-semibold leading-[14px] text-ink transition-colors duration-200 hover:text-brand-ink"
+                      className="group flex w-full cursor-pointer items-center justify-between gap-2 py-2 text-left text-[10.5px] font-semibold leading-[14px] text-ink transition-colors duration-200 hover:text-brand-ink"
                     >
                       {q}
                       <IconChevronDown size={13} className="shrink-0 -rotate-90 text-ink-3 transition-transform duration-200 group-hover:translate-x-0.5" />

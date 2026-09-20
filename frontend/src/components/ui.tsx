@@ -7,8 +7,8 @@ export function StatusBadge({ status, large }: { status: CaseStatus; large?: boo
   const s = STATUS[status]
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full font-bold ${s.tone} ${
-        large ? 'px-4 py-2 text-base' : 'px-3 py-1 text-sm'
+      className={`inline-flex items-center gap-1.5 rounded-full border font-bold uppercase tracking-wide ${s.tone} ${
+        large ? 'h-8 px-4 text-xs' : 'h-6 px-3 text-[10px]'
       }`}
     >
       {s.icon}
@@ -32,7 +32,7 @@ const pretty = (v: string) => v.replaceAll('_', ' ').toLowerCase().replace(/^./,
 
 export function StanceChip({ stance }: { stance: Stance }) {
   return (
-    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${STANCE_TONE[stance]}`}>
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STANCE_TONE[stance]}`}>
       {pretty(stance)}
     </span>
   )
@@ -43,10 +43,10 @@ export function ConfidenceMeter({ confidence }: { confidence: Confidence }) {
   const level = confidence === 'HIGH' ? 3 : confidence === 'MEDIUM' ? 2 : 1
   const tone = level === 3 ? 'bg-ok' : level === 2 ? 'bg-warn' : 'bg-bad'
   return (
-    <span className="inline-flex items-center gap-2 text-xs font-semibold text-ink-2">
+    <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-ink-2">
       <span className="flex gap-0.5" aria-hidden="true">
         {[1, 2, 3].map((n) => (
-          <span key={n} className={`h-3 w-1.5 rounded-sm ${n <= level ? tone : 'bg-line'}`} />
+          <span key={n} className={`h-2.5 w-1 rounded-sm ${n <= level ? tone : 'bg-line'}`} />
         ))}
       </span>
       {pretty(confidence)} confidence

@@ -5,6 +5,7 @@ import {
   IconAlert,
   IconArrowRight,
   IconCalendar,
+  IconCheck,
   IconClock,
   IconFile,
   IconLayers,
@@ -14,17 +15,17 @@ import {
   IconUsers,
 } from '../components/icons'
 import { Thinking } from '../components/Thinking'
-import { Skeleton, StatusBadge } from '../components/ui'
+import { Skeleton } from '../components/ui'
 import { useCountUp } from '../hooks/useCountUp'
 import { go } from '../hooks/useRoute'
-import { btnPrimary, card, formatMonth, timeAgo } from '../lib'
+import { card, formatMonth, timeAgo } from '../lib'
 
 const HOW_IT_WORKS = [
-  { icon: <IconSearch size={22} />, title: 'Provenance', body: 'See the exact sources for every answer.' },
-  { icon: <IconUsers size={22} />, title: 'Attribution', body: 'Know who said what, and when.' },
-  { icon: <IconClock size={22} />, title: 'Currency', body: "Understand what's changed since then." },
-  { icon: <IconTrash size={22} />, title: 'Deletion', body: 'Respect removals and retention rules.', href: '#/privacy' },
-  { icon: <IconRadar size={22} />, title: 'Initiative', body: 'Trace decisions across initiatives and projects.', href: '#/radar' },
+  { icon: <IconSearch size={20} />, title: 'Provenance', body: 'See the exact sources for every answer.' },
+  { icon: <IconUsers size={20} />, title: 'Attribution', body: 'Know who said what, and when.' },
+  { icon: <IconClock size={20} />, title: 'Currency', body: "Understand what's changed since then." },
+  { icon: <IconTrash size={20} />, title: 'Deletion', body: 'Respect removals and retention rules.', href: '#/privacy' },
+  { icon: <IconRadar size={20} />, title: 'Initiative', body: 'Trace decisions across initiatives and projects.', href: '#/radar' },
 ] as const
 
 const EXAMPLES = [
@@ -34,17 +35,14 @@ const EXAMPLES = [
   { tag: 'Risks', q: 'Show me open risks.' },
 ]
 
-function Stat({ icon, value, label, suffix }: { icon: React.ReactNode; value: number; label: string; suffix?: string }) {
+function Stat({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
   const n = useCountUp(value)
   return (
-    <div className={`${card} flex items-center gap-3 p-4`}>
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand-ink">{icon}</span>
+    <div className={`${card} flex h-[74px] items-center gap-[22px] px-[16px]`}>
+      <span className="grid size-[46px] shrink-0 place-items-center rounded-full bg-brand-soft text-brand-ink">{icon}</span>
       <span className="min-w-0">
-        <p className="truncate text-2xl font-extrabold tabular-nums leading-tight tracking-tight text-ink">
-          {n.toLocaleString()}
-          {suffix}
-        </p>
-        <p className="text-xs font-semibold text-ink-2">{label}</p>
+        <p className="truncate text-xl font-bold tabular-nums leading-tight text-ink">{n.toLocaleString()}</p>
+        <p className="text-[13px] leading-tight text-ink-2">{label}</p>
       </span>
     </div>
   )
@@ -52,44 +50,23 @@ function Stat({ icon, value, label, suffix }: { icon: React.ReactNode; value: nu
 
 function DateStat({ from, to }: { from: string | null; to: string | null }) {
   return (
-    <div className={`${card} flex items-center gap-3 p-4`}>
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand-ink">
+    <div className={`${card} flex h-[74px] items-center gap-[22px] px-[16px]`}>
+      <span className="grid size-[46px] shrink-0 place-items-center rounded-full bg-brand-soft text-brand-ink">
         <IconCalendar size={22} />
       </span>
       <span className="min-w-0">
-        <p className="whitespace-nowrap text-base font-extrabold leading-tight tracking-tight text-ink sm:text-lg">
+        <p className="whitespace-nowrap text-[17px] font-bold leading-tight text-ink">
           {formatMonth(from)} – {formatMonth(to)}
         </p>
-        <p className="text-xs font-semibold text-ink-2">Date range</p>
+        <p className="text-[13px] leading-tight text-ink-2">Date range</p>
       </span>
     </div>
   )
 }
 
-function Blobs() {
-  // Soft pale-blue shapes plus a light dot grid, echoing the reference hero art. Decorative only.
-  return (
-    <>
-      <svg className="pointer-events-none absolute -left-32 -top-24 hidden w-[440px] opacity-40 blur-[2px] md:block dark:opacity-10" viewBox="0 0 400 400" aria-hidden="true">
-        <path d="M311 82c46 40 60 112 29 165s-105 87-166 74S52 253 62 187 137 60 200 50s65-8 111 32Z" fill="#bcdcfb" />
-      </svg>
-      <svg className="pointer-events-none absolute -right-28 -top-16 hidden w-[480px] opacity-40 blur-[2px] md:block dark:opacity-10" viewBox="0 0 400 400" aria-hidden="true">
-        <path d="M296 130c30 30 32 84 2 119s-82 46-122 27-64-63-50-105 62-78 105-83 35-8 65 42Z" fill="#bcdcfb" />
-      </svg>
-      <svg className="pointer-events-none absolute bottom-6 right-8 hidden h-32 w-44 opacity-40 md:block dark:opacity-20" aria-hidden="true">
-        {Array.from({ length: 5 }).map((_, row) =>
-          Array.from({ length: 8 }).map((_, col) => (
-            <circle key={`${row}-${col}`} cx={10 + col * 15} cy={10 + row * 15} r="1.6" fill="#177abf" />
-          )),
-        )}
-      </svg>
-    </>
-  )
-}
-
 export function HomePage({ prefill }: { prefill?: string }) {
   const [question, setQuestion] = useState(prefill ?? '')
-  const box = useRef<HTMLInputElement>(null)
+  const box = useRef<HTMLTextAreaElement>(null)
   const stats = useQuery({ queryKey: ['stats'], queryFn: api.stats })
   const recent = useQuery({ queryKey: ['recent'], queryFn: api.recentCases })
 
@@ -117,119 +94,119 @@ export function HomePage({ prefill }: { prefill?: string }) {
 
   const s = stats.data
   return (
-    <div>
+    <div className="mx-auto max-w-[1208px] px-4 pb-12">
       {/* ------------------------------------------------------------ hero */}
-      <section className="hero-bg relative overflow-hidden">
-        <Blobs />
-        <div className="relative mx-auto max-w-4xl px-4 pb-14 pt-12 text-center">
-          <div className="anim-fade-up space-y-4">
-            <span className="inline-flex items-center gap-2 rounded-full bg-surface/80 px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.14em] text-ink-3 shadow-card">
-              Evidence-first organizational memory
-            </span>
-            <h1 className="text-balance text-4xl font-extrabold leading-[1.1] tracking-tight text-ink sm:text-5xl">
-              Ask anything.
-              <br />
-              <span className="text-brand">Get the receipt.</span>
-            </h1>
-            <p className="mx-auto max-w-2xl text-pretty text-lg text-ink-2">
-              Our AI answers questions about what was decided, who agreed, what changed, and what is true now — with
-              exact sources and any disagreements shown.
-            </p>
-          </div>
+      <section className="mx-auto max-w-[900px] pt-[24px] text-center">
+        <div className="anim-fade-up">
+          <p className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-ink-3">Evidence-first organizational memory</p>
+          <h1 className="mt-[9px] text-balance text-[40px] font-bold leading-[41px] tracking-tight text-ink">
+            Ask anything.
+            <br />
+            <span className="text-brand">Get the receipt.</span>
+          </h1>
+          <p className="mx-auto mt-[6px] max-w-[500px] text-pretty text-sm leading-5 text-ink-2">
+            Our AI answers questions about what was decided, who agreed, what changed, and what is true now — with exact
+            sources and any disagreements shown.
+          </p>
+        </div>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              submit(question)
-            }}
-            className="anim-fade-up mx-auto mt-8 max-w-3xl"
-            style={{ animationDelay: '0.1s' }}
-          >
-            <label htmlFor="question" className="sr-only">
-              Your question
-            </label>
-            <div className="flex flex-col gap-2 rounded-[28px] border border-line bg-surface p-2 shadow-lift transition-shadow duration-200 focus-within:ring-4 focus-within:ring-brand/25 sm:flex-row sm:items-center sm:gap-3 sm:rounded-full sm:py-2 sm:pl-5 sm:pr-2">
-              <div className="flex min-w-0 flex-1 items-center gap-3 px-3 pt-1 sm:p-0">
-                <IconSearch size={20} className="shrink-0 text-ink-3" />
-                <input
-                  id="question"
-                  ref={box}
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      submit(question)
-                    }
-                  }}
-                  maxLength={1000}
-                  placeholder="e.g. Did Acme sign off UAT, and what exactly was the scope?"
-                  className="min-w-0 flex-1 bg-transparent py-2 text-base text-ink placeholder:text-ink-3 focus:outline-none sm:text-lg"
-                />
-              </div>
-              <button type="submit" className={`${btnPrimary} min-h-11 shrink-0 px-5`} disabled={question.trim().length < 3}>
-                Open a Case <IconArrowRight size={18} />
-              </button>
-            </div>
-            <p className="mt-2 hidden pr-3 text-right text-xs font-semibold text-ink-3 sm:block">Press ⌘ + ↵ to submit</p>
-            {ask.isError && (
-              <div role="alert" className="mt-3 flex items-start gap-3 rounded-2xl border border-bad/40 bg-bad-soft p-4 text-left text-bad">
-                <IconAlert size={20} className="mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-bold">
-                    {ask.error instanceof ApiError && ask.error.status === 503 ? 'The archive is busy or the reasoning service is down.' : 'That did not work.'}
-                  </p>
-                  <p className="text-sm">{ask.error.message} Your question is still here, so you can try again.</p>
-                </div>
-              </div>
-            )}
-          </form>
-
-          <div className="mx-auto mt-5 flex max-w-3xl flex-wrap items-center justify-center gap-2">
-            <span className="text-sm font-semibold text-ink-2">Try an example question:</span>
-            {EXAMPLES.map((e) => (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            submit(question)
+          }}
+          className="anim-fade-up mx-auto mt-[21px] max-w-[848px]"
+          style={{ animationDelay: '0.1s' }}
+        >
+          <label htmlFor="question" className="sr-only">
+            Your question
+          </label>
+          <div className="rounded-2xl border border-line bg-surface/90 p-3 shadow-card transition-colors duration-200 focus-within:border-brand/30">
+            <div className="relative h-[72px] rounded-[10px] border border-line bg-surface">
+              <IconSearch size={18} className="absolute left-3 top-[14px] text-brand" />
+              <textarea
+                id="question"
+                ref={box}
+                rows={2}
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    submit(question)
+                  }
+                }}
+                maxLength={1000}
+                placeholder="e.g. Did Acme sign off UAT, and what exactly was the scope?"
+                className="absolute inset-y-0 left-10 right-[160px] resize-none bg-transparent pt-[15px] text-[13px] leading-[1.4] text-ink placeholder:text-ink-3 focus:outline-none"
+              />
               <button
-                key={e.q}
-                type="button"
-                onClick={() => fillExample(e.q)}
-                className="min-h-9 cursor-pointer rounded-full border border-brand/30 bg-surface px-4 py-1.5 text-sm font-semibold text-brand-ink transition-colors duration-200 hover:bg-brand-soft"
+                type="submit"
+                className="absolute right-0 top-[3px] inline-flex h-9 w-[126px] cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand text-[13px] font-semibold text-white transition-colors duration-200 hover:bg-brand-strong disabled:cursor-not-allowed"
+                disabled={question.trim().length < 3}
               >
-                {e.q}
+                Open a Case <IconArrowRight size={15} />
               </button>
-            ))}
+              <p className="pointer-events-none absolute bottom-[7px] right-3 hidden text-[10px] text-ink-3 sm:block">Press ⌘ ↵ to submit</p>
+            </div>
           </div>
+          {ask.isError && (
+            <div role="alert" className="mt-3 flex items-start gap-3 rounded-xl border border-bad/40 bg-bad-soft p-4 text-left text-bad">
+              <IconAlert size={20} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-bold">
+                  {ask.error instanceof ApiError && ask.error.status === 503 ? 'The archive is busy or the reasoning service is down.' : 'That did not work.'}
+                </p>
+                <p className="text-sm">{ask.error.message} Your question is still here, so you can try again.</p>
+              </div>
+            </div>
+          )}
+        </form>
 
-          <div className="mx-auto mt-8 grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-4">
-            {s ? (
-              <>
-                <Stat icon={<IconFile size={22} />} value={s.documents} label="Documents" />
-                <Stat icon={<IconLayers size={22} />} value={s.evidence_units} label="Evidence units" />
-                <Stat icon={<IconUsers size={22} />} value={s.people} label="People" />
-                <DateStat from={s.first_date} to={s.last_date} />
-              </>
-            ) : (
-              [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[72px]" />)
-            )}
-          </div>
+        <div className="mx-auto mt-[15px] flex max-w-[900px] flex-wrap items-center justify-center gap-x-[7px] gap-y-2">
+          <span className="mr-1 text-[10px] text-ink-2">Try an example question:</span>
+          {EXAMPLES.map((e) => (
+            <button
+              key={e.q}
+              type="button"
+              onClick={() => fillExample(e.q)}
+              className="h-[30px] cursor-pointer rounded-full border border-brand/40 bg-surface/80 px-[13px] text-[10px] font-medium text-brand-ink transition-colors duration-200 hover:bg-brand-soft"
+            >
+              {e.q}
+            </button>
+          ))}
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl space-y-12 px-4 py-12">
+      <div className="mt-[27px] grid grid-cols-2 gap-[14px] lg:grid-cols-4">
+        {s ? (
+          <>
+            <Stat icon={<IconFile size={22} />} value={s.documents} label="Documents" />
+            <Stat icon={<IconLayers size={22} />} value={s.evidence_units} label="Evidence units" />
+            <Stat icon={<IconUsers size={22} />} value={s.people} label="People" />
+            <DateStat from={s.first_date} to={s.last_date} />
+          </>
+        ) : (
+          [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[74px]" />)
+        )}
+      </div>
+
+      <div className="mt-[22px] grid gap-[19px] lg:grid-cols-[minmax(0,1fr)_461px]">
         {/* ----------------------------------------------------- how it works */}
-        <section aria-labelledby="how-title" className="space-y-6">
-          <h2 id="how-title" className="text-2xl font-extrabold tracking-tight text-ink">
+        <section aria-labelledby="how-title">
+          <h2 id="how-title" className="mb-[8px] mt-[3px] text-base font-bold text-ink">
             How it works
           </h2>
-          <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+          <ul className="grid grid-cols-2 gap-[9px] sm:grid-cols-3 lg:grid-cols-5">
             {HOW_IT_WORKS.map((c) => {
               const inner = (
                 <>
-                  <span className="grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand-ink">{c.icon}</span>
-                  <h3 className="mt-3 text-base font-extrabold text-ink">{c.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-ink-2">{c.body}</p>
+                  <span className="grid size-[38px] shrink-0 place-items-center rounded-full bg-brand-soft text-brand-ink">{c.icon}</span>
+                  <h3 className="mt-[9px] text-[13px] font-bold leading-4 text-ink">{c.title}</h3>
+                  <p className="mt-2 text-[11px] leading-[15px] text-ink-2">{c.body}</p>
                 </>
               )
-              const cls = 'group flex h-full cursor-pointer flex-col items-center text-center'
+              const cls = `${card} flex h-[141px] cursor-pointer flex-col items-start px-[15px] pb-[11px] pt-[14px] text-left transition-shadow duration-200 hover:shadow-lift`
               return (
                 <li key={c.title}>
                   {'href' in c ? (
@@ -246,42 +223,45 @@ export function HomePage({ prefill }: { prefill?: string }) {
         </section>
 
         {/* ------------------------------------------------------ recent cases */}
-        <section className={`${card} p-6`}>
-          <div className="mb-1 flex items-center justify-between">
-            <h2 className="text-xl font-extrabold text-ink">Recent Cases</h2>
+        <section className={`${card} self-start px-[15px] pb-[6px] pt-3`}>
+          <div className="mb-1 flex h-5 items-center justify-between">
+            <h2 className="text-[15px] font-bold text-ink">Recent Cases</h2>
             {recent.data && recent.data.length > 0 && (
-              <a href="#/case" className="inline-flex items-center gap-1 text-sm font-bold text-brand-ink" onClick={(e) => e.preventDefault()}>
-                View all <IconArrowRight size={14} />
+              <a href="#/case" className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-ink" onClick={(e) => e.preventDefault()}>
+                View all <IconArrowRight size={13} />
               </a>
             )}
           </div>
           {recent.isPending && (
-            <div className="mt-3 space-y-2">
-              <Skeleton className="h-14" />
-              <Skeleton className="h-14" />
+            <div className="space-y-2 pb-3">
+              <Skeleton className="h-10" />
+              <Skeleton className="h-10" />
             </div>
           )}
           {recent.data?.length === 0 && (
-            <p className="mt-4 rounded-xl border border-dashed border-line p-6 text-center text-ink-2">
+            <p className="mb-3 rounded-lg border border-dashed border-line p-5 text-center text-sm text-ink-2">
               No Cases yet. Ask something above and it will appear here.
             </p>
           )}
-          <ul className="mt-2 divide-y divide-line">
-            {recent.data?.map((c) => (
+          <ul className="divide-y divide-line border-t border-line">
+            {recent.data?.slice(0, 3).map((c) => (
               <li key={c.case_id}>
-                <a href={`#/case/${c.case_id}`} className="group flex cursor-pointer items-center gap-3 py-3.5 transition-colors duration-200 hover:bg-surface-2">
+                <a href={`#/case/${c.case_id}`} className="group flex h-[44px] cursor-pointer items-center gap-3 transition-colors duration-200">
                   <span className="min-w-0 flex-1">
-                    <span className="line-clamp-1 font-bold text-ink">{c.query}</span>
-                    <span className="text-xs font-semibold text-ink-3">{c.claims} claim{c.claims === 1 ? '' : 's'}</span>
+                    <span className="line-clamp-1 text-[11.5px] font-semibold leading-tight text-ink">{c.query}</span>
+                    <span className="block text-[9.5px] leading-tight text-ink-3">
+                      {c.claims} claim{c.claims === 1 ? '' : 's'}
+                    </span>
                   </span>
-                  <span className="flex shrink-0 flex-col items-end gap-1">
-                    {c.status ? <StatusBadge status={c.status} /> : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-xs font-bold text-brand-ink">
-                        <IconClock size={12} /> In progress
-                      </span>
-                    )}
-                    <span className="text-xs font-semibold text-ink-3">{timeAgo(c.created_at)}</span>
+                  <span
+                    className={`inline-flex h-6 w-[83px] shrink-0 items-center justify-center gap-1 rounded-full border text-[10.5px] font-semibold ${
+                      c.status ? 'border-[#b9e2cf] bg-[#eef9f3] text-ok' : 'border-brand/30 bg-brand-soft text-brand-ink'
+                    }`}
+                  >
+                    {c.status ? <IconCheck size={11} strokeWidth={3} /> : <IconClock size={11} />}
+                    {c.status ? 'Completed' : 'In progress'}
                   </span>
+                  <span className="w-[42px] shrink-0 text-right text-[11px] text-ink-3">{timeAgo(c.created_at).replace(' ago', ' ago')}</span>
                 </a>
               </li>
             ))}

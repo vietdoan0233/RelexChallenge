@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import admin, cases, deps, evidence, meta, people, privacy, radar
+from app.api import admin, cases, deps, evidence, ingestion, meta, people, privacy, radar
 from app.core.config import get_settings
 from app.db import migrations, repository
 from app.db.connection import connect
@@ -48,6 +48,7 @@ app = FastAPI(
 )
 app.include_router(cases.router)
 app.include_router(evidence.router)
+app.include_router(ingestion.router)
 app.include_router(privacy.router)
 app.include_router(people.router)
 app.include_router(admin.router)

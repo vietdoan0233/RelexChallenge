@@ -213,3 +213,55 @@ export const IconBulb = (p: IconProps) => (
     <path d="M9 18h6M10 21h4M8 14a5 5 0 1 1 8 0c-.8.9-1.5 1.7-1.5 3H9.5c0-1.3-.7-2.1-1.5-3Z" />
   </Svg>
 )
+
+export const IconUpload = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 16V4" />
+    <path d="m7 9 5-5 5 5" />
+    <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+  </Svg>
+)
+
+export const IconBlock = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 12h8" />
+  </Svg>
+)
+
+export const IconCheckCircle = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m8 12.5 2.8 2.8L16 9.5" />
+  </Svg>
+)
+
+export const IconHelp = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.8" />
+    <path d="M12 17h.01" />
+  </Svg>
+)
+
+export const IconApprox = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M7.5 10.5c1.5-1.5 3-1.5 4.5 0s3 1.5 4.5 0" />
+    <path d="M7.5 14.5c1.5-1.5 3-1.5 4.5 0s3 1.5 4.5 0" />
+  </Svg>
+)
+
+export const IconMoreHorizontal = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="6" cy="12" r="1.2" />
+    <circle cx="12" cy="12" r="1.2" />
+    <circle cx="18" cy="12" r="1.2" />
+  </Svg>
+)
+
+export const IconCloud = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 18a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 9a4.5 4.5 0 0 1 .5 9Z" />
+  </Svg>
+)

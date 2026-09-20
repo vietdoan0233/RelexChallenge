@@ -34,4 +34,4 @@ export const btnSecondary = `${base} border border-line bg-surface text-ink hove
 export const btnGhost = `${base} text-brand-ink hover:bg-brand-soft`
 export const btnDanger = `${base} bg-bad text-white hover:opacity-90`
 
-export const card = 'rounded-2xl border border-line bg-surface shadow-card'
+export const card = 'rounded-[10px] border border-line bg-surface shadow-card'

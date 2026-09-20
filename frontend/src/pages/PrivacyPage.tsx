@@ -211,7 +211,7 @@ export function PrivacyPage() {
         <div className="mx-auto max-w-[900px] px-4 pb-[22px] pt-[14px] text-center">
           <p className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-ink-3">Privacy console</p>
           <h1 className="mt-[2px] text-balance text-[30px] font-bold leading-9 tracking-tight text-ink">Erase a person. Prove it held.</h1>
-          <p className="mx-auto mt-[3px] max-w-[470px] text-[13.5px] leading-[19px] text-ink-2">
+          <p className="mx-auto mt-[3px] max-w-[560px] text-[13.5px] leading-[19px] text-ink-2">
             Irreversibly anonymize one person's tracked names, aliases and emails across the archive, search index, embeddings, and dependent Cases while
             preserving unrelated evidence.
           </p>
@@ -349,18 +349,18 @@ export function PrivacyPage() {
                 )}
               </section>
 
-              <section className={`${card} px-[17px] pb-4 pt-[10px]`} aria-labelledby="verified">
+              <section className={`${card} px-[17px] pb-4 pt-[12px]`} aria-labelledby="verified">
                 <h2 id="verified" className="text-[15px] font-bold leading-[18px]">What gets verified</h2>
-                <p className="mb-2 text-[10px] leading-[14px] text-ink-2">We check these surfaces for the person's tracked identifiers. This is not cryptographic erasure.</p>
-                <ul className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-[1fr_1.35fr_1.1fr_1fr]">
+                <p className="mb-[10px] text-[10px] leading-[14px] text-ink-2">We check these surfaces for the person's tracked identifiers. This is not cryptographic erasure.</p>
+                <ul className="grid grid-cols-2 gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-x-2.5">
                   {VERIFIED_SURFACES.map((v) => (
-                    <li key={v.title} className="flex min-w-0 items-start gap-1.5">
+                    <li key={v.title} className="flex min-w-0 items-start gap-1.5 sm:shrink-0">
                       <span className="mt-px grid size-4 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-ink">
                         <IconCheck size={10} strokeWidth={3.5} />
                       </span>
                       <span className="leading-[12px]">
-                        <span className="block text-[9px] font-bold text-ink">{v.title}</span>
-                        <span className="block truncate text-[8px] leading-[11px] text-ink-3" title={v.body}>{v.body}</span>
+                        <span className="block whitespace-nowrap text-[8.5px] font-bold text-ink">{v.title}</span>
+                        <span className="block max-w-[88px] truncate text-[8px] leading-[11px] text-ink-3" title={v.body}>{v.body}</span>
                       </span>
                     </li>
                   ))}

@@ -26,7 +26,7 @@ export function DecisionEvolution({
           </div>
           <div className="mt-1.5 space-y-0.5 pr-1">
             <time className="block text-[9px] text-ink-3">{formatDate(event.event_date)}</time>
-            <p className="text-[10.5px] font-bold leading-[14px] text-ink">{event.event_text}</p>
+            <p className="line-clamp-3 text-[10.5px] font-bold leading-[14px] text-ink" title={event.event_text}>{event.event_text}</p>
             <div className="flex flex-wrap items-center gap-1 pt-0.5">
               <StanceChip stance={event.state} />
               {event.citations.map((c, i) => (

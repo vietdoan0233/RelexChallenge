@@ -54,7 +54,7 @@ function ClaimCard({ claim, index, onOpen }: { claim: ReceiptClaim; index: numbe
   const v = claimVerdict(claim)
   return (
     <article
-      className={`anim-fade-up flex h-full flex-col gap-2.5 rounded-[10px] border bg-surface px-[13px] pb-[11px] pt-[11px] shadow-card ${
+      className={`anim-fade-up flex h-full flex-col gap-2 rounded-[10px] border bg-surface px-[13px] pb-[10px] pt-[11px] shadow-card ${
         claim.stance === 'UNCERTAIN' ? 'border-warn/40' : 'border-line'
       }`}
       style={{ animationDelay: `${Math.min(index, 6) * 60}ms` }}
@@ -139,12 +139,12 @@ function CheckedMetric({
   detail: string
 }) {
   return (
-    <div className="flex min-w-0 gap-2.5 lg:px-3 lg:first:pl-0 lg:last:pr-0">
-      <span className={`grid size-[30px] shrink-0 place-items-center rounded-full ${tone}`}>{icon}</span>
+    <div className="flex min-w-0 gap-2 lg:px-3 lg:first:pl-0 lg:last:pr-0">
+      <span className={`grid size-[28px] shrink-0 place-items-center rounded-full ${tone}`}>{icon}</span>
       <div className="min-w-0">
-        <p className="text-[10px] font-bold leading-tight text-ink">{label}</p>
+        <p className="whitespace-nowrap text-[10px] font-bold leading-[13px] text-ink">{label}</p>
         {value && <p className="text-[13px] font-bold leading-[18px] text-ink">{value}</p>}
-        <p className="text-[9.5px] leading-[13px] text-ink-2">{detail}</p>
+        <p className="text-[9px] leading-[12px] text-ink-2">{detail}</p>
       </div>
     </div>
   )
@@ -240,7 +240,7 @@ function RailButton({ icon, children, primary, onClick }: { icon: React.ReactNod
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-[34px] w-full cursor-pointer items-center justify-between rounded-full px-4 text-[11px] font-bold transition-colors duration-200 ${
+      className={`flex h-[31px] w-full cursor-pointer items-center justify-between rounded-full px-4 text-[11px] font-bold transition-colors duration-200 ${
         primary ? 'bg-brand text-white hover:bg-brand-strong' : 'border border-brand/50 bg-surface text-brand-ink hover:bg-brand-soft'
       }`}
     >
@@ -295,13 +295,13 @@ export function CaseView({ receipt, onAsk }: { receipt: CaseReceipt; onAsk: (que
         </div>
       </div>
 
-      <div className="mt-[6px] grid gap-8 lg:grid-cols-[minmax(0,1fr)_236px]">
+      <div className="mt-[9px] grid gap-8 lg:grid-cols-[minmax(0,1fr)_236px]">
         {/* ------------------------------------------------------------ main */}
         <div className="min-w-0">
-          <div className="anim-fade-up space-y-[9px] pl-[9px]">
+          <div className="anim-fade-up space-y-[5px] pl-[9px]">
             <h1 className="text-balance text-[22px] font-bold leading-7 tracking-tight text-ink">{receipt.query}</h1>
             <StatusBadge status={receipt.status} />
-            <p className="max-w-[660px] text-[13.5px] leading-[21px] text-ink">{receipt.answer_summary}</p>
+            <p className="max-w-[660px] pt-[1px] text-[13.5px] leading-[21px] text-ink">{receipt.answer_summary}</p>
             {!r.completed && (
               <p role="alert" className="flex items-center gap-2 rounded-lg bg-warn-soft p-2.5 text-xs font-bold text-warn">
                 <IconAlert size={16} /> The contradiction check could not finish. Treat this answer as provisional.
@@ -309,7 +309,7 @@ export function CaseView({ receipt, onAsk }: { receipt: CaseReceipt; onAsk: (que
             )}
           </div>
 
-          <div className="mt-[14px] space-y-3">
+          <div className="mt-3 space-y-3">
             <HowChecked receipt={receipt} sources={sources} />
 
             {r.objections.length > 0 && (
@@ -361,7 +361,7 @@ export function CaseView({ receipt, onAsk }: { receipt: CaseReceipt; onAsk: (que
                   </span>
                   What the archive does not establish
                 </p>
-                <ul className="min-w-0 flex-1 list-disc space-y-1 pl-4 text-[10px] leading-[14px] text-ink-2">
+                <ul className="min-w-0 flex-1 list-disc gap-x-8 space-y-1 pl-4 text-[10px] leading-[14px] text-ink-2 lg:columns-2">
                   {receipt.missing_information.map((m) => (
                     <li key={m}>{m}</li>
                   ))}
@@ -376,7 +376,7 @@ export function CaseView({ receipt, onAsk }: { receipt: CaseReceipt; onAsk: (que
         </div>
 
         {/* ----------------------------------------------------------- rail */}
-        <aside className="no-print space-y-[15px] lg:sticky lg:top-[68px] lg:self-start">
+        <aside className="no-print space-y-[15px] lg:sticky lg:top-[68px] lg:-mt-[5px] lg:self-start">
           <div className={`${card} p-[15px]`}>
             <h2 className="mb-3 flex items-center gap-2 text-[13px] font-bold text-ink">
               <IconCalendar size={15} className="text-brand-ink" /> Case summary
@@ -395,7 +395,7 @@ export function CaseView({ receipt, onAsk }: { receipt: CaseReceipt; onAsk: (que
                 </div>
               ))}
             </dl>
-            <div className="mt-[14px] space-y-[7px]">
+            <div className="mt-[28px] space-y-[7px]">
               <RailButton primary icon={<IconLink size={13} />} onClick={() => scrollTo('claims')}>View sources</RailButton>
               <RailButton icon={<IconBarChart size={13} />} onClick={() => scrollTo(receipt.timeline_events.length ? 'evolution' : 'claims')}>Compare over time</RailButton>
               <RailButton icon={<IconMessage size={13} />} onClick={() => onAsk('')}>Ask follow-up</RailButton>

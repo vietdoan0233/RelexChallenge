@@ -9,12 +9,14 @@ import { card } from '../lib'
 import { Skeleton } from '../components/ui'
 import type { RadarAssessment } from '../types/api'
 
-function CountChip({ tone, icon, label, n }: { tone: string; icon: React.ReactNode; label: string; n: number }) {
+function CountChip({ a, n, wide }: { a: (typeof ASSESSMENT)[RadarAssessment]; n: number; wide?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold uppercase tracking-wide ${tone}`}>
-      {icon}
-      {label}
-      <span className="rounded-full bg-white/60 px-1.5 py-0.5 text-xs dark:bg-black/20">{n}</span>
+    <span className={`inline-flex h-[34px] items-center justify-between gap-2 whitespace-nowrap rounded-[10px] border px-2.5 text-[8px] font-bold uppercase ${wide ? "min-w-[157px]" : "min-w-[131px]"} ${a.chip}`}>
+      <span className="inline-flex items-center gap-1.5">
+        <span className={a.ink}>{a.icon}</span>
+        {a.label}
+      </span>
+      <span className="text-[11px] font-bold tabular-nums">{n}</span>
     </span>
   )
 }
@@ -31,27 +33,25 @@ export function RadarPage() {
   return (
     <div>
       <section className="hero-bg relative overflow-hidden">
-        <div className="mx-auto max-w-4xl space-y-4 px-4 pb-10 pt-12 text-center">
-          <span className="inline-flex items-center gap-2 rounded-full bg-surface/80 px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.14em] text-ink-3 shadow-card">
-            Find opportunities in past decisions
-          </span>
-          <h1 className="text-balance text-4xl font-extrabold tracking-tight text-brand-ink sm:text-5xl">Reconsideration Radar</h1>
-          <p className="mx-auto max-w-2xl text-lg text-ink-2">
-            Surfaces ideas the organization rejected or deferred where the original blocker may have changed. Turn
-            past decisions into new possibilities.
+        <div className="mx-auto max-w-[900px] px-4 pb-[19px] pt-1 text-center">
+          <p className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-ink-3">Find opportunities in past decisions</p>
+          <h1 className="mt-[6px] text-balance text-[30px] font-bold leading-9 tracking-tight text-title">Reconsideration Radar</h1>
+          <p className="mx-auto mt-[2px] max-w-[430px] text-[12px] leading-[17px] text-ink-2">
+            Surfaces ideas the organization rejected or deferred where the original blocker may have changed. Turn past
+            decisions into new possibilities.
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <CountChip tone={ASSESSMENT.STILL_BLOCKED.tone} icon={ASSESSMENT.STILL_BLOCKED.icon} label={ASSESSMENT.STILL_BLOCKED.label} n={counts.STILL_BLOCKED} />
-            <CountChip tone={ASSESSMENT.PARTIALLY_CHANGED.tone} icon={ASSESSMENT.PARTIALLY_CHANGED.icon} label={ASSESSMENT.PARTIALLY_CHANGED.label} n={counts.PARTIALLY_CHANGED} />
-            <CountChip tone={ASSESSMENT.WORTH_REASSESSING.tone} icon={ASSESSMENT.WORTH_REASSESSING.icon} label={ASSESSMENT.WORTH_REASSESSING.label} n={counts.WORTH_REASSESSING} />
-            <CountChip tone={ASSESSMENT.INSUFFICIENT_EVIDENCE.tone} icon={ASSESSMENT.INSUFFICIENT_EVIDENCE.icon} label={ASSESSMENT.INSUFFICIENT_EVIDENCE.label} n={counts.INSUFFICIENT_EVIDENCE} />
+          <div className="mt-[13px] flex flex-wrap items-center justify-center gap-[33px] gap-y-2">
+            <CountChip a={ASSESSMENT.STILL_BLOCKED} n={counts.STILL_BLOCKED} />
+            <CountChip a={ASSESSMENT.PARTIALLY_CHANGED} n={counts.PARTIALLY_CHANGED} />
+            <CountChip a={ASSESSMENT.WORTH_REASSESSING} n={counts.WORTH_REASSESSING} />
+            <CountChip a={ASSESSMENT.INSUFFICIENT_EVIDENCE} n={counts.INSUFFICIENT_EVIDENCE} wide />
           </div>
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl px-4 py-10">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="min-w-0 space-y-5">
+      <div className="mx-auto max-w-[1174px] px-4 pb-10">
+        <div className="grid gap-[17px] lg:grid-cols-[minmax(0,1fr)_248px]">
+          <div className="min-w-0 space-y-[7px]">
             {query.isPending && (
               <div role="status" className="space-y-4" aria-label="Loading candidates">
                 <Skeleton className="h-56" />
@@ -78,45 +78,45 @@ export function RadarPage() {
             {query.data?.map((f) => <FindingCard key={f.finding_id} card={f} />)}
           </div>
 
-          <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-            <div className={`${card} space-y-2 p-5`}>
-              <p className="flex items-center gap-2 font-extrabold text-ink">
-                <IconSpark size={18} className="text-brand-ink" /> Found before you asked
+          <aside className="space-y-[10px] lg:self-start">
+            <div className={`${card} space-y-1 px-[14px] py-[12px]`}>
+              <p className="flex items-center gap-2 text-[12px] font-bold text-ink">
+                <IconSpark size={15} className="text-brand" /> Found before you asked
               </p>
-              <p className="text-sm text-ink-2">
+              <p className="text-[10px] leading-[14px] text-ink-2">
                 The Reconsideration Radar continuously analyses past decisions across your organization to find
                 opportunities that may be worth a fresh look — so valuable ideas don't stay buried.
               </p>
             </div>
 
-            <div className={`${card} space-y-3 p-5`}>
-              <p className="font-extrabold text-ink">Assessment types</p>
-              <ul className="space-y-3">
-                {Object.entries(ASSESSMENT).map(([key, a]) => (
-                  <li key={key} className="flex items-start gap-2.5">
-                    <span className={`mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase ${a.tone}`}>
-                      {a.icon}
-                      {a.label}
+            <div className={`${card} px-[14px] py-[12px]`}>
+              <p className="mb-[14px] text-[12px] font-bold text-ink">Assessment types</p>
+              <ul className="space-y-[15px]">
+                {[ASSESSMENT.WORTH_REASSESSING, ASSESSMENT.PARTIALLY_CHANGED, ASSESSMENT.STILL_BLOCKED, ASSESSMENT.INSUFFICIENT_EVIDENCE].map((a) => (
+                  <li key={a.label} className="flex items-start gap-3">
+                    <span className={`mt-px shrink-0 [&>svg]:size-5 ${a.ink}`}>{a.icon}</span>
+                    <span className="leading-tight">
+                      <span className="block text-[8.5px] font-bold uppercase tracking-wide text-ink">{a.label}</span>
+                      <span className="block text-[9.5px] leading-[13px] text-ink-2">{a.meaning}</span>
                     </span>
-                    <span className="text-xs leading-relaxed text-ink-2">{a.meaning}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="space-y-2 rounded-2xl border border-brand/20 bg-brand-soft p-5">
-              <p className="flex items-center gap-2 font-extrabold text-ink">
-                <IconBulb size={18} className="text-brand-ink" /> Turn hindsight into progress
+            <div className="rounded-[10px] border border-brand/20 bg-brand-soft px-[14px] pb-[14px] pt-[13px]">
+              <p className="flex items-center gap-2 text-[12px] font-bold text-ink">
+                <IconBulb size={15} className="text-brand-ink" /> Turn hindsight into progress
               </p>
-              <p className="text-sm text-ink-2">
+              <p className="mt-1 text-[10px] leading-[14px] text-ink-2">
                 Combine Radar findings with Ask to dive deeper, validate changes, and build a new business case.
               </p>
               <button
                 type="button"
                 onClick={() => go.ask('Which rejected or deferred proposals are worth reassessing given what has changed?')}
-                className="inline-flex items-center gap-1 text-sm font-bold text-brand-ink"
+                className="mt-2 inline-flex cursor-pointer items-center gap-1 text-[10px] font-bold text-brand-ink"
               >
-                Try an example question <IconArrowRight size={14} />
+                Try an example question <IconArrowRight size={12} />
               </button>
             </div>
           </aside>

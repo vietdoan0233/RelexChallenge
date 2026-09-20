@@ -229,3 +229,13 @@ export interface UploadFailure {
   filename: string
   error: string
 }
+
+export interface RecentDocument {
+  document_id: string
+  filename: string
+  document_type: string
+  title: string | null
+  evidence_units: number
+  indexed: 'full' | 'keyword'
+  added_at: string
+}

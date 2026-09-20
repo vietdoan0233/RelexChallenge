@@ -56,16 +56,16 @@ export function SourceRow({ citation: c, onOpen }: { citation: Citation; onOpen:
     <button
       type="button"
       onClick={() => onOpen(c.evidence_id)}
-      className="group flex w-full cursor-pointer items-start gap-2.5 rounded-lg py-1.5 text-left transition-colors duration-200 hover:bg-surface-2"
+      className="group flex w-full cursor-pointer items-start gap-2 rounded-md py-1.5 text-left transition-colors duration-200 hover:bg-surface-2"
     >
       <span className="mt-0.5 shrink-0 text-ink-3">
-        <DocIcon type={c.document_type} size={15} />
+        <DocIcon type={c.document_type} size={14} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold text-ink">{c.document_title ?? c.filename}</span>
-        <span className="block truncate text-xs text-ink-3">{c.speaker_sender ?? c.filename}</span>
+        <span className="block truncate text-[10px] font-bold leading-[13px] text-ink">{c.document_title ?? c.filename}</span>
+        <span className="block truncate text-[9px] leading-[12px] text-ink-3">{c.speaker_sender ?? c.filename}</span>
       </span>
-      <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-ink-3">{formatDate(c.event_date)}</span>
+      <span className="shrink-0 whitespace-nowrap text-[9px] text-ink-3">{formatDate(c.event_date)}</span>
     </button>
   )
 }

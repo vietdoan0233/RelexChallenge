@@ -1,6 +1,8 @@
+import sqlite3
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.api import deps
@@ -11,6 +13,7 @@ from app.ingestion.embeddings import EmbeddingProvider
 router = APIRouter(prefix="/api/ingest", tags=["ingestion"])
 
 Embedder = Annotated[EmbeddingProvider | None, Depends(deps.get_embedding_provider)]
+Conn = Annotated[sqlite3.Connection, Depends(deps.get_conn)]
 
 
 def get_paths() -> upload.IngestPaths:
@@ -64,3 +67,43 @@ def upload_evidence(
         # the new evidence from retrieval.
         deps.reset_shared_index()
     return JSONResponse(content=result.__dict__ | {"files": [f.__dict__ for f in result.files]})
+
+
+_TYPE_DIRS = {"EMAIL": "emails", "TRANSCRIPT": "transcripts", "REPORT": "reports"}
+
+
+@router.get("/recent")
+def recent_documents(
+    conn: Conn, paths: Paths, limit: Annotated[int, Query(ge=1, le=50)] = 5
+) -> list[dict]:
+    """The most recently added documents, newest first. "Added" is the canonical
+    source file's modification time, so it reflects when the file entered the
+    archive rather than anything a client claims. Counts only -- no evidence text."""
+    rows = conn.execute(
+        "SELECT d.document_id, d.filename, d.document_type, d.title, "
+        "COUNT(u.evidence_id) AS units, COUNT(e.evidence_id) AS embedded "
+        "FROM documents d "
+        "LEFT JOIN evidence_units u ON u.document_id = d.document_id "
+        "LEFT JOIN evidence_embeddings e ON e.evidence_id = u.evidence_id "
+        "GROUP BY d.document_id"
+    ).fetchall()
+    found = []
+    for row in rows:
+        subdir = _TYPE_DIRS.get(row["document_type"])
+        path = paths.source_dir / subdir / row["filename"] if subdir else None
+        if path is None or not path.is_file():
+            continue
+        found.append((path.stat().st_mtime, row))
+    found.sort(key=lambda item: (-item[0], item[1]["filename"]))
+    return [
+        {
+            "document_id": row["document_id"],
+            "filename": row["filename"],
+            "document_type": row["document_type"],
+            "title": row["title"],
+            "evidence_units": row["units"],
+            "indexed": "full" if row["embedded"] >= row["units"] else "keyword",
+            "added_at": datetime.fromtimestamp(mtime, UTC).isoformat(),
+        }
+        for mtime, row in found[:limit]
+    ]

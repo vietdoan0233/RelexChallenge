@@ -430,3 +430,25 @@ def test_response_is_valid_json_with_the_documented_fields(env):
         "embeddings",
         "parse_warnings",
     } <= set(body)
+
+
+def test_recent_lists_the_newest_document_first_with_its_index_state(env):
+    client, paths, provider, _ = env
+    provider["value"] = None  # lexical-only: the new document has no embeddings
+    assert _post(client, [("zephyr-pilot.txt", EMAIL)]).status_code == 200
+
+    rows = client.get("/api/ingest/recent?limit=5").json()
+
+    assert rows[0]["filename"] == "zephyr-pilot.txt"
+    assert rows[0]["document_type"] == "EMAIL"
+    assert rows[0]["evidence_units"] == 1
+    assert rows[0]["indexed"] == "keyword"
+    seed = next(r for r in rows if r["filename"] == "00_seed.txt")
+    assert seed["indexed"] == "full"
+    assert "raw_text" not in rows[0]
+
+
+def test_recent_skips_a_document_whose_source_file_is_gone(env):
+    client, paths, _, _ = env
+    (paths.source_dir / "emails" / "00_seed.txt").unlink()
+    assert client.get("/api/ingest/recent").json() == []

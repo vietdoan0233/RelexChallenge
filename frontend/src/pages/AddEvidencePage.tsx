@@ -5,16 +5,20 @@ import { ApiError, api } from '../api/client'
 import {
   IconAlert,
   IconArrowRight,
+  IconCloud,
   IconFile,
+  IconFolder,
   IconMail,
+  IconMessage,
   IconMic,
-  IconShield,
+  IconMoreHorizontal,
   IconUpload,
   IconX,
 } from '../components/icons'
+import { EuFlag } from '../components/Logo'
 import { Spinner, Tick } from '../components/ui'
 import { btnPrimary, btnSecondary, card } from '../lib'
-import type { UploadDocumentType, UploadFailure, UploadResult } from '../types/api'
+import type { RecentDocument, UploadDocumentType, UploadFailure, UploadResult } from '../types/api'
 
 // Mirrors the backend limits (app/ingestion/upload.py). The backend is the
 // authority; these only save a round trip for an obviously bad selection.
@@ -42,23 +46,26 @@ const TYPES: { value: UploadDocumentType; label: string; blurb: string; icon: Re
   },
 ]
 
-const TYPE_LABEL: Record<string, string> = { EMAIL: 'Email', TRANSCRIPT: 'Meeting', REPORT: 'Report' }
+const TYPE_LABEL: Record<string, string> = { EMAIL: 'Email', TRANSCRIPT: 'Meeting notes', REPORT: 'Report' }
 
-// Rows exist only for documents the backend confirmed. They live in the query
-// cache, so they last for the browser session and are never invented client-side.
-interface AddedRow {
-  document_id: string
-  name: string
-  type: string
-  units: number
-  keywordOnly: boolean
-  addedAt: string
-}
+// Sources shown for orientation only: none of them is connected in this build.
+const SOURCES: { name: string; blurb: string; icon: ReactNode; tone: string; action: string }[] = [
+  { name: 'Gmail', blurb: 'Emails and attachments', icon: <IconMail size={20} />, tone: 'bg-[#fdeeed] text-[#d64545]', action: 'Connect' },
+  { name: 'Outlook', blurb: 'Emails and calendar', icon: <IconMail size={20} />, tone: 'bg-[#e6f1fb] text-[#1772b8]', action: 'Connect' },
+  { name: 'Google Drive', blurb: 'Documents and files', icon: <IconFolder size={20} />, tone: 'bg-[#eaf8f1] text-[#22a06b]', action: 'Connect' },
+  { name: 'Microsoft Teams', blurb: 'Chats and meeting notes', icon: <IconMessage size={20} />, tone: 'bg-[#efeafb] text-[#6b55c7]', action: 'Connect' },
+  { name: 'Notion', blurb: 'Pages and documentation', icon: <IconFile size={20} />, tone: 'bg-[#eef1f4] text-[#0d2c4d]', action: 'Connect' },
+  { name: 'Other sources', blurb: 'iCloud, Slack, SharePoint, etc.', icon: <IconCloud size={20} />, tone: 'bg-[#eef1f4] text-[#46607b]', action: 'Set up' },
+]
 
 const formatSize = (bytes: number) => (bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`)
 
-const formatWhen = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+const formatWhen = (iso: string) => {
+  const d = new Date(iso)
+  const date = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+  return `${date}, ${time}`
+}
 
 function problemWith(file: File): string | null {
   if (!file.name.toLowerCase().endsWith('.txt')) return 'Only .txt files are accepted.'
@@ -179,44 +186,34 @@ function ErrorPanel({ error }: { error: UploadError }) {
 function StepHeading({ n, children }: { n: number; children: ReactNode }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="grid size-6 place-items-center rounded-full bg-brand-soft text-xs font-extrabold text-brand-ink">{n}</span>
-      <h2 className="text-sm font-extrabold text-ink">{children}</h2>
+      <span className="grid size-6 place-items-center rounded-full bg-brand-soft text-xs font-bold text-brand-ink">{n}</span>
+      <h2 className="text-[13px] font-bold text-ink">{children}</h2>
     </div>
   )
 }
 
+type Tab = 'connect' | 'upload'
+
 export function AddEvidencePage() {
   const queryClient = useQueryClient()
+  const [tab, setTab] = useState<Tab>('connect')
+  const [showAll, setShowAll] = useState(false)
   const [documentType, setDocumentType] = useState<UploadDocumentType>('email')
   const [files, setFiles] = useState<File[]>([])
   const [dragging, setDragging] = useState(false)
   const picker = useRef<HTMLInputElement>(null)
-  const stats = useQuery({ queryKey: ['stats'], queryFn: api.stats })
-  const history = useQuery<AddedRow[]>({
-    queryKey: ['ingest-history'],
-    queryFn: () => [],
-    initialData: [],
-    staleTime: Infinity,
-    gcTime: Infinity,
+  const recent = useQuery({
+    queryKey: ['ingest-recent', showAll],
+    queryFn: () => api.recentDocuments(showAll ? 50 : 5),
   })
 
   const upload = useMutation({
     mutationFn: ({ type, list }: { type: UploadDocumentType; list: File[] }) => api.uploadEvidence(type, list),
-    onSuccess: (result) => {
+    onSuccess: () => {
       setFiles([])
-      const addedAt = new Date().toISOString()
-      const keywordOnly = result.embeddings.status !== 'complete'
-      const rows: AddedRow[] = result.files.map((f) => ({
-        document_id: f.document_id,
-        name: f.stored_filename,
-        type: TYPE_LABEL[f.document_type] ?? f.document_type,
-        units: f.evidence_units,
-        keywordOnly,
-        addedAt,
-      }))
-      queryClient.setQueryData<AddedRow[]>(['ingest-history'], (old) => [...rows, ...(old ?? [])].slice(0, 25))
-      // The archive counts (header status, Ask page, this page) changed.
+      // The archive counts (header status, Ask page) and the recent list changed.
       void queryClient.invalidateQueries({ queryKey: ['stats'] })
+      void queryClient.invalidateQueries({ queryKey: ['ingest-recent'] })
     },
   })
 
@@ -227,8 +224,7 @@ export function AddEvidencePage() {
     const picked = Array.from(incoming)
     setFiles((current) => {
       const seen = new Set(current.map((f) => `${f.name}:${f.size}`))
-      const fresh = picked.filter((f) => !seen.has(`${f.name}:${f.size}`))
-      return [...current, ...fresh]
+      return [...current, ...picked.filter((f) => !seen.has(`${f.name}:${f.size}`))]
     })
   }
   const onDrop = (e: DragEvent) => {
@@ -240,53 +236,102 @@ export function AddEvidencePage() {
   const problems = files.map(problemWith)
   const tooMany = files.length > MAX_FILES
   const canSubmit = files.length > 0 && !tooMany && problems.every((p) => p === null) && !upload.isPending
-  const s = stats.data
   const typeLabel = TYPES.find((t) => t.value === documentType)!.label
 
   return (
-    <div>
-      <section className="hero-bg">
-        <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 pb-10 pt-12 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="anim-fade-up space-y-4">
-            <h1 className="text-balance text-4xl font-extrabold leading-[1.08] tracking-tight text-brand-ink sm:text-5xl">
-              Add evidence to the archive
-            </h1>
-            <p className="max-w-2xl text-pretty text-lg text-ink-2">
-              Upload emails, meeting notes, reports and conversation transcripts. Each file is saved to the canonical
-              archive and indexed, so it can be searched, cited and reasoned over exactly like the original evidence.
-            </p>
-          </div>
-          <aside className={`${card} anim-fade-up flex gap-3 p-5`} style={{ animationDelay: '0.08s' }}>
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand-ink">
-              <IconShield size={22} />
-            </span>
-            <div className="space-y-1">
-              <p className="text-sm font-extrabold text-ink">Your data stays in your control</p>
-              <p className="text-sm text-ink-2">
-                Uploads join the same archive as the original evidence, so anyone named in them can later be redacted or
-                deleted from the Privacy console.
-              </p>
-              <a href="#/privacy" className="inline-flex items-center gap-1 text-sm font-bold text-brand-ink hover:underline">
-                Open Privacy console <IconArrowRight size={14} />
-              </a>
-            </div>
-          </aside>
+    <div className="mx-auto max-w-[1104px] px-4 pb-12">
+      {/* ------------------------------------------------------------ hero */}
+      <section className="grid items-start gap-6 pt-[26px] lg:grid-cols-[minmax(0,1fr)_323px]">
+        <div className="anim-fade-up">
+          <h1 className="text-balance text-[34px] font-bold leading-[42px] tracking-tight text-title">Add your organizational knowledge</h1>
+          <p className="mt-[14px] max-w-[640px] text-pretty text-[15px] leading-[22px] text-ink-2">
+            Give the Organizational Memory Auditor access to your organization's emails, meetings, documents and
+            conversations. Everything you add is saved to the archive, indexed and structured, so it can be searched,
+            cited and reasoned over like the original evidence.
+          </p>
         </div>
+        <aside className="anim-fade-up flex gap-3 rounded-[10px] border border-line bg-[#eef5fc] p-4" style={{ animationDelay: '0.08s' }}>
+          <EuFlag width={40} />
+          <div className="space-y-1">
+            <p className="text-[12px] font-bold text-ink">Your data stays in your control</p>
+            <p className="text-[10.5px] leading-[15px] text-ink-2">
+              Uploads join the same archive as the original evidence, so anyone named in them can later be redacted or
+              deleted from the Privacy console.
+            </p>
+            <a href="#/privacy" className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-ink hover:underline">
+              Open Privacy console <IconArrowRight size={12} />
+            </a>
+          </div>
+        </aside>
       </section>
 
-      <div className="mx-auto max-w-6xl space-y-6 px-4 pb-16 pt-2">
-        <form
-          className={`${card} overflow-hidden`}
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (canSubmit) upload.mutate({ type: documentType, list: files })
-          }}
-        >
-          <div className="border-b border-line px-6">
-            <span className="inline-block border-b-2 border-brand py-3.5 text-sm font-extrabold text-brand-ink">Upload files</span>
-          </div>
+      {/* ------------------------------------------------------ main card */}
+      <section className={`${card} mt-[22px] overflow-hidden`}>
+        <div role="tablist" aria-label="How to add evidence" className="flex gap-8 border-b border-line px-6">
+          {(
+            [
+              ['connect', 'Connect sources'],
+              ['upload', 'Upload files'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              role="tab"
+              type="button"
+              id={`tab-${id}`}
+              aria-selected={tab === id}
+              aria-controls={`panel-${id}`}
+              onClick={() => setTab(id)}
+              className={`-mb-px cursor-pointer border-b-2 py-[14px] text-[13px] font-semibold transition-colors duration-200 ${
+                tab === id ? 'border-brand text-brand-ink' : 'border-transparent text-ink-2 hover:text-ink'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-          <div className="space-y-7 p-6">
+        {tab === 'connect' && (
+          <div role="tabpanel" id="panel-connect" aria-labelledby="tab-connect" className="p-[13px]">
+            <ul className="grid grid-cols-2 gap-[11px] md:grid-cols-3 xl:grid-cols-6">
+              {SOURCES.map((src) => (
+                <li key={src.name} className="flex h-[162px] flex-col items-center rounded-[10px] border border-line bg-surface px-3 pt-5 text-center">
+                  <span className={`grid size-10 place-items-center rounded-xl ${src.tone}`}>{src.icon}</span>
+                  <p className="mt-3 text-[12px] font-bold text-ink">{src.name}</p>
+                  <p className="mt-0.5 text-[10px] leading-[13px] text-ink-3">{src.blurb}</p>
+                  <button
+                    type="button"
+                    onClick={() => setTab('upload')}
+                    title="Live connectors are not enabled in this build; this opens Upload files."
+                    className="mt-auto mb-4 h-8 w-[90px] cursor-pointer rounded-full border border-brand/50 bg-surface text-[11px] font-semibold text-brand-ink transition-colors duration-200 hover:bg-brand-soft"
+                  >
+                    {src.action}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 flex items-center gap-2 rounded-lg bg-warn-soft px-3 py-2 text-[11px] text-ink" role="note">
+              <IconAlert size={14} className="shrink-0 text-warn" />
+              Live connectors are not enabled in this build, so nothing is fetched automatically. Use{' '}
+              <button type="button" onClick={() => setTab('upload')} className="cursor-pointer font-bold text-brand-ink underline">
+                Upload files
+              </button>{' '}
+              to add emails, meeting notes and reports as .txt files.
+            </p>
+          </div>
+        )}
+
+        {tab === 'upload' && (
+          <form
+            role="tabpanel"
+            id="panel-upload"
+            aria-labelledby="tab-upload"
+            className="space-y-7 p-6"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (canSubmit) upload.mutate({ type: documentType, list: files })
+            }}
+          >
             <fieldset className="space-y-3" disabled={upload.isPending}>
               <legend className="mb-3">
                 <StepHeading n={1}>What are you adding?</StepHeading>
@@ -297,23 +342,14 @@ export function AddEvidencePage() {
                   return (
                     <label
                       key={t.value}
-                      className={`flex cursor-pointer flex-col items-center gap-2 rounded-2xl border p-5 text-center transition-all duration-200 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand/25 ${
-                        on ? 'border-brand bg-brand-soft shadow-card' : 'border-line bg-surface hover:border-brand hover:shadow-card'
+                      className={`flex cursor-pointer flex-col items-center gap-2 rounded-[10px] border p-4 text-center transition-all duration-200 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand/25 ${
+                        on ? 'border-brand bg-brand-soft' : 'border-line bg-surface hover:border-brand'
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="document_type"
-                        value={t.value}
-                        checked={on}
-                        onChange={() => setDocumentType(t.value)}
-                        className="sr-only"
-                      />
-                      <span className={`grid size-11 place-items-center rounded-full ${on ? 'bg-surface text-brand-ink' : 'bg-surface-2 text-ink-3'}`}>
-                        {t.icon}
-                      </span>
-                      <span className="text-sm font-extrabold text-ink">{t.label}</span>
-                      <span className="text-xs text-ink-2">{t.blurb}</span>
+                      <input type="radio" name="document_type" value={t.value} checked={on} onChange={() => setDocumentType(t.value)} className="sr-only" />
+                      <span className={`grid size-10 place-items-center rounded-full ${on ? 'bg-surface text-brand-ink' : 'bg-surface-2 text-ink-3'}`}>{t.icon}</span>
+                      <span className="text-[13px] font-bold text-ink">{t.label}</span>
+                      <span className="text-[11px] leading-[15px] text-ink-2">{t.blurb}</span>
                     </label>
                   )
                 })}
@@ -331,14 +367,14 @@ export function AddEvidencePage() {
                 }}
                 onDragLeave={() => setDragging(false)}
                 onDrop={onDrop}
-                className={`grid place-items-center gap-2 rounded-2xl border-2 border-dashed px-4 py-9 text-center transition-colors duration-200 ${
+                className={`grid place-items-center gap-2 rounded-[10px] border-2 border-dashed px-4 py-8 text-center transition-colors duration-200 ${
                   dragging ? 'border-brand bg-brand-soft' : 'border-line bg-surface-2'
                 }`}
               >
-                <span className="grid size-12 place-items-center rounded-full bg-surface text-brand-ink shadow-card">
-                  <IconUpload size={24} />
+                <span className="grid size-11 place-items-center rounded-full bg-surface text-brand-ink shadow-card">
+                  <IconUpload size={22} />
                 </span>
-                <p className="text-sm font-semibold text-ink-2">Drag and drop .txt files here, or</p>
+                <p className="text-[12px] font-semibold text-ink-2">Drag and drop .txt files here, or</p>
                 <button type="button" className={btnSecondary} onClick={() => picker.current?.click()}>
                   Choose .txt files
                 </button>
@@ -355,31 +391,31 @@ export function AddEvidencePage() {
                     e.target.value = ''
                   }}
                 />
-                <p className="text-xs text-ink-3">
+                <p className="text-[11px] text-ink-3">
                   Up to {MAX_FILES} files · {MAX_FILE_BYTES / (1024 * 1024)} MB each · plain text only
                 </p>
               </div>
 
               {files.length > 0 && (
-                <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line" aria-label="Selected files">
+                <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line" aria-label="Selected files">
                   {files.map((file, i) => (
-                    <li key={`${file.name}:${file.size}`} className="flex items-center justify-between gap-3 bg-surface px-4 py-2.5 text-sm">
+                    <li key={`${file.name}:${file.size}`} className="flex items-center justify-between gap-3 bg-surface px-4 py-2 text-[12px]">
                       <span className="flex min-w-0 items-center gap-3">
-                        <IconFile size={18} className="shrink-0 text-ink-3" />
+                        <IconFile size={16} className="shrink-0 text-ink-3" />
                         <span className="min-w-0">
                           <span className="block truncate font-bold text-ink">{file.name}</span>
-                          {problems[i] && <span className="block text-xs font-semibold text-bad">{problems[i]}</span>}
+                          {problems[i] && <span className="block text-[11px] font-semibold text-bad">{problems[i]}</span>}
                         </span>
                       </span>
                       <span className="flex shrink-0 items-center gap-3">
-                        <span className="text-xs text-ink-3">{formatSize(file.size)}</span>
+                        <span className="text-[11px] text-ink-3">{formatSize(file.size)}</span>
                         <button
                           type="button"
                           aria-label={`Remove ${file.name}`}
-                          className="grid size-8 cursor-pointer place-items-center rounded-full text-ink-3 transition-colors duration-200 hover:bg-neutral-soft hover:text-ink"
+                          className="grid size-7 cursor-pointer place-items-center rounded-full text-ink-3 transition-colors duration-200 hover:bg-neutral-soft hover:text-ink"
                           onClick={() => setFiles((current) => current.filter((_, j) => j !== i))}
                         >
-                          <IconX size={16} />
+                          <IconX size={14} />
                         </button>
                       </span>
                     </li>
@@ -408,71 +444,108 @@ export function AddEvidencePage() {
                 </p>
               )}
             </div>
-          </div>
-        </form>
+          </form>
+        )}
+      </section>
 
-        {upload.isSuccess && upload.data.status === 'ingested' && <ResultPanel result={upload.data} />}
-        {upload.isError && <ErrorPanel error={toUploadError(upload.error)} />}
+      {tab === 'upload' && upload.isSuccess && upload.data.status === 'ingested' && (
+        <div className="mt-4">
+          <ResultPanel result={upload.data} />
+        </div>
+      )}
+      {tab === 'upload' && upload.isError && (
+        <div className="mt-4">
+          <ErrorPanel error={toUploadError(upload.error)} />
+        </div>
+      )}
 
-        <section className={`${card} overflow-hidden`} aria-labelledby="recent-title">
-          <div className="flex flex-wrap items-end justify-between gap-2 px-6 pb-3 pt-5">
-            <div>
-              <h2 id="recent-title" className="text-lg font-extrabold text-ink">
-                Added this session
-              </h2>
-              <p className="text-sm text-ink-2">Files the archive has confirmed and indexed.</p>
-            </div>
-            <p className="text-xs font-semibold text-ink-3" aria-live="polite">
-              {s
-                ? `Archive: ${s.documents} documents · ${s.evidence_units.toLocaleString()} evidence units · ${s.embeddings.toLocaleString()} embeddings`
-                : stats.isError
-                  ? 'Archive statistics are unavailable.'
-                  : ''}
-            </p>
+      {/* ------------------------------------------------ recent ingestions */}
+      <section className={`${card} mt-[22px] overflow-hidden`} aria-labelledby="recent-title">
+        <div className="flex flex-wrap items-start justify-between gap-3 px-5 pb-[14px] pt-[18px]">
+          <div>
+            <h2 id="recent-title" className="text-[17px] font-bold leading-6 text-ink">
+              Recent ingestions
+            </h2>
+            <p className="text-[11px] text-ink-2">Files and data sources that have been added to your knowledge base.</p>
           </div>
-          {history.data.length === 0 ? (
-            <p className="border-t border-line px-6 py-8 text-center text-sm text-ink-3">
-              Nothing added yet. Uploaded files appear here once the archive confirms them.
-            </p>
-          ) : (
-            <div className="overflow-x-auto border-t border-line">
-              <table className="w-full min-w-[560px] text-left text-sm">
-                <thead className="bg-surface-2 text-xs font-bold uppercase tracking-wide text-ink-3">
-                  <tr>
-                    <th className="px-6 py-2.5">Name</th>
-                    <th className="px-3 py-2.5">Type</th>
-                    <th className="px-3 py-2.5">Items</th>
-                    <th className="px-3 py-2.5">Status</th>
-                    <th className="px-6 py-2.5">Added</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {history.data.map((row) => (
-                    <tr key={`${row.document_id}-${row.addedAt}`}>
-                      <td className="px-6 py-3 font-bold text-ink">{row.name}</td>
-                      <td className="px-3 py-3">
-                        <span className="rounded-md bg-neutral-soft px-2 py-0.5 text-xs font-bold text-ink-2">{row.type}</span>
-                      </td>
-                      <td className="px-3 py-3 tabular-nums text-ink-2">{row.units}</td>
-                      <td className="px-3 py-3">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-bold ${
-                            row.keywordOnly ? 'bg-warn-soft text-warn' : 'bg-ok-soft text-ok'
-                          }`}
-                        >
-                          <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
-                          {row.keywordOnly ? 'Indexed · keyword only' : 'Indexed'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-ink-2">{formatWhen(row.addedAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {(recent.data?.length ?? 0) >= 5 && (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full border border-brand/50 bg-surface px-4 text-[11px] font-semibold text-brand-ink transition-colors duration-200 hover:bg-brand-soft"
+            >
+              {showAll ? 'Show fewer' : 'View all'} <IconArrowRight size={13} />
+            </button>
           )}
-        </section>
-      </div>
+        </div>
+        {recent.isPending && <p className="border-t border-line px-5 py-6 text-center text-[12px] text-ink-3">Loading…</p>}
+        {recent.isError && (
+          <p role="alert" className="border-t border-line px-5 py-6 text-center text-[12px] text-bad">
+            The recent list could not be loaded.
+          </p>
+        )}
+        {recent.data && recent.data.length === 0 && (
+          <p className="border-t border-line px-5 py-6 text-center text-[12px] text-ink-3">Nothing has been added yet.</p>
+        )}
+        {recent.data && recent.data.length > 0 && (
+          <div className="overflow-x-auto px-3 pb-3">
+            <table className="w-full min-w-[640px] text-left text-[12px]">
+              <thead>
+                <tr className="bg-surface-2 text-[11px] font-semibold text-ink-2">
+                  <th className="rounded-l-lg px-3 py-2.5">Name</th>
+                  <th className="px-3 py-2.5">Source</th>
+                  <th className="px-3 py-2.5">Type</th>
+                  <th className="px-3 py-2.5">Items</th>
+                  <th className="px-3 py-2.5">Status</th>
+                  <th className="px-3 py-2.5">Added</th>
+                  <th className="w-8 rounded-r-lg px-3 py-2.5">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {recent.data.map((row: RecentDocument) => (
+                  <tr key={row.document_id} className="h-10">
+                    <td className="px-3 py-2">
+                      <span className="flex items-center gap-2.5 font-semibold text-ink">
+                        <IconFile size={15} className="shrink-0 text-ink-3" />
+                        <span className="max-w-[230px] truncate" title={row.filename}>
+                          {row.title ?? row.filename}
+                        </span>
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-ink-2">
+                      <span className="inline-flex items-center gap-2">
+                        <IconFolder size={14} className="text-ink-3" /> Archive source
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="rounded-md bg-neutral-soft px-2 py-0.5 text-[10.5px] font-medium text-ink-2">
+                        {TYPE_LABEL[row.document_type] ?? row.document_type}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-ink-2">{row.evidence_units.toLocaleString()}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10.5px] font-semibold ${
+                          row.indexed === 'full' ? 'bg-ok-soft text-ok' : 'bg-warn-soft text-warn'
+                        }`}
+                      >
+                        <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+                        {row.indexed === 'full' ? 'Indexed' : 'Keyword only'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-ink-2">{formatWhen(row.added_at)}</td>
+                    <td className="px-3 py-2 text-ink-3">
+                      <IconMoreHorizontal size={16} aria-hidden="true" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

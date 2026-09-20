@@ -6,18 +6,17 @@ import {
   IconArrowRight,
   IconCheck,
   IconFile,
-  IconFlag,
   IconFolder,
   IconLink,
   IconLock,
   IconSearch,
   IconShield,
-  IconTrash,
   IconUsers,
 } from '../components/icons'
 import { Skeleton, Spinner, Tick } from '../components/ui'
+import { EuFlag } from '../components/Logo'
 import { go } from '../hooks/useRoute'
-import { btnDanger, btnPrimary, btnSecondary, card } from '../lib'
+import { btnPrimary, btnSecondary, card } from '../lib'
 import type { PersonSummary, PurgeResult } from '../types/api'
 
 const SURFACES: Record<string, string> = {
@@ -50,25 +49,27 @@ const VERIFIED_SURFACES = [
   { icon: <IconUsers size={18} />, title: 'Person and alias rows', body: 'Known names, emails, and aliases' },
 ]
 
-const AVATAR_TONES = ['bg-brand-soft text-brand-ink', 'bg-purple-soft text-purple', 'bg-ok-soft text-ok', 'bg-orange-soft text-orange', 'bg-bad-soft text-bad']
+const AVATAR_TONES = ['bg-brand-soft text-brand-ink']
 
 function Stepper({ current }: { current: number }) {
   return (
-    <ol className="mx-auto flex max-w-2xl items-start justify-between" aria-label="Progress">
+    <ol className="mx-auto flex max-w-[812px] items-center" aria-label="Progress">
       {STEPS.map((step, i) => (
-        <li key={step.label} className="flex flex-1 items-start last:flex-none">
-          <span className="flex flex-col items-center gap-1 text-center" aria-current={i === current ? 'step' : undefined}>
+        <li key={step.label} className="flex flex-1 items-center last:flex-none">
+          <span className="flex items-center gap-[10px] text-left" aria-current={i === current ? 'step' : undefined}>
             <span
-              className={`grid size-9 place-items-center rounded-full text-sm font-extrabold transition-colors duration-300 ${
-                i < current ? 'bg-ok text-white' : i === current ? 'bg-brand text-white ring-4 ring-brand/25' : 'bg-neutral-soft text-ink-3'
+              className={`grid size-[30px] shrink-0 place-items-center rounded-full text-[13px] font-bold transition-colors duration-300 ${
+                i < current ? 'bg-ok text-white' : i === current ? 'bg-brand text-white' : 'bg-brand-soft text-ink-2'
               }`}
             >
-              {i < current ? <IconCheck size={16} strokeWidth={3} /> : i + 1}
+              {i < current ? <IconCheck size={14} strokeWidth={3} /> : i + 1}
             </span>
-            <span className={`text-xs font-bold ${i <= current ? 'text-ink' : 'text-ink-3'}`}>{step.label}</span>
-            <span className="hidden max-w-[9rem] text-xs text-ink-3 sm:block">{step.hint}</span>
+            <span className="hidden leading-tight sm:block">
+              <span className="block text-[12px] font-bold text-ink">{step.label}</span>
+              <span className="block text-[10px] text-ink-3">{step.hint}</span>
+            </span>
           </span>
-          {i < STEPS.length - 1 && <span className={`mx-2 mt-[18px] h-0.5 flex-1 ${i < current ? 'bg-ok' : 'bg-line'}`} aria-hidden="true" />}
+          {i < STEPS.length - 1 && <span className="mx-[10px] h-px flex-1 bg-line" aria-hidden="true" />}
         </li>
       ))}
     </ol>
@@ -78,7 +79,7 @@ function Stepper({ current }: { current: number }) {
 function Avatar({ name, tone = 0 }: { name: string; tone?: number }) {
   const initials = name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
   return (
-    <span className={`grid size-10 shrink-0 place-items-center rounded-full text-sm font-extrabold ${AVATAR_TONES[tone % AVATAR_TONES.length]}`}>
+    <span className={`grid size-9 shrink-0 place-items-center rounded-full text-[12px] font-semibold ${AVATAR_TONES[tone % AVATAR_TONES.length]}`}>
       {initials}
     </span>
   )
@@ -207,28 +208,26 @@ export function PrivacyPage() {
   return (
     <div>
       <section className="hero-bg">
-        <div className="mx-auto max-w-4xl space-y-4 px-4 pb-10 pt-12 text-center">
-          <span className="inline-flex items-center gap-2 rounded-full bg-surface/80 px-4 py-1.5 text-xs font-extrabold uppercase tracking-[0.14em] text-ink-3 shadow-card">
-            Privacy console
-          </span>
-          <h1 className="text-balance text-4xl font-extrabold tracking-tight text-ink sm:text-5xl">Erase a person. Prove it held.</h1>
-          <p className="mx-auto max-w-2xl text-lg text-ink-2">
+        <div className="mx-auto max-w-[900px] px-4 pb-[22px] pt-[14px] text-center">
+          <p className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-ink-3">Privacy console</p>
+          <h1 className="mt-[2px] text-balance text-[30px] font-bold leading-9 tracking-tight text-ink">Erase a person. Prove it held.</h1>
+          <p className="mx-auto mt-[3px] max-w-[470px] text-[13.5px] leading-[19px] text-ink-2">
             Irreversibly anonymize one person from the archive, search index, embeddings, and dependent Cases while
             preserving unrelated evidence.
           </p>
-          <span className="mx-auto inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-brand-soft px-3 py-1.5 text-xs font-bold text-brand-ink">
-            <IconFlag size={14} /> EU privacy controls
+          <span className="mt-[6px] inline-flex h-[21px] items-center gap-2 rounded-full border border-line bg-surface/80 px-3 text-[10px] font-medium text-ink-2">
+            <EuFlag width={18} /> EU privacy controls
           </span>
-          <div className="pt-4">
+          <div className="mt-[19px]">
             <Stepper current={step} />
           </div>
         </div>
       </section>
 
-      <div className="mx-auto max-w-5xl px-4 py-10">
+      <div className="mx-auto max-w-[1129px] px-4 pb-10 pt-[6px]">
         {purge.isPending && <Working stage={stage} />}
         {purge.isError && (
-          <div role="alert" className="mb-6 flex items-start gap-3 rounded-2xl border border-bad/40 bg-bad-soft p-4 text-bad">
+          <div role="alert" className="mb-6 flex items-start gap-3 rounded-xl border border-bad/40 bg-bad-soft p-4 text-bad">
             <IconAlert size={20} className="mt-0.5 shrink-0" />
             <p className="font-semibold">{purge.error.message} The system stays locked for review; nothing was reported as removed.</p>
           </div>
@@ -236,18 +235,18 @@ export function PrivacyPage() {
         {purge.data && <Result result={purge.data.result} questions={reask} />}
 
         {!purge.isPending && !purge.data && (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <section className={`${card} p-5`} aria-labelledby="choose">
-              <h2 id="choose" className="text-lg font-extrabold">Choose a person</h2>
-              <p className="mb-3 text-sm text-ink-2">Search for a person to see their impact across your organization's memory.</p>
+          <div className="grid gap-[15px] lg:grid-cols-2">
+            <section className={`${card} px-[17px] pb-[14px] pt-[15px]`} aria-labelledby="choose">
+              <h2 id="choose" className="text-[17px] font-bold leading-6">Choose a person</h2>
+              <p className="mb-[13px] -mt-px text-[11px] text-ink-2">Search for a person to see their impact across your organization's memory.</p>
               <label htmlFor="filter" className="sr-only">Filter people</label>
-              <div className="relative mb-3">
-                <IconSearch size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-3" />
-                <input id="filter" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search by name, email, or alias…" className="min-h-12 w-full rounded-full border border-line bg-surface-2 pl-11 pr-4 font-semibold" />
+              <div className="relative mb-[8px]">
+                <IconSearch size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-2" />
+                <input id="filter" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search by name, email, or alias…" className="h-[31px] w-full rounded-full border border-line bg-surface pl-9 pr-4 text-[11px] placeholder:text-ink-3" />
               </div>
               {people.isPending && <div className="space-y-2"><Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14" /></div>}
               {people.isError && <p role="alert" className="text-bad">{people.error.message}</p>}
-              <ul className="max-h-[28rem] space-y-1.5 overflow-y-auto pr-1">
+              <ul className="max-h-[300px] overflow-y-auto pr-0.5">
                 {shown.map((p, i) => {
                   const own = p.author_units + p.speaker_units
                   const on = selected?.person_id === p.person_id
@@ -257,27 +256,26 @@ export function PrivacyPage() {
                         type="button"
                         aria-pressed={on}
                         onClick={() => { setSelected(p); setTyped('') }}
-                        className={`flex w-full cursor-pointer items-center gap-3 rounded-2xl border p-3 text-left transition-all duration-200 ${on ? 'border-brand bg-brand-soft shadow-card' : 'border-transparent hover:border-line hover:bg-surface-2'}`}
+                        className={`grid h-[54px] w-full cursor-pointer grid-cols-[14px_36px_minmax(0,1fr)_88px_80px_68px] items-center gap-x-3 rounded-lg border px-[15px] text-left transition-colors duration-200 ${on ? 'border-brand bg-brand-soft/60' : 'my-[2px] border-transparent hover:bg-surface-2'} ${on ? '' : ''}`}
                       >
-                        <span className={`grid size-4 shrink-0 place-items-center rounded-full border-2 ${on ? 'border-brand' : 'border-line'}`} aria-hidden="true">
-                          {on && <span className="size-2 rounded-full bg-brand" />}
+                        <span className={`grid size-[14px] place-items-center rounded-full border ${on ? 'border-brand bg-brand' : 'border-ink-3'}`} aria-hidden="true">
+                          {on && <span className="size-[5px] rounded-full bg-white" />}
                         </span>
                         <Avatar name={p.canonical_name} tone={i} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-bold">{p.canonical_name}</span>
-                          <span className="mt-1.5 block h-1.5 w-24 overflow-hidden rounded-full bg-line" aria-hidden="true">
-                            <span className="anim-bar block h-full rounded-full bg-brand" style={{ width: `${Math.max(3, (own / maxOwn) * 100)}%` }} />
-                          </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-[12px] font-bold text-ink">{p.canonical_name}</span>
+                          <span className="block truncate text-[10.5px] text-ink-3">{(own + p.mentioned_units).toLocaleString()} units</span>
                         </span>
-                        <span className="flex shrink-0 gap-4 text-right">
-                          <span>
-                            <span className="block text-base font-extrabold tabular-nums text-ink">{own}</span>
-                            <span className="block text-[11px] font-semibold text-ink-3">authored/spoken</span>
-                          </span>
-                          <span>
-                            <span className="block text-base font-extrabold tabular-nums text-ink">{p.mentioned_units}</span>
-                            <span className="block text-[11px] font-semibold text-ink-3">mentioned</span>
-                          </span>
+                        <span className="block h-2 w-[88px] overflow-hidden rounded-full bg-[#dfe8f3]" aria-hidden="true">
+                          <span className="anim-bar block h-full rounded-full bg-[#4a9be0]" style={{ width: `${Math.max(4, (own / maxOwn) * 100)}%` }} />
+                        </span>
+                        <span className="text-center">
+                          <span className="block text-[13px] font-bold tabular-nums leading-tight text-ink">{own.toLocaleString()}</span>
+                          <span className="block text-[9px] leading-tight text-ink-3">authored/spoken</span>
+                        </span>
+                        <span className="text-center">
+                          <span className="block text-[13px] font-bold tabular-nums leading-tight text-ink">{p.mentioned_units.toLocaleString()}</span>
+                          <span className="block text-[9px] leading-tight text-ink-3">mentioned</span>
                         </span>
                       </button>
                     </li>
@@ -286,87 +284,89 @@ export function PrivacyPage() {
               </ul>
             </section>
 
-            <section className={`${card} p-5`} aria-labelledby="review">
-              <h2 id="review" className="text-lg font-extrabold">Review the impact</h2>
-              {!selected && (
-                <>
-                  <p className="mb-3 text-sm text-ink-2">Select a person to see exactly what would change.</p>
-                  <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-line p-6 text-center text-ink-2">
-                    <p>Nothing selected yet.</p>
-                  </div>
-                </>
-              )}
-              {selected && preview.isPending && <div role="status" className="mt-3 space-y-3"><Skeleton className="h-24" /><Skeleton className="h-24" /></div>}
-              {selected && preview.isError && <p role="alert" className="text-bad">{preview.error.message}</p>}
-              {selected && preview.data && (
-                <div className="anim-fade-up space-y-5">
-                  <p className="mb-1 text-sm text-ink-2">Here's what will be anonymized for {selected.canonical_name}.</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { icon: <IconFile size={18} />, n: preview.data.author_units + preview.data.speaker_units, label: 'Units they wrote or spoke', hint: 'Emails, docs, chats, meetings' },
-                      { icon: <IconUsers size={18} />, n: preview.data.mentioned_units, label: 'Units that mention them', hint: 'Conversations, docs, threads' },
-                      { icon: <IconFolder size={18} />, n: preview.data.files_to_sanitize, label: 'Files to sanitize', hint: 'Source files will be updated' },
-                      { icon: <IconLink size={18} />, n: preview.data.cases_to_invalidate + (preview.data.findings_to_invalidate ?? 0), label: 'Dependent Cases to invalidate', hint: 'Evidence references will be removed' },
-                    ].map((s) => (
-                      <div key={s.label} className="rounded-xl bg-surface-2 p-3">
-                        <span className="mb-2 grid size-8 place-items-center rounded-lg bg-brand-soft text-brand-ink">{s.icon}</span>
-                        <p className="text-2xl font-extrabold tabular-nums leading-tight">{s.n}</p>
-                        <p className="text-xs font-bold text-ink">{s.label}</p>
-                        <p className="text-xs text-ink-3">{s.hint}</p>
+            <div className="space-y-2 self-start">
+              <section className={`${card} px-[17px] pb-3 pt-[15px]`} aria-labelledby="review">
+                <h2 id="review" className="text-[17px] font-bold leading-6">Review the impact</h2>
+                {!selected && (
+                  <>
+                    <p className="mb-[6px] -mt-px text-[11px] text-ink-2">Select a person to see exactly what would change.</p>
+                    <div className="grid min-h-[230px] place-items-center rounded-[10px] border border-dashed border-line p-6 text-center text-[12px] text-ink-2">
+                      <p>Nothing selected yet.</p>
+                    </div>
+                  </>
+                )}
+                {selected && preview.isPending && <div role="status" className="mt-3 space-y-3"><Skeleton className="h-24" /><Skeleton className="h-24" /></div>}
+                {selected && preview.isError && <p role="alert" className="text-bad">{preview.error.message}</p>}
+                {selected && preview.data && (
+                  <div className="anim-fade-up">
+                    <p className="mb-[6px] -mt-px text-[11px] text-ink-2">Here's what will be anonymized for {selected.canonical_name}.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { icon: <IconFile size={18} />, n: preview.data.author_units + preview.data.speaker_units, label: 'Units they wrote or spoke', hint: 'Emails, docs, chats, meetings' },
+                        { icon: <IconUsers size={18} />, n: preview.data.mentioned_units, label: 'Units that mention them', hint: 'Conversations, docs, threads' },
+                        { icon: <IconFolder size={18} />, n: preview.data.files_to_sanitize, label: 'Files to sanitize', hint: 'Source files will be updated' },
+                        { icon: <IconLink size={18} />, n: preview.data.cases_to_invalidate + (preview.data.findings_to_invalidate ?? 0), label: 'Dependent Cases to invalidate', hint: 'Evidence references will be removed' },
+                      ].map((t) => (
+                        <div key={t.label} className="flex h-[56px] items-center gap-3 rounded-lg border border-line bg-surface px-[13px]">
+                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-ink">{t.icon}</span>
+                          <span className="min-w-0 leading-tight">
+                            <span className="block text-[15px] font-bold tabular-nums text-ink">{t.n.toLocaleString()}</span>
+                            <span className="block truncate text-[10px] text-ink-2">{t.label}</span>
+                            <span className="block truncate text-[9px] text-ink-3">{t.hint}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-[12px] rounded-lg border border-[#f3c9c6] bg-bad-soft px-[13px] py-[9px]">
+                      <p className="flex items-center gap-2 text-[11px] font-bold text-bad"><IconAlert size={15} /> What will happen</p>
+                      <p className="mt-1 pl-[23px] text-[9.5px] leading-[13px] text-ink">
+                        We will anonymize this person in source files, rebuild the search index and embeddings, purge
+                        derived data, and verify that they no longer appear in any product surfaces. Unrelated evidence
+                        will be preserved.
+                      </p>
+                    </div>
+
+                    <div className="mt-[7px]">
+                      <label htmlFor="confirm" className="mb-0.5 block text-[10.5px] font-bold leading-[14px] text-ink">
+                        Type the full name to confirm
+                      </label>
+                      <div className="flex items-center gap-[11px]">
+                        <input
+                          id="confirm"
+                          value={typed}
+                          onChange={(e) => setTyped(e.target.value)}
+                          autoComplete="off"
+                          placeholder={selected.canonical_name}
+                          className="h-8 w-full min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-[11px] placeholder:text-ink-3"
+                        />
+                        <button type="button" className="inline-flex h-[33px] w-[135px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-bad text-[11px] font-bold text-white transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed" disabled={!confirmed} onClick={() => { setStage(0); purge.mutate(selected) }}>
+                          Remove this person
+                        </button>
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="space-y-2 rounded-2xl border border-bad/40 bg-bad-soft p-4">
-                    <p className="flex items-center gap-2 font-extrabold text-bad"><IconAlert size={18} /> What will happen</p>
-                    <p className="text-sm text-ink">
-                      We will anonymize this person in source files, rebuild the search index and embeddings, purge
-                      derived data, and verify that they no longer appear in any product surfaces. Unrelated evidence
-                      will be preserved.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label htmlFor="confirm" className="mb-1.5 block text-sm font-bold text-ink">
-                      Type the full name to confirm
-                    </label>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <input
-                        id="confirm"
-                        value={typed}
-                        onChange={(e) => setTyped(e.target.value)}
-                        autoComplete="off"
-                        placeholder={selected.canonical_name}
-                        className="min-h-12 w-full min-w-0 flex-1 rounded-full border border-line bg-surface px-5 font-semibold"
-                      />
-                      <button type="button" className={`${btnDanger} shrink-0`} disabled={!confirmed} onClick={() => { setStage(0); purge.mutate(selected) }}>
-                        <IconTrash size={18} /> Remove this person
-                      </button>
                     </div>
                   </div>
+                )}
+              </section>
 
-                  <div className="border-t border-line pt-4">
-                    <h3 className="mb-3 flex items-center gap-2 text-sm font-extrabold text-ink">
-                      <IconShield size={16} className="text-brand-ink" /> What gets verified
-                    </h3>
-                    <p className="mb-3 text-xs text-ink-2">We check these surfaces to make sure the person is fully removed.</p>
-                    <ul className="grid grid-cols-2 gap-3">
-                      {VERIFIED_SURFACES.map((v) => (
-                        <li key={v.title} className="flex items-start gap-2">
-                          <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-ok text-white">
-                            <IconCheck size={12} strokeWidth={3.5} />
-                          </span>
-                          <span>
-                            <span className="block text-xs font-bold text-ink">{v.title}</span>
-                            <span className="block text-xs text-ink-3">{v.body}</span>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </section>
+              <section className={`${card} px-[17px] pb-4 pt-[10px]`} aria-labelledby="verified">
+                <h2 id="verified" className="text-[15px] font-bold leading-[18px]">What gets verified</h2>
+                <p className="mb-2 text-[10px] leading-[14px] text-ink-2">We check these surfaces to make sure the person is fully removed.</p>
+                <ul className="flex flex-wrap justify-between gap-x-3 gap-y-2">
+                  {VERIFIED_SURFACES.map((v) => (
+                    <li key={v.title} className="flex max-w-[132px] items-start gap-1.5">
+                      <span className="mt-px grid size-4 shrink-0 place-items-center rounded-full bg-brand-soft text-brand-ink">
+                        <IconCheck size={10} strokeWidth={3.5} />
+                      </span>
+                      <span className="leading-[12px]">
+                        <span className="block text-[9px] font-bold text-ink">{v.title}</span>
+                        <span className="block text-[8px] leading-[11px] text-ink-3">{v.body}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </div>
           </div>
         )}
       </div>

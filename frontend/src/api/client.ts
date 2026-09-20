@@ -7,6 +7,7 @@ import type {
   PurgePreview,
   PurgeResult,
   RecentCase,
+  RecentDocument,
   UploadDocumentType,
   UploadResult,
 } from '../types/api'
@@ -56,6 +57,7 @@ export const api = {
     request<PurgePreview>('/api/privacy/preview', post({ person_id: personId })),
   stats: () => request<ArchiveStats>('/api/stats'),
   recentCases: () => request<RecentCase[]>('/api/cases?limit=6'),
+  recentDocuments: (limit: number) => request<RecentDocument[]>(`/api/ingest/recent?limit=${limit}`),
   uploadEvidence: (documentType: UploadDocumentType, files: File[]) => {
     const form = new FormData()
     form.append('document_type', documentType)

@@ -139,7 +139,7 @@ Architecture v1.5 (section 0.3) corrects the Phase 5 deletion/anonymization targ
 
 The local repository uses the configured `origin` remote. Connector availability varies by session and must be verified rather than assumed.
 
-Use read-only remote inspection where it reduces manual friction, but first verify what actions are actually available in the current environment. The user performs repository `pull`, `fetch`, and `push` operations; give the user the exact command when one is required.
+Claude may inspect and synchronize the configured `origin` remote when the task requires it. Remote operations are allowed, but must follow the checks below and must never overwrite unrelated work.
 
 ## Required first checks
 
@@ -153,9 +153,23 @@ Before making repository-history changes:
 
 ## Commit/push behavior
 
-Prefer milestone commits after tests pass.
+Commit completed work in small, tested batches. After writing or changing code, configuration, tests, or repository instructions:
 
-Create tested local commits when appropriate. Do not run `git pull`, `git fetch`, or `git push`; tell the user which exact command to run and wait for them to perform the network operation.
+1. inspect the diff and confirm that unrelated user changes are not included,
+2. run the relevant tests, linters, type checks, or build checks,
+3. create a focused local commit before sending the response.
+
+Every response that reports completed changes must leave those changes committed. Do not create an empty commit when no files changed. If a check or commit cannot be completed, say so explicitly and leave the work safely staged or unstaged rather than claiming completion.
+
+Claude may run `git fetch`, `git pull`, and `git push` when needed for the requested task. Before synchronization:
+
+- inspect status, the current branch, configured remotes, and ahead/behind state,
+- preserve or commit local work before pulling; do not silently discard it,
+- prefer fast-forward-only pulls unless the user explicitly asks for merge or rebase behavior,
+- review the resulting diff and run relevant checks after a pull,
+- push only the intended branch and report the exact remote/branch updated.
+
+If a pull produces conflicts, or a push is rejected because the remote advanced, stop and report the conflict or divergence. Do not force-push unless the user explicitly requests it.
 
 If local `git commit` is used and identity is missing:
 
@@ -164,8 +178,6 @@ If local `git commit` is used and identity is missing:
 - use a verified connector/account identity only if it is explicitly exposed and appropriate,
 - otherwise leave the changes staged/uncommitted and report the commit blocker,
 - **missing git identity must never block Phase 1 implementation, testing, or local progress.**
-
-Never force-push unless the user explicitly requests it.
 
 Never rewrite existing remote history for convenience.
 
@@ -184,11 +196,12 @@ At this checkpoint, `8c6b79b` is committed locally and currently unpushed. This 
 
 Phases 1–7 are complete (section 0.1). The Architecture v1.5 deletion/anonymization documentation (section 0.3, section 18) is a separate contract correction for future Phase 5 work — it is not part of the Phase 1–2 milestones above.
 
-Use an available GitHub connection only for read-only work such as:
+Use an available GitHub connection for repository work such as:
 
 - verifying remote repository state,
 - inspecting branch/history,
-- reviewing diffs.
+- reviewing diffs,
+- fetching, pulling, and pushing when required by the task.
 
 Do not let GitHub integration change the architecture or source-of-truth rules.
 

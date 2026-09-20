@@ -9,7 +9,34 @@ first name that has not been reviewed into the manifest is deliberately
 
 import re
 import sqlite3
+import unicodedata
 from dataclasses import dataclass, field
+
+# The archive itself spells the same person both ways ("Henrik Sørensen" in an
+# Attendees header, "Henrik Sorensen" in that speaker's own captions), so a
+# purge that matches only one spelling leaves the other behind -- and a
+# redaction that lands on half of a document's spellings corrupts its structure.
+_FOLD_EXTRA = str.maketrans({"ø": "o", "Ø": "O", "ß": "s", "đ": "d", "ł": "l"})
+
+
+def fold(text: str) -> str:
+    """Lower-cased, diacritic-free form used to compare names and to scan."""
+    decomposed = unicodedata.normalize("NFKD", text.translate(_FOLD_EXTRA))
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).lower()
+
+
+_VARIANTS = {
+    "a": "aàáâãäåā",
+    "c": "cçč",
+    "e": "eèéêëē",
+    "i": "iìíîï",
+    "n": "nñ",
+    "o": "oòóôõöøō",
+    "s": "sšß",
+    "u": "uùúûüū",
+    "y": "yýÿ",
+    "z": "zž",
+}
 
 
 @dataclass(frozen=True)
@@ -65,8 +92,14 @@ def name_pattern(name: str) -> re.Pattern[str]:
     """Case-insensitive, whole-token match (Unicode-aware, so 'Kwame' never
     matches inside 'Kwameh'), tolerant of any run of whitespace between
     the words of a multi-word name."""
-    parts = [re.escape(p) for p in name.split()]
+    parts = ["".join(_char_class(ch) for ch in word) for word in name.split()]
     return re.compile(r"(?<!\w)" + r"\s+".join(parts) + r"(?!\w)", re.IGNORECASE)
+
+
+def _char_class(ch: str) -> str:
+    base = fold(ch)
+    variants = _VARIANTS.get(base)
+    return f"[{variants}]" if variants else re.escape(ch)
 
 
 def list_people(conn: sqlite3.Connection) -> list[PersonSummary]:

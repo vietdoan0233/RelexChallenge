@@ -33,7 +33,7 @@ from app.ingestion import locator_manifest
 from app.ingestion.embeddings import EmbeddingProvider, generate_embeddings
 from app.ingestion.parsers import transcript as transcript_parser
 from app.ingestion.service import _PARSERS, enumerate_source_files, ingest
-from app.privacy import ops, redact, targets, verify
+from app.privacy import ops, orgs, redact, targets, verify
 from app.privacy.ops import PrivacyOperationError
 
 _LOGGER = logging.getLogger(__name__)
@@ -117,7 +117,12 @@ def purge(
         raise PrivacyOperationError("person not found")
 
     op_id = uuid.uuid4().hex[:12]
-    ops.acquire(ops_dir, op_id)  # from here on, a failure must leave the lock held
+    ops.acquire(ops_dir, op_id)
+    # Planning reads and computes only: no source file and no database row has
+    # been touched yet. If it fails there is nothing to recover, so the lock is
+    # released and the system keeps serving -- a purge that cannot even be
+    # prepared must not brick the app. Once mutation starts (below), any
+    # failure leaves the lock held for review.
     try:
         migrations.initialize(conn)
         files = _sanitize_all(source_dir, target)
@@ -137,6 +142,17 @@ def purge(
             "affected_evidence_ids": affected,
             "had_embeddings": repository.embedding_row_count(conn) > 0,
         }
+    except Exception as exc:
+        _LOGGER.error(
+            "privacy planning failed op_id=%s error_type=%s; nothing was changed",
+            op_id,
+            type(exc).__name__,
+        )
+        ops.release(ops_dir)
+        raise PrivacyOperationError(
+            "the privacy operation could not be prepared; nothing was changed"
+        ) from None
+    try:
         ops.write_plan(ops_dir, plan)
         ops.set_state(ops_dir, ops.SOURCE_IN_PROGRESS)
         return _run(
@@ -371,9 +387,10 @@ def _final_scan(ops_dir: Path) -> bool:
 def _sanitize_all(source_dir: Path, target: targets.Target) -> dict[str, str]:
     """Relative path -> sanitized text, for every source file that changes."""
     changed: dict[str, str] = {}
+    org_context = orgs.build(source_dir, target)
     for path, kind in enumerate_source_files(source_dir):
         old = path.read_text(encoding="utf-8")
-        new = redact.sanitize_text(old, kind, target)
+        new = redact.sanitize_text(old, kind, target, org_context)
         if new != old:
             changed[str(path.relative_to(source_dir))] = new
     manifest = source_dir / _MANIFEST_NAME

@@ -189,11 +189,12 @@ def test_purge_removes_every_tracked_identifier_from_every_surface(inst):
 def test_structural_metadata_is_sanitized_not_just_body_text(inst):
     inst.purge()
     teams = (inst.source / "transcripts" / "01_weekly-sync.txt").read_text(encoding="utf-8")
-    assert "Attendees: Marco Rossi (RELEX), Lena Fischer (Acme)" in teams
+    # The name and title go; the organisation stays as an anonymous hint.
+    assert "Attendees: Marco Rossi (RELEX), [REDACTED PERSON: RELEX], Lena Fischer (Acme)" in teams
     assert "\nKB\n" not in teams  # initials chrome
-    assert f"{labels.REDACTED_SPEAKER} 10 seconds" in teams
+    assert "[REDACTED SPEAKER: RELEX] 10 seconds" in teams
     email = (inst.source / "emails" / "01_extract-status.txt").read_text(encoding="utf-8")
-    assert f"From: {labels.REDACTED_SENDER}" in email
+    assert "From: [REDACTED SENDER: RELEX]" in email
     assert "+44 7700 900 318" not in email  # signature block removed with the name
     assert "Technical Consultant" not in email
     assert "lena.fischer@acme-org.example" in email  # other people are untouched
@@ -205,7 +206,7 @@ def test_organizational_evidence_survives_anonymized_and_retrievable(inst):
     assert "shelf life is populated on forty-eight percent" in texts
     assert "the extract succeeded" in texts.lower() or "extract succeeded" in texts
     speakers = {r["speaker_sender"] for r in inst.units().values()}
-    assert labels.REDACTED_SPEAKER in speakers
+    assert "[REDACTED SPEAKER: RELEX]" in speakers
     hit = inst.conn.execute(
         "SELECT evidence_id FROM evidence_fts WHERE evidence_fts MATCH 'forty'"
     ).fetchall()
@@ -338,6 +339,20 @@ def test_purge_of_an_unknown_person_fails_before_locking(inst):
 
 
 # ------------------------------------------------- locking and recovery
+
+
+def test_a_failure_while_planning_changes_nothing_and_does_not_lock_the_app(inst, monkeypatch):
+    before = inst.all_source_text()
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("sanitization changed a document's unit structure")
+
+    monkeypatch.setattr(service, "_plan_manifest_remap", boom)
+    with pytest.raises(PrivacyOperationError):
+        inst.purge()
+    assert inst.all_source_text() == before
+    assert not ops.is_locked(inst.ops_dir)  # the demo must keep serving
+    assert inst.units()  # database untouched
 
 
 def test_a_failed_operation_stays_locked_and_never_reports_success(inst, monkeypatch):
@@ -611,7 +626,8 @@ def test_group_boundaries_are_backfilled_for_a_database_that_predates_them(inst)
             "ORDER BY unit_index"
         )
     ]
-    assert speakers.count(labels.REDACTED_SPEAKER) == 2
+    # Marco and Kwame are both RELEX, so both carry the same organisation tag.
+    assert speakers.count("[REDACTED SPEAKER: RELEX]") == 2
 
 
 # ------------------------------------------- redaction edge cases (unit-level)

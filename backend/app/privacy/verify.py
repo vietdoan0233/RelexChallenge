@@ -14,6 +14,8 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app.privacy.targets import fold
+
 
 @dataclass
 class VerificationReport:
@@ -34,11 +36,11 @@ def needles(canonical_name: str, names: list[str], emails: list[str]) -> list[st
 
 
 def _contains(haystack: bytes, needle_list: list[str]) -> int:
-    """Case-insensitive, Unicode-aware substring count. Bytes are decoded
-    leniently (database pages are mostly UTF-8 text) so 'Öberg' matches
-    'öberg' -- a raw bytes.lower() would only fold ASCII."""
-    text = haystack.decode("utf-8", errors="ignore").lower()
-    return sum(text.count(needle.lower()) for needle in needle_list)
+    """Case- and diacritic-insensitive substring count. Bytes are decoded
+    leniently (database pages are mostly UTF-8 text) so 'Sørensen' also
+    matches the corpus's own 'Sorensen' spelling."""
+    text = fold(haystack.decode("utf-8", errors="ignore"))
+    return sum(text.count(fold(needle)) for needle in needle_list)
 
 
 def scan_files(root: Path, needle_list: list[str]) -> int:

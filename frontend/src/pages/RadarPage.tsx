@@ -22,7 +22,13 @@ function CountChip({ a, n, wide }: { a: (typeof ASSESSMENT)[RadarAssessment]; n:
 }
 
 export function RadarPage() {
-  const query = useQuery({ queryKey: ['radar'], queryFn: api.radar })
+  const query = useQuery({
+    queryKey: ['radar'],
+    queryFn: api.radar,
+    // Startup generation is asynchronous. Keep the empty state live until a
+    // background refresh has had a chance to persist the first cards.
+    refetchInterval: (current) => (current.state.data?.length ? false : 3000),
+  })
 
   const counts = useMemo(() => {
     const c: Record<RadarAssessment, number> = { STILL_BLOCKED: 0, PARTIALLY_CHANGED: 0, WORTH_REASSESSING: 0, INSUFFICIENT_EVIDENCE: 0 }
@@ -70,8 +76,8 @@ export function RadarPage() {
                 </span>
                 <h2 className="text-xl font-extrabold">No candidates surfaced yet</h2>
                 <p className="text-ink-2">
-                  Findings are precomputed so this page opens with answers waiting. Generate them with{' '}
-                  <code className="rounded bg-surface-2 px-2 py-0.5 font-mono text-sm">python scripts/radar.py</code>.
+                  Radar is prepared automatically when the application starts. If the reasoning service is unavailable,
+                  this page will remain empty until the next successful startup refresh.
                 </p>
               </div>
             )}

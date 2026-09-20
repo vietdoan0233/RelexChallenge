@@ -413,8 +413,12 @@ a validated Case and to Evidence Units.
 python scripts/radar.py --limit 5
 ```
 
-This sends retrieved evidence excerpts to the configured organizer reasoning
-service and stores the findings in the runtime database. Curated outside
+The application also performs this check automatically when the server starts
+if no valid Radar findings are already stored. The work runs in the background,
+so the UI can open immediately and will refresh while the first cards are being
+prepared. The command above remains available when you intentionally want to
+force a rebuild. It sends retrieved evidence excerpts to the configured
+organizer reasoning service and stores the findings in the runtime database. Curated outside
 developments go in `data/source/external_signals.json`, which ships empty: the
 system never scrapes the web or invents an external signal. The findings appear
 under **Radar** in the UI. See [docs/RECONSIDERATION_RADAR.md](docs/RECONSIDERATION_RADAR.md).

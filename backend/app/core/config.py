@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     expected_fts_row_count: int = 2534
     expected_embedding_row_count: int = 2534
 
+    # Radar findings are normally precomputed, but a fresh application session
+    # can initialize an empty runtime database automatically. The work runs in
+    # the background so the API remains available while the provider responds.
+    radar_startup_refresh: bool = True
+    radar_startup_limit: int = 5
+
     @property
     def app_name_display(self) -> str:
         return self.app_name or _DEFAULT_APP_NAME

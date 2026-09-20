@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -14,6 +15,7 @@ from app.db import migrations, repository
 from app.db.connection import connect
 from app.privacy import ops, pseudonymise
 from app.privacy.gate import gate
+from app.radar import startup as radar_startup
 
 settings = get_settings()
 _LOGGER = logging.getLogger(__name__)
@@ -38,7 +40,25 @@ async def lifespan(_app: FastAPI):
         _LOGGER.error("privacy recovery incomplete error_type=%s", type(exc).__name__)
     # Whatever recovery changed, never serve from a matrix loaded before it.
     deps.reset_shared_index()
-    yield
+    radar_task = None
+    if current.radar_startup_refresh:
+        radar_task = asyncio.create_task(
+            asyncio.to_thread(radar_startup.refresh_if_needed, current),
+            name="radar-startup-refresh",
+        )
+    try:
+        yield
+    finally:
+        # The worker owns its database connection. Cancel the awaitable during
+        # shutdown so a slow provider does not hold the ASGI lifecycle open;
+        # the process will dispose of the worker when it exits.
+        if radar_task is not None and not radar_task.done():
+            radar_task.cancel()
+        if radar_task is not None:
+            try:
+                await radar_task
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(

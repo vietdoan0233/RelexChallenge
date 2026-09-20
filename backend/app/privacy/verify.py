@@ -10,8 +10,10 @@ pseudonymise.py), which is the only thing here that may have touched vault
 plaintext, and only for the duration of one already-authorized operation.
 """
 
+import re
 import sqlite3
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -26,20 +28,47 @@ class VerificationReport:
 
 
 def needles(display_name: str, names: list[str], emails: list[str]) -> list[str]:
-    """The subject's *tracked* original identifiers only: display name,
-    every person_aliases row, emails. A bare first or last name that was
-    never reviewed into an alias is deliberately not scanned for -- it may
-    belong to someone else, and this contract verifies what the system
-    tracked (CLAUDE.md 18.0.6), not every conceivable reference."""
+    """The subject's *tracked* original identifiers only: display name, every
+    person_aliases row, the safe first name (strict first-name basis,
+    app/ingestion/name_resolution.py) and emails. A first name that was NOT
+    safe to assign -- shared with another participant, an ordinary word -- is
+    deliberately never scanned for: it may belong to someone else, and this
+    contract verifies what the system tracked (CLAUDE.md 18.0.6), not every
+    conceivable reference."""
     return [v for v in dict.fromkeys(x.strip() for x in [display_name, *names, *emails]) if v]
 
 
+# A bare name token: letters (any script), optionally joined by an apostrophe or hyphen.
+_BARE_NAME_TOKEN = re.compile(r"[^\W\d_]+(?:['\u2019-][^\W\d_]+)*")
+
+
+@lru_cache(maxsize=1024)
+def _whole_token_pattern(needle: str) -> re.Pattern[str] | None:
+    """A whole-token pattern for a bare name token, else None.
+
+    The rewrite replaces a name only as a whole token (targets.name_pattern), so the
+    verifier must judge it the same way: "ana" is a leak in "Ana said" but not inside
+    "management" or "analysis". Emails, multi-word names, numbers and reserved
+    strings are not bare tokens and keep the strict substring rule."""
+    if not _BARE_NAME_TOKEN.fullmatch(needle):
+        return None
+    return re.compile(r"(?<!\w)" + re.escape(needle) + r"(?!\w)")
+
+
 def _contains(haystack: bytes, needle_list: list[str]) -> int:
-    """Case-insensitive, Unicode-aware substring count. Bytes are decoded
-    leniently (database pages are mostly UTF-8 text) so 'Öberg' matches
-    'öberg' -- a raw bytes.lower() would only fold ASCII."""
+    """Case-insensitive, Unicode-aware count. Bytes are decoded leniently
+    (database pages are mostly UTF-8 text) so 'Öberg' matches 'öberg' -- a
+    raw bytes.lower() would only fold ASCII. A bare name token counts only as
+    a whole token; anything else counts as a substring."""
     text = haystack.decode("utf-8", errors="ignore").lower()
-    return sum(text.count(needle.lower()) for needle in needle_list if needle)
+    total = 0
+    for needle in needle_list:
+        if not needle:
+            continue
+        lowered = needle.lower()
+        pattern = _whole_token_pattern(lowered)
+        total += len(pattern.findall(text)) if pattern else text.count(lowered)
+    return total
 
 
 def scan_files(root: Path, needle_list: list[str]) -> int:

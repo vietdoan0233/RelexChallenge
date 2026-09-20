@@ -519,6 +519,36 @@ def test_a_pseudonymised_first_name_survives_the_vault_round_trip(tmp_path):
     instance.conn.close()
 
 
+def test_a_short_first_name_inside_other_words_does_not_fail_verification(tmp_path):
+    """ "Ana" is a substring of "management" and "analysis". The rewrite only touches the whole
+    token, so the verifier must also judge it as a whole token: otherwise every short first name
+    fail-closes forever on innocent words. A real surviving "Ana" is still a leak."""
+    instance = Instance(tmp_path)
+    (instance.source / "reviewed_identities.json").write_text(
+        json.dumps({"description": "x", "entries": []}), encoding="utf-8"
+    )
+    (instance.source / "emails" / "02_data-report.txt").write_text(
+        "Subject: Analysis of management data\n"
+        "From: Ana Souza <ana.souza@acme-org.example>\n"
+        "Date: Friday, October 31, 2025 09:00 AM\n"
+        "To: Lena Fischer <lena.fischer@acme-org.example>\n"
+        "Messages in thread: 1\n\n"
+        "The analysis of the management banana report is attached. Ana will present it.\n",
+        encoding="utf-8",
+    )
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Ana Souza")
+
+    result = instance.pseudonymise(subject_id)
+
+    assert result.verified, result.verification
+    text = (instance.source / "emails" / "02_data-report.txt").read_text(encoding="utf-8")
+    assert "analysis of the management banana report" in text  # innocent words untouched
+    assert f"{result.display_alias} will present it" in text  # the bare first name went with her
+    assert "Ana Souza" not in text and "Ana will" not in text
+    instance.conn.close()
+
+
 def test_a_first_name_shared_by_two_participants_is_never_guessed(tmp_path):
     """A bare "Kwame" could be either Kwame: it must be left alone, and the console must be
     able to say so. The full name is still rewritten."""

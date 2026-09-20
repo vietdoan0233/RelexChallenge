@@ -2,14 +2,25 @@
 
 The target is what the hardened identity layer tracks for an ACTIVE subject:
 their display name, every person_aliases row (full-name variants, email,
-reviewed short forms), and -- on the strict first-name basis -- the bare first
-name when it safely stands for them alone (app/ingestion/name_resolution.py).
-"Ana Duarte" and "Ana" are one participant, so both are rewritten to the alias.
+reviewed short forms), and -- on the strict first-name and last-name bases --
+the bare first/last name when either safely stands for them alone
+(app/ingestion/name_resolution.py). "Ana Duarte" and "Ana" are one
+participant, so both are rewritten to the alias; the same is true of "Kwame
+Boateng" and a bare "Boateng" mentioned by a colleague who never speaks or
+sends anything themselves in the affected evidence unit. Text-only mentions
+by someone else are exactly the case this covers: the rewrite below runs
+against every application-owned source file regardless of who authored it,
+so a target's identifiers must be complete before that pass runs -- there is
+no separate "did evidence_people already link this" gate here or anywhere
+downstream (see app/privacy/pseudonymise.py's _rewrite_all/_affected_evidence_ids,
+which independently re-scan raw text rather than trusting evidence_people
+alone, for the same reason).
 
-A first name is still never *guessed*: when another participant shares it
-("Nadia" with two Nadias), it is an everyday word, or it is too short, it is
-left out of the target and reported on the Target so the operator can see what
-was deliberately left unchanged and why.
+A first or last name is still never *guessed*: when another participant
+shares it ("Nadia" with two Nadias), it is an everyday word, or it is too
+short, it is left out of the target (first name is additionally reported on
+the Target so the operator can see what was deliberately left unchanged and
+why -- CLAUDE.md 18.0.5's preview contract only ever documented first name).
 """
 
 import re
@@ -24,13 +35,17 @@ class Target:
     subject_id: str
     display_name: str
     display_alias: str
-    names: tuple[str, ...]  # display_name + every non-email alias + safe first name
+    names: tuple[str, ...]  # display_name + every non-email alias + safe first/last name
     emails: tuple[str, ...]
     # The bare first name included in `names` on the strict first-name basis, or
     # None; and, if a first name exists but was NOT safe to assign, what and why.
     first_name: str | None = None
     unassigned_first_name: str | None = None
     unassigned_reason: str | None = None
+    # The bare last name included in `names` on the identical strict basis, or
+    # None. Unlike first name, an unsafe last name is not currently reported --
+    # nothing has asked a preview to explain a withheld last name yet.
+    last_name: str | None = None
 
     @property
     def identifiers(self) -> tuple[str, ...]:
@@ -73,10 +88,15 @@ def resolve_active_target(conn: sqlite3.Connection, subject_id: str) -> Target |
 
     index = name_resolution.build_index(conn)
     first_name = index.first_name_of(subject_id)
+    last_name = index.last_name_of(subject_id)
     unassigned = index.unassigned_first_name(subject_id)
     already = {n.casefold() for n in names}
     if first_name and first_name.casefold() not in already:
         names.append(first_name)
+        already.add(first_name.casefold())
+    if last_name and last_name.casefold() not in already:
+        names.append(last_name)
+        already.add(last_name.casefold())
     # Longest first so a full name is replaced before any shorter alias inside it.
     return Target(
         subject_id=subject_id,
@@ -85,6 +105,7 @@ def resolve_active_target(conn: sqlite3.Connection, subject_id: str) -> Target |
         names=tuple(sorted(dict.fromkeys(names), key=len, reverse=True)),
         emails=tuple(dict.fromkeys(emails)),
         first_name=first_name,
+        last_name=last_name,
         unassigned_first_name=unassigned.token if unassigned else None,
         unassigned_reason=unassigned.reason if unassigned else None,
     )

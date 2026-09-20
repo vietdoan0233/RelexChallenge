@@ -58,6 +58,9 @@ class PreviewResult:
     first_name: str | None = None
     unassigned_first_name: str | None = None
     unassigned_reason: str | None = None
+    # Identical strict basis applied to the last name (e.g. a colleague's bare
+    # "Boateng" mention with nobody else in the archive sharing that word).
+    last_name: str | None = None
 
 
 @dataclass
@@ -102,6 +105,7 @@ def preview(conn: sqlite3.Connection, source_dir: Path, subject_id: str) -> Prev
         first_name=target.first_name,
         unassigned_first_name=target.unassigned_first_name,
         unassigned_reason=target.unassigned_reason,
+        last_name=target.last_name,
     )
 
 

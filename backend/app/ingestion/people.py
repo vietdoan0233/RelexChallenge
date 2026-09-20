@@ -440,7 +440,7 @@ def _observed_independently(candidate: str, full_name: str, all_text: str) -> bo
 
 
 def _unique_short_name_owners(
-    people_rows: list[sqlite3.Row], include_first: bool = True
+    people_rows: list[sqlite3.Row], include_first: bool = True, include_last: bool = True
 ) -> dict[str, str]:
     """First/last/initials derived from each confirmed person's display
     name, keeping a token only when it resolves to exactly one person.
@@ -458,9 +458,14 @@ def _unique_short_name_owners(
     to alias promotion. A person with no display_name (PSEUDONYMISED) has
     nothing to derive a short form from and is skipped.
 
-    `include_first=False` leaves first names out of the result (they are counted
-    for collisions all the same): the caller supplies them from the strict
-    first-name index instead."""
+    `include_first=False`/`include_last=False` leave first/last names out of the
+    result (they are still counted for collisions either way): the caller
+    supplies them from the strict name_resolution index instead, so that
+    index -- not this looser fallback -- decides whether that bare form is
+    safe enough to also drive pseudonymisation rewriting (app/privacy/
+    targets.py). Only initials are still decided here unconditionally: see
+    app/ingestion/name_resolution.py's module docstring for why initials
+    were deliberately not given the stricter treatment."""
     owners: dict[str, set[str]] = {}
     for row in people_rows:
         if not row["display_name"]:
@@ -470,19 +475,23 @@ def _unique_short_name_owners(
             continue
         for token in (parts[0], parts[-1], "".join(p[0] for p in parts).upper()):
             owners.setdefault(token, set()).add(row["subject_id"])
-    first_words = (
-        set()
-        if include_first
-        else {
+    excluded_words: set[str] = set()
+    if not include_first:
+        excluded_words |= {
             r["display_name"].split()[0]
             for r in people_rows
             if r["display_name"] and len(r["display_name"].split()) >= 2
         }
-    )
+    if not include_last:
+        excluded_words |= {
+            r["display_name"].split()[-1]
+            for r in people_rows
+            if r["display_name"] and len(r["display_name"].split()) >= 2
+        }
     return {
         token: next(iter(ids))
         for token, ids in owners.items()
-        if len(ids) == 1 and token not in first_words
+        if len(ids) == 1 and token not in excluded_words
     }
 
 
@@ -526,13 +535,21 @@ def link_mentions(
     if index is None:
         short_names = _unique_short_name_owners(people_rows)
     else:
-        # The strict first-name basis (app/ingestion/name_resolution.py) replaces the
-        # loose "unique first word" rule, so linking and pseudonymisation agree on
-        # exactly which bare first names belong to whom. Last names and initials keep
-        # their existing unique-owner rule.
-        short_names = _unique_short_name_owners(people_rows, include_first=False)
+        # The strict first-name AND last-name bases (app/ingestion/name_resolution.py)
+        # replace the loose "unique word" rule for those two categories, so linking
+        # and pseudonymisation agree on exactly which bare first/last names belong to
+        # whom -- see that module's docstring for the leak this closes. Initials keep
+        # their existing looser unique-owner rule (never fed into the pseudonymisation
+        # target; see the same docstring for why).
+        short_names = _unique_short_name_owners(
+            people_rows, include_first=False, include_last=False
+        )
         for subject_id in index.first_name_tokens().values():
             token = index.first_name_of(subject_id)
+            if token:
+                short_names[token] = subject_id
+        for subject_id in index.last_name_tokens().values():
+            token = index.last_name_of(subject_id)
             if token:
                 short_names[token] = subject_id
     for token, subject_id in short_names.items():

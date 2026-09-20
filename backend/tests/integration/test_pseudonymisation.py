@@ -613,6 +613,344 @@ def test_reviewed_spoken_employee_number_is_rewritten_with_the_person(inst):
     assert verify.scan_database_files(inst.db_path, [*NEEDLES, "five one oh three"]) == 0
 
 
+# --------------------------------------------------- mention-only rewriting
+#
+# Regression coverage for a bug in app/ingestion/name_resolution.py,
+# app/privacy/targets.py, and app/ingestion/people.py: a target mentioned
+# ONLY by another employee -- never the author/speaker/sender of the
+# affected evidence unit -- must still be fully rewritten, whether the
+# mention uses the full name, a reviewed short alias, or an unreviewed but
+# corpus-unique last name. The last case was the actual gap:
+# link_mentions() already auto-linked a bare last name ("Boateng") as
+# MENTIONED via a separate, looser check that app/privacy/targets.py never
+# consulted, so the source text kept the bare surname verbatim while
+# pseudonymise() still reported `verified: True` with every leak count at
+# zero -- a false-positive success. Every test here builds its own
+# temporary source/db (never the repository's real data/source or
+# data/app.db), per CLAUDE.md 0.5.
+
+
+def _kickoff_with_bare_mention(source_dir, mention_text: str) -> Path:
+    """A transcript where Marco Rossi -- never Kwame -- is the only speaker,
+    so any relation to Kwame in the resulting evidence unit can only come
+    from a text-only MENTIONED link, never AUTHOR/SPEAKER."""
+    path = source_dir / "transcripts" / "03_kickoff.txt"
+    path.write_text(
+        "Meeting: Kickoff\nCustomer: Acme Org\nDate: 2024-07-15\nPhase: Implementation\n"
+        "Attendees: Marco Rossi (RELEX), Lena Fischer (Acme)\n\n"
+        "Marco Rossi\n0:050:05\nMR\nMarco Rossi 5 seconds\n"
+        f"{mention_text}\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _clear_manifest(instance) -> None:
+    (instance.source / "reviewed_identities.json").write_text(
+        json.dumps({"description": "x", "entries": []}), encoding="utf-8"
+    )
+
+
+def test_full_name_mentioned_only_by_another_employee_is_rewritten(inst):
+    """#1: Marco's own report bullet names Kwame by full name; Kwame never
+    authors or speaks in that evidence unit."""
+    subject_id = inst.subject_id_for("Kwame Boateng")
+    result = inst.pseudonymise(subject_id)
+    assert result.verified
+    report = (inst.source / "reports" / "01_weekly-report.txt").read_text(encoding="utf-8")
+    assert "Kwame Boateng" not in report
+    assert f"{result.display_alias} fixed the rounding defect" in report
+
+
+def test_reviewed_short_alias_mentioned_only_by_another_employee_is_rewritten(inst):
+    """#2: Marco's transcript turn uses Kwame's reviewed FIRST_NAME alias
+    ("Kwame will confirm...") without Kwame ever speaking in that unit."""
+    subject_id = inst.subject_id_for("Kwame Boateng")
+    result = inst.pseudonymise(subject_id)
+    assert result.verified
+    teams = (inst.source / "transcripts" / "01_weekly-sync.txt").read_text(encoding="utf-8")
+    assert "Kwame will confirm" not in teams
+    assert f"{result.display_alias} will confirm the extract status after lunch." in teams
+
+
+def test_unreviewed_bare_last_name_mentioned_only_by_another_employee_is_rewritten(tmp_path):
+    """#2 (the actual bug): an UNREVIEWED but corpus-unique last name,
+    mentioned only in a colleague's turn, used to survive verbatim while
+    the operation still reported full success."""
+    instance = Instance(tmp_path)
+    _clear_manifest(instance)
+    kickoff = _kickoff_with_bare_mention(
+        instance.source, "Boateng confirmed the extract status after lunch."
+    )
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Kwame Boateng")
+
+    preview = pseudonymise.preview(instance.conn, instance.source, subject_id)
+    assert preview is not None and preview.last_name == "Boateng"
+
+    result = instance.pseudonymise(subject_id)
+
+    assert result.verified, result.verification
+    text = kickoff.read_text(encoding="utf-8")
+    assert "Boateng" not in text
+    assert f"{result.display_alias} confirmed the extract status after lunch." in text
+    from app.privacy import verify
+
+    assert verify.scan_files(instance.source, NEEDLES) == 0
+    instance.conn.close()
+
+
+def test_text_only_mention_is_affected_and_invalidates_its_case(tmp_path):
+    """#3: a Case citing only the mention-only unit (Kwame is never
+    AUTHOR/SPEAKER anywhere in it) must still be invalidated."""
+    instance = Instance(tmp_path)
+    _clear_manifest(instance)
+    _kickoff_with_bare_mention(instance.source, "Boateng confirmed the extract status after lunch.")
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Kwame Boateng")
+    mention_id = next(
+        i
+        for i, r in instance.units().items()
+        if r["raw_text"] == "Boateng confirmed the extract status after lunch."
+    )
+    assert (mention_id, subject_id, "MENTIONED") in {
+        (r["evidence_id"], r["subject_id"], r["relation"])
+        for r in instance.conn.execute("SELECT * FROM evidence_people")
+    }
+    # Deterministically unrelated: Lena's own line, naming nobody who is
+    # about to be pseudonymised -- unlike `next(iter(some_set))`, which
+    # would pick an arbitrary (and possibly Kwame-authored/mentioning)
+    # evidence unit depending on this process's string-hash seed.
+    unrelated = next(
+        i
+        for i, r in instance.units().items()
+        if "Kwame" not in r["raw_text"] and r["speaker_sender"] == "Lena Fischer"
+    )
+    _add_case(instance.conn, "c-mention-only", "who confirmed the extract?", [mention_id])
+    _add_case(instance.conn, "c-clean", "ordering?", [unrelated])
+
+    result = instance.pseudonymise(subject_id)
+
+    assert result.cases_invalidated == 1
+    remaining = {r[0] for r in instance.conn.execute("SELECT case_id FROM cases")}
+    assert remaining == {"c-clean"}
+    instance.conn.close()
+
+
+def test_mentioned_relationship_evidence_id_and_profile_history_survive(tmp_path):
+    """#4: the MENTIONED relationship, the Evidence ID, and profile history
+    for the mention-only unit all survive the operation."""
+    instance = Instance(tmp_path)
+    _clear_manifest(instance)
+    _kickoff_with_bare_mention(instance.source, "Boateng confirmed the extract status after lunch.")
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Kwame Boateng")
+    mention_id = next(
+        i
+        for i, r in instance.units().items()
+        if r["raw_text"] == "Boateng confirmed the extract status after lunch."
+    )
+    ids_before = instance.ids()
+
+    instance.pseudonymise(subject_id)
+
+    assert instance.ids() == ids_before
+    after = {
+        (r["evidence_id"], r["relation"])
+        for r in instance.conn.execute(
+            "SELECT evidence_id, relation FROM evidence_people WHERE subject_id = ?", (subject_id,)
+        )
+    }
+    assert (mention_id, "MENTIONED") in after
+    detail = profile.get_profile(instance.conn, subject_id)
+    assert mention_id in {h.evidence_id for h in detail.history}
+    instance.conn.close()
+
+
+def test_fts_artifacts_caches_and_regenerated_embedding_have_no_original_identifier(tmp_path):
+    """#5: FTS, artifacts/cache, and the regenerated embedding for the
+    mention-only evidence unit must all reflect the alias, never "Boateng"."""
+    instance = Instance(tmp_path)
+    _clear_manifest(instance)
+    _kickoff_with_bare_mention(instance.source, "Boateng confirmed the extract status after lunch.")
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Kwame Boateng")
+    mention_id = next(
+        i
+        for i, r in instance.units().items()
+        if r["raw_text"] == "Boateng confirmed the extract status after lunch."
+    )
+    old_vector = instance.conn.execute(
+        "SELECT vector_json FROM evidence_embeddings WHERE evidence_id = ?", (mention_id,)
+    ).fetchone()[0]
+
+    result = instance.pseudonymise(subject_id)
+
+    assert (
+        instance.conn.execute(
+            "SELECT 1 FROM evidence_fts WHERE evidence_fts MATCH 'Boateng'"
+        ).fetchall()
+        == []
+    )
+    new_text = instance.units()[mention_id]["raw_text"]
+    assert "Boateng" not in new_text and result.display_alias in new_text
+    new_vector = instance.conn.execute(
+        "SELECT vector_json FROM evidence_embeddings WHERE evidence_id = ?", (mention_id,)
+    ).fetchone()[0]
+    assert new_vector == json.dumps(instance.provider.embed_batch([new_text])[0])
+    assert new_vector != old_vector
+
+    from app.privacy import verify
+
+    assert verify.scan_files(instance.artifacts, NEEDLES) == 0
+    assert verify.scan_files(instance.cache, NEEDLES) == 0
+    assert result.verified
+    instance.conn.close()
+
+
+def test_rebuild_after_mention_only_pseudonymisation_does_not_resurrect_the_name(tmp_path):
+    """#6."""
+    instance = Instance(tmp_path)
+    _clear_manifest(instance)
+    _kickoff_with_bare_mention(instance.source, "Boateng confirmed the extract status after lunch.")
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Kwame Boateng")
+    result = instance.pseudonymise(subject_id)
+    ids_before = instance.ids()
+
+    ingest(instance.conn, instance.source, instance.provider)  # the normal rebuild command
+
+    assert instance.ids() == ids_before
+    from app.privacy import verify
+
+    assert verify.scan_database_rows(instance.conn, NEEDLES) == 0
+    assert verify.scan_files(instance.source, NEEDLES) == 0
+    row = repository.get_person(instance.conn, subject_id)
+    assert row["privacy_state"] == "PSEUDONYMISED"
+    assert row["display_alias"] == result.display_alias
+    instance.conn.close()
+
+
+def test_reversal_restores_the_canonical_name_for_a_mention_only_last_name(tmp_path):
+    """#7: reversal restores every rewritten occurrence -- including the
+    mention-only bare last name -- to the vault's one canonical full name
+    (the documented, non-guessing limitation: reversal cannot know that this
+    particular position only ever held the bare surname)."""
+    instance = Instance(tmp_path)
+    _clear_manifest(instance)
+    kickoff = _kickoff_with_bare_mention(
+        instance.source, "Boateng confirmed the extract status after lunch."
+    )
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Kwame Boateng")
+    instance.pseudonymise(subject_id)
+
+    reversed_result = instance.reverse(subject_id)
+
+    assert reversed_result.verified and reversed_result.privacy_state == "ACTIVE"
+    text = kickoff.read_text(encoding="utf-8")
+    assert "Kwame Boateng confirmed the extract status after lunch." in text
+    instance.conn.close()
+
+
+def test_ambiguous_shared_first_name_remains_unchanged_with_the_correct_preview_reason(tmp_path):
+    """#8 (first-name half; the pre-existing mechanism, pinned down here
+    alongside its last-name counterpart below)."""
+    instance = Instance(tmp_path)
+    _clear_manifest(instance)
+    (instance.source / "emails" / "02_second-kwame.txt").write_text(
+        "Subject: Access list\n"
+        "From: Kwame Mensah <k.mensah@acme-org.example>\n"
+        "Date: Friday, October 31, 2025 09:00 AM\n"
+        "To: Lena Fischer <lena.fischer@acme-org.example>\n"
+        "Messages in thread: 1\n\nAccess list attached.\n",
+        encoding="utf-8",
+    )
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Kwame Boateng")
+
+    preview = pseudonymise.preview(instance.conn, instance.source, subject_id)
+
+    assert preview.first_name is None
+    assert (preview.unassigned_first_name, preview.unassigned_reason) == ("Kwame", "shared")
+    instance.conn.close()
+
+
+def test_ambiguous_shared_last_name_is_never_guessed(tmp_path):
+    """#8 (last-name half): two participants sharing a last name must leave
+    it unassigned on both sides, and pseudonymising one must never touch
+    the other's evidence."""
+    instance = Instance(tmp_path)
+    _clear_manifest(instance)
+    (instance.source / "emails" / "02_second-boateng.txt").write_text(
+        "Subject: Access list\n"
+        "From: Ama Boateng <a.boateng@acme-org.example>\n"
+        "Date: Friday, October 31, 2025 09:00 AM\n"
+        "To: Lena Fischer <lena.fischer@acme-org.example>\n"
+        "Messages in thread: 1\n\nAccess list attached.\n",
+        encoding="utf-8",
+    )
+    ingest(instance.conn, instance.source, instance.provider)
+    kwame_id = instance.subject_id_for("Kwame Boateng")
+    ama_id = instance.subject_id_for("Ama Boateng")
+
+    preview = pseudonymise.preview(instance.conn, instance.source, kwame_id)
+    assert preview.last_name is None
+
+    result = instance.pseudonymise(kwame_id)
+
+    assert result.verified
+    email = (instance.source / "emails" / "02_second-boateng.txt").read_text(encoding="utf-8")
+    assert "Ama Boateng" in email  # sharing the last name never damages her
+    row_ama = repository.get_person(instance.conn, ama_id)
+    assert row_ama["privacy_state"] == "ACTIVE" and row_ama["display_name"] == "Ama Boateng"
+    instance.conn.close()
+
+
+def test_overlapping_surnames_are_not_damaged_by_the_last_name_basis(tmp_path):
+    """#9: mirrors the brief's own example ("Ann Lee"/"Ann Leeson"/"Joann
+    Leeds") but with surnames outside the ordinary-word stoplist ("lee" is
+    itself in _COMMON_WORD_NAMES), so this specifically proves the
+    whole-token regex boundary rather than an incidental stoplist hit:
+    pseudonymising "Elin Reed" must not touch "Petra Reedman" or "Sanna
+    Reeder", even though "Reed" is a literal prefix of both. First names are
+    deliberately kept distinct across all three (unlike the brief's shared
+    "Ann"/"Joann"), because the strict first-name basis only ever compares a
+    candidate against other *registered* people (transcript/email
+    structural names, or manifest-reviewed ones) -- "Petra Reedman" and
+    "Sanna Reeder" here are unregistered free-text mentions, so sharing
+    "Elin"'s first name would exercise a separate, pre-existing
+    free-text-collision limitation of that basis rather than the last-name
+    behavior this test targets."""
+    instance = Instance(tmp_path)
+    _clear_manifest(instance)
+    (instance.source / "emails" / "02_overlap.txt").write_text(
+        "Subject: Intro\n"
+        "From: Elin Reed <elin.reed@acme-org.example>\n"
+        "Date: Friday, October 31, 2025 09:00 AM\n"
+        "To: Lena Fischer <lena.fischer@acme-org.example>\n"
+        "Messages in thread: 1\n\n"
+        "Elin Reed met Sanna Reeder and Petra Reedman at the site visit. "
+        "Reed will follow up.\n",
+        encoding="utf-8",
+    )
+    ingest(instance.conn, instance.source, instance.provider)
+    subject_id = instance.subject_id_for("Elin Reed")
+
+    preview = pseudonymise.preview(instance.conn, instance.source, subject_id)
+    assert preview.last_name == "Reed"
+
+    result = instance.pseudonymise(subject_id)
+
+    assert result.verified
+    email = (instance.source / "emails" / "02_overlap.txt").read_text(encoding="utf-8")
+    assert "Sanna Reeder" in email
+    assert "Petra Reedman" in email
+    assert f"{result.display_alias} met Sanna Reeder and Petra Reedman" in email
+    assert f"{result.display_alias} will follow up." in email  # bare "Reed" also rewritten
+    instance.conn.close()
+
+
 # ------------------------------------------------------- embeddings
 
 

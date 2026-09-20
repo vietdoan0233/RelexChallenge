@@ -1,4 +1,5 @@
-"""Strict name -> subject assignment on the full-name and first-name bases."""
+"""Strict name -> subject assignment on the full-name, first-name, and
+last-name bases."""
 
 from app.db import repository
 from app.ingestion import name_resolution as nr
@@ -106,6 +107,70 @@ def test_a_reviewed_first_name_alias_is_authoritative_even_if_shared(conn):
     index = _index(conn)
 
     assert index.resolve("Nadia").subject_id == haddad
+
+
+# ------------------------------------------------------------- last name
+#
+# The identical strict basis as first name, added to close a gap where
+# link_mentions() already auto-linked a bare last name as MENTIONED via a
+# separate, looser check that the pseudonymisation target never consulted
+# -- so a colleague's bare "Boateng" survived rewriting while the operation
+# still reported full verified success. See this module's docstring.
+
+
+def test_a_unique_last_name_is_assigned(conn):
+    kwame = _person(conn, "Kwame Boateng")
+    index = _index(conn)
+
+    assert index.last_name_of(kwame) == "Boateng"
+
+
+def test_a_last_name_shared_by_two_people_is_assigned_to_neither(conn):
+    kwame = _person(conn, "Kwame Boateng")
+    ama = _person(conn, "Ama Boateng")
+    index = _index(conn)
+
+    assert index.last_name_of(kwame) is None
+    assert index.last_name_of(ama) is None
+    # Their full names still resolve, each to the right person.
+    assert index.resolve("Kwame Boateng").subject_id == kwame
+    assert index.resolve("Ama Boateng").subject_id == ama
+
+
+def test_a_last_name_that_is_someone_elses_first_name_is_not_assigned(conn):
+    _person(conn, "Robert Kahn")
+    other = _person(conn, "Sofia Robert")
+    index = _index(conn)
+
+    assert index.last_name_of(other) is None
+    assert index.first_name_of(other) == "Sofia"
+
+
+def test_an_everyday_word_used_as_a_last_name_is_not_assigned(conn):
+    turner = _person(conn, "Ann Rose")
+    index = _index(conn)
+
+    assert index.last_name_of(turner) is None
+
+
+def test_a_reviewed_last_name_alias_is_authoritative_even_if_shared(conn):
+    kwame = _person(conn, "Kwame Boateng", ("Boateng", "LAST_NAME"))
+    _person(conn, "Ama Boateng")
+    index = _index(conn)
+
+    assert index.last_name_of(kwame) == "Boateng"
+
+
+def test_overlapping_surnames_are_not_confused_by_the_last_name_basis(conn):
+    """ "Reed" is a literal prefix of "Reeder"/"Reedman", but _name_parts
+    splits on whitespace only, so neither shares the word "reed" with Ann
+    Reed -- her last name is still safely unique."""
+    reed = _person(conn, "Ann Reed")
+    _person(conn, "Joann Reeder")
+    _person(conn, "Ann Reedman")
+    index = _index(conn)
+
+    assert index.last_name_of(reed) == "Reed"
 
 
 def test_a_single_word_display_name_has_no_first_name_basis(conn):

@@ -139,7 +139,7 @@ The latest verified counts are:
 
 This part required extra care. A capitalized phrase inside a sentence can look like a name even when it is actually a project phrase, job title, or transcription error. Earlier extraction logic produced false identities such as “Risk Fresh Phase,” “This So,” and “Slight Delay Bakery.” Those false identities are now absent.
 
-Real people found only in text are added through a human-reviewed identity file, `data/source/reviewed_identities.json`. Short forms such as first names, last names, initials, nicknames, and spelling variants are also added only when explicitly reviewed. A name being unique in the archive is not enough by itself.
+Real people found only in text are added through a human-reviewed identity file, `data/source/reviewed_identities.json`. Short forms such as first names, last names, initials, nicknames, and spelling variants are also added only when explicitly reviewed. A name being unique in the archive is not enough to *promote* it into the alias table. Pseudonymisation is stricter in a different way: it treats a person's full name and their bare first name as the same participant, rewriting both, whenever that first name belongs to nobody else (`backend/app/ingestion/name_resolution.py`). A first name shared by two people, such as the two Nadias, is never guessed and is reported as left unchanged.
 
 This conservative rule protects the deletion feature. If the system mistakenly turns an ordinary phrase into a person, it could later erase or hide unrelated organizational memory.
 

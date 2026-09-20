@@ -69,7 +69,7 @@ export const api = {
   preview: (subjectId: string) =>
     request<PseudonymisePreview>('/api/privacy/preview', post({ subject_id: subjectId })),
   stats: () => request<ArchiveStats>('/api/stats'),
-  recentCases: () => request<RecentCase[]>('/api/cases?limit=6'),
+  recentCases: (limit = 6) => request<RecentCase[]>(`/api/cases?limit=${limit}`),
   recentDocuments: (limit: number) => request<RecentDocument[]>(`/api/ingest/recent?limit=${limit}`),
   uploadEvidence: (documentType: UploadDocumentType, files: File[]) => {
     const form = new FormData()

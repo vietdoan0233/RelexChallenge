@@ -121,6 +121,11 @@ export interface PseudonymisePreview {
   files_to_rewrite: number
   cases_to_invalidate: number
   findings_to_invalidate?: number
+  // Strict first-name basis: the bare first name that is rewritten along with the full name,
+  // or, when the person has a first name that was not safe to assign, which one and why.
+  first_name?: string | null
+  unassigned_first_name?: string | null
+  unassigned_reason?: 'shared' | 'ordinary-word' | 'too-short' | 'reserved' | null
 }
 
 export interface PseudonymiseResult {
@@ -146,8 +151,11 @@ export interface ReversalResult {
   display_alias: string
   privacy_state: PrivacyState
   files_restored: number
+  embeddings_regenerated?: number
+  embeddings_pending?: number
   verified: boolean
   verification: Record<string, number>
+  checks?: Record<string, boolean>
 }
 
 export interface ContributionEntry {

@@ -68,7 +68,8 @@ export function HomePage({ prefill }: { prefill?: string }) {
   const [question, setQuestion] = useState(prefill ?? '')
   const box = useRef<HTMLTextAreaElement>(null)
   const stats = useQuery({ queryKey: ['stats'], queryFn: api.stats })
-  const recent = useQuery({ queryKey: ['recent'], queryFn: api.recentCases })
+  const [showAllCases, setShowAllCases] = useState(false)
+  const recent = useQuery({ queryKey: ['recent', showAllCases], queryFn: () => api.recentCases(showAllCases ? 30 : 6) })
 
   const ask = useMutation({
     mutationFn: (q: string) => api.ask(q),
@@ -226,10 +227,15 @@ export function HomePage({ prefill }: { prefill?: string }) {
         <section className={`${card} self-start px-[15px] pb-[6px] pt-3`}>
           <div className="mb-1 flex h-5 items-center justify-between">
             <h2 className="text-[15px] font-bold text-ink">Recent Cases</h2>
-            {recent.data && recent.data.length > 0 && (
-              <a href="#/case" className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-ink" onClick={(e) => e.preventDefault()}>
-                View all <IconArrowRight size={13} />
-              </a>
+            {recent.data && (showAllCases || recent.data.length > 3) && (
+              <button
+                type="button"
+                aria-expanded={showAllCases}
+                onClick={() => setShowAllCases((v) => !v)}
+                className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-brand-ink hover:underline"
+              >
+                {showAllCases ? 'Show fewer' : 'View all'} <IconArrowRight size={13} />
+              </button>
             )}
           </div>
           {recent.isPending && (
@@ -243,8 +249,8 @@ export function HomePage({ prefill }: { prefill?: string }) {
               No Cases yet. Ask something above and it will appear here.
             </p>
           )}
-          <ul className="divide-y divide-line border-t border-line">
-            {recent.data?.slice(0, 3).map((c) => (
+          <ul className={`divide-y divide-line border-t border-line ${showAllCases ? "max-h-[330px] overflow-y-auto" : ""}`}>
+            {recent.data?.slice(0, showAllCases ? 30 : 3).map((c) => (
               <li key={c.case_id}>
                 <a href={`#/case/${c.case_id}`} className="group flex h-[44px] cursor-pointer items-center gap-3 transition-colors duration-200">
                   <span className="min-w-0 flex-1">

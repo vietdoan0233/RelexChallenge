@@ -21,6 +21,11 @@ MUTED = RGBColor(103, 113, 121)
 PALE = RGBColor(241, 246, 248)
 LIGHT_TEAL = RGBColor(218, 241, 245)
 
+FONT = "Arial"
+TITLE_SIZE = 30
+SECTION_SIZE = 16
+BODY_SIZE = 13
+
 
 def clear_text(shape):
     if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
@@ -53,7 +58,7 @@ def delete_slide(prs, index):
 
 
 def textbox(slide, x, y, w, h, text, size=18, color=INK, bold=False,
-            font="Arial", align=PP_ALIGN.LEFT, valign=MSO_ANCHOR.TOP,
+            font=FONT, align=PP_ALIGN.LEFT, valign=MSO_ANCHOR.TOP,
             margin=0.02, italic=False):
     shape = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
     tf = shape.text_frame
@@ -94,7 +99,7 @@ def paragraphs(slide, x, y, w, h, rows, margin=0.02,
         p.space_after = Pt(after)
         run = p.add_run()
         run.text = text
-        run.font.name = "Arial"
+        run.font.name = FONT
         run.font.size = Pt(size)
         run.font.bold = bold
         run.font.color.rgb = color
@@ -133,7 +138,7 @@ def circle(slide, x, y, d, fill=TEAL, line_color=TEAL, text=None,
         p.alignment = PP_ALIGN.CENTER
         run = p.add_run()
         run.text = text
-        run.font.name = "Arial"
+        run.font.name = FONT
         run.font.size = Pt(text_size)
         run.font.bold = True
         run.font.color.rgb = text_color
@@ -147,7 +152,7 @@ def footer(slide, number, dark=False):
     textbox(slide, 12.55, 7.05, 0.25, 0.2, str(number), 8, color, align=PP_ALIGN.RIGHT)
 
 
-def title(slide, text, x=1.0, y=0.62, w=11.5, color=BLACK, size=32,
+def title(slide, text, x=1.0, y=0.62, w=11.5, color=BLACK, size=TITLE_SIZE,
           align=PP_ALIGN.LEFT):
     textbox(slide, x, y, w, 0.55, text, size, color, True, align=align)
 
@@ -163,6 +168,18 @@ def card(slide, x, y, w, h, heading, body, dark=False, heading_size=16,
             heading_size, BLUE, True, align=PP_ALIGN.CENTER)
     textbox(slide, x + 0.22, y + 0.82, w - 0.44, h - 1.0, body,
             body_size, text_color, align=PP_ALIGN.CENTER, valign=MSO_ANCHOR.MIDDLE,
+            margin=0.01)
+
+
+def roadmap_step(slide, x, y, w, h, number, heading, body):
+    """Compact numbered card for the end-to-end implementation roadmap."""
+    rect(slide, x, y, w, h, WHITE, transparency=3, line=WHITE, radius=True)
+    rect(slide, x, y, w, 0.08, TEAL, line=TEAL)
+    circle(slide, x + 0.15, y + 0.16, 0.31, TEAL, TEAL, str(number), WHITE, 10)
+    textbox(slide, x + 0.55, y + 0.14, w - 0.68, 0.28, heading,
+            11, BLUE, True)
+    textbox(slide, x + 0.18, y + 0.57, w - 0.36, h - 0.68, body,
+            11, INK, align=PP_ALIGN.LEFT, valign=MSO_ANCHOR.MIDDLE,
             margin=0.01)
 
 
@@ -199,21 +216,21 @@ def build():
 
     # 2. The challenge
     slide = prs.slides[1]
-    title(slide, "WHY MEMORY BREAKS", 1.0, 0.60, 10.0, WHITE, 32)
+    title(slide, "WHY MEMORY BREAKS", 1.0, 0.60, 10.0, WHITE, TITLE_SIZE)
     textbox(slide, 1.0, 1.24, 8.7, 0.38,
             "A clean summary can still be wrong when the archive disagrees with itself.",
             16, WHITE)
     paragraphs(slide, 1.10, 1.85, 5.0, 3.95, [
-        ("45 files, one messy truth", 17, BLUE, True, 3),
-        ("Transcripts, email threads and status reports — with people, dates and decisions changing over time.", 13, INK, False, 14),
-        ("Suggestion ≠ commitment", 17, BLUE, True, 3),
-        ("A polished assistant can turn an idea into an agreement if nobody checks the receipt.", 13, INK, False, 14),
+        ("45 files, one messy truth", SECTION_SIZE, BLUE, True, 3),
+        ("Transcripts, email threads and status reports — with people, dates and decisions changing over time.", BODY_SIZE, INK, False, 14),
+        ("Suggestion ≠ commitment", SECTION_SIZE, BLUE, True, 3),
+        ("A polished assistant can turn an idea into an agreement if nobody checks the receipt.", BODY_SIZE, INK, False, 14),
     ])
     paragraphs(slide, 6.28, 1.85, 5.0, 3.95, [
-        ("Stale ≠ false", 17, BLUE, True, 3),
-        ("A later report may be superseded by operational evidence — or contradict it. Newer is not automatically truer.", 13, INK, False, 14),
-        ("Privacy ≠ amnesia", 17, BLUE, True, 3),
-        ("Remove a person from ordinary surfaces without deleting the organization's attributable history.", 13, INK, False, 14),
+        ("Stale ≠ false", SECTION_SIZE, BLUE, True, 3),
+        ("A later report may be superseded by operational evidence — or contradict it. Newer is not automatically truer.", BODY_SIZE, INK, False, 14),
+        ("Privacy ≠ amnesia", SECTION_SIZE, BLUE, True, 3),
+        ("Remove a person from ordinary surfaces without deleting the organization's attributable history.", BODY_SIZE, INK, False, 14),
     ])
     rect(slide, 0.85, 6.12, 11.35, 0.58, DEEP_TEAL, line=DEEP_TEAL)
     textbox(slide, 1.08, 6.25, 10.8, 0.28,
@@ -223,7 +240,7 @@ def build():
 
     # 3. The product answer
     slide = prs.slides[2]
-    title(slide, "THE ANSWER IS A CASE — NOT A CHAT", 6.78, 0.64, 6.05, BLACK, 22)
+    title(slide, "A CASE, NOT A CHAT", 6.78, 0.64, 6.05, BLACK, TITLE_SIZE)
     textbox(slide, 6.82, 1.30, 5.55, 0.38,
             "Every question becomes a structured ruling.",
             15, BLUE, True)
@@ -252,30 +269,49 @@ def build():
             15, TEAL, True, italic=True)
     footer(slide, 3)
 
-    # 4. Roadmap and delivery
+    # 4. Seven-step implementation roadmap
     slide = prs.slides[3]
-    title(slide, "ROADMAP & SEAMLESS EXECUTION", 1.0, 0.45, 11.2, WHITE, 31,
-          align=PP_ALIGN.CENTER)
-    textbox(slide, 2.0, 1.12, 9.3, 0.35,
-            "We planned for evidence first — and shipped the whole loop in that order.",
-            16, WHITE, align=PP_ALIGN.CENTER)
-    card(slide, 1.55, 2.05, 3.25, 2.75, "1 · LOCK THE MEMORY",
-         "45 source files\n→ 2,534 atomic Evidence Units\n→ stable, citable IDs", dark=True)
-    card(slide, 5.02, 2.05, 3.25, 2.75, "2 · BUILD THE AUDITOR",
-         "Retrieve\n→ challenge\n→ reconcile\n→ validate", dark=True)
-    card(slide, 8.49, 2.05, 3.25, 2.75, "3 · PROVE THE EDGES",
-         "490 passing tests\n+ privacy/reversal rehearsal\n+ live demo path", dark=True)
-    textbox(slide, 2.15, 5.34, 9.0, 0.38,
-            "PLAN  →  BUILD  →  VERIFY  →  DEMO", 17, WHITE, True,
+    title(slide, "OUR 7-STEP IMPLEMENTATION PLAN", 1.0, 0.45, 11.2, WHITE,
+          TITLE_SIZE, align=PP_ALIGN.CENTER)
+    textbox(slide, 1.75, 1.12, 9.8, 0.35,
+            "We planned the full system end to end — then executed the loop in order.",
+            15, WHITE, align=PP_ALIGN.CENTER)
+
+    # The template carries a dark chart/card composition here. A single translucent
+    # panel gives the roadmap a clean stage while keeping the template's visual tone.
+    rect(slide, 0.72, 1.66, 11.90, 4.72, BLACK, transparency=18, line=BLACK)
+
+    top = [(0.98, 1, "INGEST & PARSE", "Canonicalize the\n45-file archive."),
+           (3.96, 2, "LOCK MEMORY", "2,534 atomic units\n+ stable Evidence IDs."),
+           (6.94, 3, "MAP PEOPLE", "Attribution, aliases\n+ relationships."),
+           (9.92, 4, "FIND TRUTH", "Hybrid lexical +\nsemantic retrieval.")]
+    bottom = [(2.47, 5, "BUILD AUDITOR", "Cases, risk engine,\nSkeptic, reconciliation."),
+              (5.45, 6, "SHOW CHANGE", "Decision Evolution +\nReconsideration Radar."),
+              (8.43, 7, "PROVE EDGES", "Pseudonymization, reversal,\ntests and demo.")]
+
+    # Connectors sit behind the cards, making the seven steps read as one delivery path.
+    for x1, x2 in [(3.43, 3.96), (6.41, 6.94), (9.39, 9.92)]:
+        line(slide, x1, 2.58, x2, 2.58, TEAL, 2.5)
+    line(slide, 6.50, 3.28, 6.50, 3.62, TEAL, 2.5)
+    for x1, x2 in [(4.92, 5.45), (7.90, 8.43)]:
+        line(slide, x1, 4.48, x2, 4.48, TEAL, 2.5)
+
+    for x, number, heading, body in top:
+        roadmap_step(slide, x, 1.88, 2.45, 1.40, number, heading, body)
+    for x, number, heading, body in bottom:
+        roadmap_step(slide, x, 3.78, 2.45, 1.40, number, heading, body)
+
+    textbox(slide, 1.95, 5.62, 9.5, 0.34,
+            "PLAN  →  BUILD  →  PROVE  →  DEMO", 16, WHITE, True,
             align=PP_ALIGN.CENTER)
-    textbox(slide, 2.0, 5.86, 9.3, 0.34,
-            "What the judge sees: one coherent product, not a collection of promises.",
+    textbox(slide, 1.75, 6.03, 9.8, 0.28,
+            "One coherent product, from raw archive to an auditable decision.",
             13, WHITE, italic=True, align=PP_ALIGN.CENTER)
     footer(slide, 4, dark=True)
 
     # 5. Trust boundary and evidence locker
     slide = prs.slides[4]
-    title(slide, "THE EVIDENCE LOCKER IS THE MEMORY", 1.0, 0.58, 11.2, WHITE, 30,
+    title(slide, "THE EVIDENCE LOCKER IS THE MEMORY", 1.0, 0.58, 11.2, WHITE, TITLE_SIZE,
           align=PP_ALIGN.CENTER)
     textbox(slide, 2.0, 1.16, 9.3, 0.35,
             "Raw evidence is authoritative; model output is a derived interpretation.",
@@ -302,7 +338,7 @@ def build():
     # 6. Radar initiative
     slide = prs.slides[5]
     rect(slide, 0.75, 1.45, 11.85, 5.2, WHITE, line=WHITE)
-    title(slide, "THE RADAR: INITIATIVE THAT LOOKS AHEAD", 1.0, 0.60, 11.6, BLACK, 28)
+    title(slide, "THE RADAR: INITIATIVE THAT LOOKS AHEAD", 1.0, 0.60, 11.6, BLACK, TITLE_SIZE)
     textbox(slide, 1.0, 1.08, 11.2, 0.30,
             "A proactive feature that turns hindsight into a ranked reason to look again.",
             15, MUTED)
@@ -329,7 +365,7 @@ def build():
 
     # 7. Reversible pseudonymisation
     slide = prs.slides[6]
-    title(slide, "REVERSIBLE PSEUDONYMIZATION", 1.0, 0.55, 11.2, WHITE, 30,
+    title(slide, "REVERSIBLE PSEUDONYMIZATION", 1.0, 0.55, 11.2, WHITE, TITLE_SIZE,
           align=PP_ALIGN.CENTER)
     textbox(slide, 2.0, 1.10, 9.3, 0.35,
             "Privacy without erasing organizational memory.", 17, WHITE,
@@ -351,7 +387,7 @@ def build():
 
     # 8. Differentiators
     slide = prs.slides[7]
-    title(slide, "NOT JUST ANOTHER CHATBOT", 1.0, 0.58, 11.2, WHITE, 31,
+    title(slide, "NOT JUST ANOTHER CHATBOT", 1.0, 0.58, 11.2, WHITE, TITLE_SIZE,
           align=PP_ALIGN.CENTER)
     textbox(slide, 1.55, 1.18, 10.3, 0.32,
             "The difference is accountable memory — not more fluent prose.",
@@ -371,7 +407,7 @@ def build():
     # 9. Live demo story
     slide = prs.slides[8]
     rect(slide, 0.55, 1.18, 12.1, 5.4, WHITE, line=WHITE)
-    title(slide, "THE LIVE STORY IN 60 SECONDS", 1.0, 0.58, 11.2, BLACK, 31)
+    title(slide, "THE LIVE STORY IN 60 SECONDS", 1.0, 0.58, 11.2, BLACK, TITLE_SIZE)
     textbox(slide, 1.0, 1.08, 11.2, 0.31,
             "One question. One evidence trail. One controlled way to forget responsibly.",
             15, MUTED)

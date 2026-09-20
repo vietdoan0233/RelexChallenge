@@ -37,13 +37,14 @@ function claimVerdict(claim: ReceiptClaim) {
   return { label: 'Unsupported', tone: 'border-line bg-neutral-soft text-ink-2', icon: <IconHelp size={11} /> }
 }
 
-function SourceGroup({ title, tone, children }: { title: string; tone?: 'bad'; children: React.ReactNode }) {
+function SourceGroup({ title, tone, aside, children }: { title: string; tone?: 'bad'; aside?: string; children: React.ReactNode }) {
   return (
     <details open className="group">
       <summary className={`flex cursor-pointer list-none items-center gap-1 text-[10px] font-bold ${tone === 'bad' ? 'text-bad' : 'text-ink'}`}>
         {tone === 'bad' && <IconAlert size={11} />}
         {title}
         <IconChevronDown size={12} className="text-ink-3 transition-transform duration-200 group-open:rotate-180" />
+        {aside && <span className="ml-auto text-[9px] font-medium text-ink-3">{aside}</span>}
       </summary>
       <div className="mt-1 divide-y divide-line">{children}</div>
     </details>
@@ -54,23 +55,20 @@ function ClaimCard({ claim, index, onOpen }: { claim: ReceiptClaim; index: numbe
   const v = claimVerdict(claim)
   return (
     <article
-      className={`anim-fade-up flex flex-col gap-[10px] rounded-[10px] border bg-surface px-[13px] pb-[14px] pt-[10px] shadow-card ${
+      className={`anim-fade-up flex flex-col gap-[5px] rounded-[10px] border bg-surface px-[13px] pb-[11px] pt-[10px] shadow-card ${
         claim.stance === 'UNCERTAIN' ? 'border-warn/40' : 'border-line'
       }`}
       style={{ animationDelay: `${Math.min(index, 6) * 60}ms` }}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-[10.5px] font-bold text-ink">
-          Claim {index + 1}
-          <span className="ml-1.5 text-[10px] font-medium text-ink-3">{claim.stance.replaceAll('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}</span>
-        </p>
+        <p className="min-w-0 truncate text-[10.5px] font-bold text-ink">Claim {index + 1}</p>
         <span className={`inline-flex h-5 shrink-0 items-center gap-1 rounded-full border px-2 text-[8.5px] font-bold uppercase tracking-wide ${v.tone}`}>
           {v.icon}
           {v.label}
           <span className="font-semibold opacity-80">· {claim.confidence.toLowerCase()}</span>
         </span>
       </div>
-      <p className="text-[10px] leading-[14px] text-ink">{claim.claim_text}</p>
+      <p className="min-h-[42px] text-[10px] leading-[14px] text-ink">{claim.claim_text}</p>
       {claim.uncertainty && !claim.conflicts.length && (
         <p className="flex gap-1.5 rounded-lg bg-warn-soft p-2 text-[10px] leading-[14px] text-warn">
           <IconAlert size={13} className="mt-px shrink-0" />
@@ -81,7 +79,10 @@ function ClaimCard({ claim, index, onOpen }: { claim: ReceiptClaim; index: numbe
       )}
 
       {claim.support.length > 0 && (
-        <SourceGroup title={`Supporting source${claim.support.length === 1 ? '' : 's'} (${claim.support.length})`}>
+        <SourceGroup
+          title={`Supporting source${claim.support.length === 1 ? '' : 's'} (${claim.support.length})`}
+          aside={claim.stance.replaceAll('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}
+        >
           {claim.support.map((c) => (
             <SourceRow key={c.evidence_id} citation={c} onOpen={onOpen} />
           ))}
@@ -91,13 +92,10 @@ function ClaimCard({ claim, index, onOpen }: { claim: ReceiptClaim; index: numbe
       {claim.conflicts.length > 0 && (
         <div>
           <SourceGroup title={`Conflicting evidence (${claim.conflicts.length})`} tone="bad">
-            {claim.conflicts.map((c) => (
-              <SourceRow key={c.evidence_id} citation={c} onOpen={onOpen} />
+            {claim.conflicts.map((c, i) => (
+              <SourceRow key={c.evidence_id} citation={c} onOpen={onOpen} note={i === 0 ? (claim.uncertainty ?? undefined) : undefined} />
             ))}
           </SourceGroup>
-          {claim.uncertainty && (
-            <p className="mt-0.5 pl-[22px] text-[9px] leading-[12px] text-ink-3">{claim.uncertainty}</p>
-          )}
         </div>
       )}
     </article>

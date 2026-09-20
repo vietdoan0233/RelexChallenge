@@ -1,10 +1,10 @@
 # CLAUDE.md — KEEPER: Evidence-First Organizational Memory Auditor
 
-> **Status:** Architecture v1.5 FROZEN — Phase 1 Evidence Locker is complete and its final review passed with 2,517 real embedding rows. Phase 2 retrieval is complete (12-topic benchmark, `docs/PHASE_2_REVIEW_2026-09-19.md`); Phase 3 (Primary Reasoner, receipts, validator) is complete (`docs/PHASE_3_REVIEW_2026-09-19.md`); Phase 4 (risk routing, Skeptic, reconciliation) is complete (`docs/PHASE_4_REVIEW_2026-09-19.md`); Phase 5 (deletion/anonymization) is complete with disclosed deviations (`docs/PHASE_5_REVIEW_2026-09-19.md`); Phase 6 (UI: Ask, Case, Evidence drawer, Decision Evolution, Privacy console) is complete (`docs/PHASE_6_REVIEW_2026-09-19.md`); Phase 7 (hardening + Reconsideration Radar) is complete with a stated shortfall (`docs/PHASE_7_REVIEW_2026-09-19.md`); the planned build is finished. v1.5 corrects the deletion strategy from default whole-Evidence-Unit removal to granular, irreversible redaction/anonymization with whole-unit deletion as the fallback; this is a documentation correction only — Phase 5 deletion/anonymization remains unimplemented.
+> **Status:** Architecture v1.6 FROZEN — the evidence/reasoning foundation exists, but the previous Phase 5 privacy implementation is rejected and superseded. The 2026-09-19 audit at `f48a666` recorded 368 passing and 22 failing backend tests (all in deletion/deletion-dependent behavior), a stale runtime database with zero embeddings, and a fresh ingest of 2,534 units. The next implementation must build judge-required stable pseudonymisation with preserved relationships and an isolated reversal vault; do not extend the old generic-marker deletion path.
 > **Challenge:** RELEX Solutions — “Memory With a Receipt”
 > **Project:** KEEPER
 > **Build model:** 1 developer, ~40 total working hours, AI-assisted implementation
-> **Primary objective:** Build the smallest reliable system that can reconstruct organizational truth from a small archive, prove every conclusion with evidence, expose conflicts and supersession, and physically erase a person’s data plus dependent memory.
+> **Primary objective:** Build the smallest reliable system that can reconstruct organizational truth from a small archive, prove every conclusion with evidence, expose conflicts and supersession, and pseudonymise a participant while preserving their complete attributable history and relationship graph.
 
 ---
 
@@ -19,7 +19,7 @@ The priority order is:
 1. Reliability in a live judge demo.
 2. Correct evidence provenance.
 3. Correct attribution and current-state reasoning.
-4. Real deletion and post-deletion recalculation.
+4. Correct pseudonymisation, profile history, vault isolation, and post-operation recalculation.
 5. Debuggability.
 6. Clear product value.
 7. Polish.
@@ -38,7 +38,7 @@ Raw evidence is authoritative. LLM annotations, summaries, stances, conclusions,
 
 # 0.1 CURRENT IMPLEMENTATION CHECKPOINT
 
-This section reflects the verified repository state at the end of work on 2026-09-19.
+This section reflects the audited repository baseline at `f48a666` on 2026-09-19. It is not a claim that the legacy privacy implementation is acceptable for the demo.
 
 ## Completed
 
@@ -68,12 +68,10 @@ This section reflects the verified repository state at the end of work on 2026-0
   - OpenAI-compatible `/v1/embeddings` provider adapter with safe status/request-ID logging,
   - ingestion CLI/report,
   - unit and integration tests.
-- The latest verified offline ingestion parsed 45 documents into 2,517 Evidence Units:
-  - 2,115 transcript units,
-  - 110 email-message units,
-  - 292 report units.
-- The latest verified FTS row count is 2,517.
-- The latest verified quality gate is 131 passing backend tests, clean Ruff checks, and a successful frontend typecheck/build.
+- The audit's fresh isolated ingestion parsed 45 documents into 2,534 Evidence Units and 2,534 FTS rows.
+- The audit recorded 25 people, 41 aliases, and 1,966 speaker relationships in the fresh ingest.
+- The audited quality gate was 368 passing and 22 failing backend tests; every failure was in legacy deletion or deletion-dependent Radar behavior. Ruff, frontend type-check, frontend lint, and production build passed.
+- The checked-in runtime database was stale and contained 2,517 Evidence Units but zero embeddings. It must be rebuilt before any judge rehearsal.
 - Phase 1 identity hardening is complete: `people`/`person_aliases` are rebuilt every ingestion run from `data/source/` plus a human-reviewed identity manifest (`data/source/reviewed_identities.json`); a capitalized free-text span is never auto-promoted to `people`; short-form aliases (first name, last name, initials, nicknames, spelling variants) are promoted only through an explicit reviewed manifest entry with its own alias_type and source_reference, never from uniqueness or independent corpus usage alone.
 
 ## Important corpus discoveries already verified
@@ -123,15 +121,15 @@ Do not make parsing dependent on one exact placeholder token.
 
 ## Phase state
 
-**Phase 1 is complete.** Its final review is in `docs/PHASE_1_REVIEW_2026-09-19.md`: all 45 documents ingest into 2,517 stable Evidence Units, FTS has 2,517 rows, and the runtime database has 2,517 verified real embedding rows with consistent 1,536 dimensions. Phase 2 retrieval may begin.
+**Phase 1 is implemented but the runtime artifact is stale.** The audit's fresh ingest is the current corpus baseline: 2,534 Evidence Units and 2,534 FTS rows. A release/readiness step must rebuild and verify embeddings rather than trusting the gitignored runtime database.
 
-**Phase 2 is complete.** Hybrid retrieval (`backend/app/retrieval/`: FTS5 BM25, NumPy cosine, RRF, neighbour context, later-evidence sweep) is implemented and benchmarked on 12 topics — 10/12 in the fused top 5, 11/12 in the top 10, 12/12 in the reasoner-visible set — see `docs/PHASE_2_REVIEW_2026-09-19.md`. `evidence_fts` now also indexes `thread_context` and `speaker_sender`; a Phase 5 purge must scrub those columns. **Phase 3 is complete:** structured Cases with DB-hydrated citations and a deterministic validator work end to end (`docs/PHASE_3_REVIEW_2026-09-19.md`); the organizer chat contract is verified (OpenAI-compatible `/chat/completions`, JSON mode, default `temperature` only). **Phase 4 is complete** (`docs/PHASE_4_REVIEW_2026-09-19.md`). **Phase 5 is complete with disclosed deviations** (in-place redaction only: no whole-unit deletion or locator revocation yet; plan stores identifiers for crash-resumable verification) — see `docs/PHASE_5_REVIEW_2026-09-19.md`. **Phase 6 is complete** (`docs/PHASE_6_REVIEW_2026-09-19.md`). **Phase 7 is complete** (`docs/PHASE_7_REVIEW_2026-09-19.md`): core hardened; Radar implemented and verified live (1–2 findings per run against a 3–5 target). The planned build is finished.
+**Phases 2–4, 6, and 7 have implementation work and review artifacts, but the product is not demo-ready.** Retrieval still has known answer-quality misses and the audit found the legacy privacy path broken on Windows, unauthenticated, and incomplete for arbitrary targets. **Phase 5 is explicitly reset:** its generic-marker deletion/anonymisation behavior is legacy and must be replaced by Architecture v1.6 pseudonymisation. The planned build is not finished until the new privacy/profile/vault contract passes.
 
 Identity hardening is resolved: capitalized free-text phrases can no longer become deletion-relevant identities, and the resulting people/alias/evidence-person counts have been reviewed against the corpus (see below). The two items that remained open — real full-corpus embeddings and a corrected Phase 1 review — were resolved (`docs/PHASE_1_REVIEW_2026-09-19.md`).
 
-The corrected offline ingestion produces 25 people and 39 aliases (25 FULL_NAME + 14 EMAIL; zero short-form aliases are currently promoted, because none have yet passed the explicit human-review path that is now the only route to a deletion-relevant first name, last name, initials, nickname, or spelling variant) against the real 45-document archive. All previously identified false identities (e.g. "Risk Fresh Phase", "This So", "Slight Delay Bakery"/"Bakery", "Not Nadia Öberg") are confirmed absent from both `people` and `person_aliases`, and all 9 reviewed text-only identities (Tobias Ekström, Nadia Öberg, Nils Ackermann, Osman Yildirim, Marika Lindqvist, Heidi Salminen, Martina Reuss, Ahmed Nasser, Elin Bergqvist) are confirmed present. Relationship counts: `AUTHOR` 402, `MENTIONED` 242, `SPEAKER` 1964. A local, gitignored `.env` has all four GPT fields populated. One benign live smoke request to its HTTPS `/v1/embeddings` endpoint returned a valid 1,536-dimensional vector; full-corpus ingestion has since run and the runtime database holds 2,517 real embedding rows.
+The audit's fresh offline ingest produced 25 people and 41 aliases, with 1,966 speaker relationships. The legacy identity layer still derives `person_id` from names and is therefore not an acceptable identity foundation for the new contract. The replacement must migrate to random `subject_id` values, stable cryptorandom `display_alias` values, and evidence relationships that survive pseudonymisation.
 
-Architecture v1.5 (section 0.3) corrects the Phase 5 deletion/anonymization target design in response to a judge-confirmed clarification. **Phase 5 is implemented with disclosed deviations** (see `docs/PHASE_5_REVIEW_2026-09-19.md`): `app/privacy/` provides the staged, locked, crash-resumable operation, canonical-source redaction, dependency invalidation, verification and end-to-end tests. Still not implemented: whole-unit deletion with locator revocation (18.6 step 4, 18.8) and the replay source-span resolver (18.9). Limited groundwork is implemented: reserved redaction markers are excluded from identity parsing, and `source_locators.revoked_at` plus the in-place revocation primitive prevent locator reuse. That groundwork does not sanitize a person or perform a deletion. Section 18 (and its new subsections 18.6–18.12) remains the implementation contract for the future full feature.
+Architecture v1.6 supersedes the old Phase 5 contract. The new privacy operation writes a stable per-person alias into the canonical source and all derived public representations, preserves `evidence_people` and the complete profile history, and stores the original identity only in a separately encrypted vault. The original names, emails, aliases, generic redaction markers, name-derived IDs, and old locator-revocation strategy are not implementation targets for the new operation.
 
 ---
 
@@ -139,7 +137,7 @@ Architecture v1.5 (section 0.3) corrects the Phase 5 deletion/anonymization targ
 
 The local repository uses the configured `origin` remote. Connector availability varies by session and must be verified rather than assumed.
 
-Use read-only remote inspection where it reduces manual friction, but first verify what actions are actually available in the current environment. The user performs repository `pull`, `fetch`, and `push` operations; give the user the exact command when one is required.
+Claude may inspect and synchronize the configured `origin` remote when the task requires it. Remote operations are allowed, but must follow the checks below and must never overwrite unrelated work.
 
 ## Required first checks
 
@@ -153,9 +151,23 @@ Before making repository-history changes:
 
 ## Commit/push behavior
 
-Prefer milestone commits after tests pass.
+Commit completed work in small, tested batches. After writing or changing code, configuration, tests, or repository instructions:
 
-Create tested local commits when appropriate. Do not run `git pull`, `git fetch`, or `git push`; tell the user which exact command to run and wait for them to perform the network operation.
+1. inspect the diff and confirm that unrelated user changes are not included,
+2. run the relevant tests, linters, type checks, or build checks,
+3. create a focused local commit before sending the response.
+
+Every response that reports completed changes must leave those changes committed. Do not create an empty commit when no files changed. If a check or commit cannot be completed, say so explicitly and leave the work safely staged or unstaged rather than claiming completion.
+
+Claude may run `git fetch`, `git pull`, and `git push` when needed for the requested task. Before synchronization:
+
+- inspect status, the current branch, configured remotes, and ahead/behind state,
+- preserve or commit local work before pulling; do not silently discard it,
+- prefer fast-forward-only pulls unless the user explicitly asks for merge or rebase behavior,
+- review the resulting diff and run relevant checks after a pull,
+- push only the intended branch and report the exact remote/branch updated.
+
+If a pull produces conflicts, or a push is rejected because the remote advanced, stop and report the conflict or divergence. Do not force-push unless the user explicitly requests it.
 
 If local `git commit` is used and identity is missing:
 
@@ -164,8 +176,6 @@ If local `git commit` is used and identity is missing:
 - use a verified connector/account identity only if it is explicitly exposed and appropriate,
 - otherwise leave the changes staged/uncommitted and report the commit blocker,
 - **missing git identity must never block Phase 1 implementation, testing, or local progress.**
-
-Never force-push unless the user explicitly requests it.
 
 Never rewrite existing remote history for convenience.
 
@@ -184,11 +194,12 @@ At this checkpoint, `8c6b79b` is committed locally and currently unpushed. This 
 
 Phases 1–7 are complete (section 0.1). The Architecture v1.5 deletion/anonymization documentation (section 0.3, section 18) is a separate contract correction for future Phase 5 work — it is not part of the Phase 1–2 milestones above.
 
-Use an available GitHub connection only for read-only work such as:
+Use an available GitHub connection for repository work such as:
 
 - verifying remote repository state,
 - inspecting branch/history,
-- reviewing diffs.
+- reviewing diffs,
+- fetching, pulling, and pushing when required by the task.
 
 Do not let GitHub integration change the architecture or source-of-truth rules.
 
@@ -196,7 +207,8 @@ Do not let GitHub integration change the architecture or source-of-truth rules.
 
 The architecture version changes only when the frozen product or technical architecture changes. Updating implementation progress, repository state, test counts, or handoff notes does **not** create a new architecture version.
 
-- **v1.5 — current, frozen.** Judge-confirmed clarification of the deletion requirement, replacing v1.4's default of deleting every whole Evidence Unit associated with the target person. The corrected invariant: a deletion request permanently removes or irreversibly anonymizes the requested person's personal data from every application-owned storage surface while preserving non-personal organizational evidence wherever reasonably possible; a unit is deleted in full only when it cannot be adequately anonymized without leaving the person reasonably identifiable. This changes only the deletion/anonymization strategy in sections 2.4 and 18 (and adds sections 18.6–18.12); retrieval, reasoning, risk, Skeptic, the tech stack, and every other frozen decision are unchanged. This is the project's own judge-confirmed deletion/anonymization requirement — it is not a claim of universal legal or GDPR compliance, and scalability is explicitly out of scope for it. Phase 5's end-to-end deletion/anonymization operation remains unimplemented. The repository does contain limited supporting groundwork for the policy: reserved-marker parsing and tested locator revocation; neither performs person redaction, deletion, or verification.
+- **v1.6 — current, frozen.** Replaces the rejected generic-marker deletion design with judge-required robust pseudonymisation. Every participant has a random internal `subject_id`, a stable cryptographically random `display_alias` such as `Participant Q7M4-N8`, and a `privacy_state`. Pseudonymisation preserves every Evidence Unit, `evidence_people` relationship, Evidence ID, and clickable full-history profile; it rewrites direct identifiers and structural attribution to the per-person alias. The original identity is retained only as encrypted data in a strictly isolated reversal vault. Main audit records contain the subject ID, alias, state, timestamps, operation ID, and verification result, never the original name. Standard queries, FTS, embeddings, caches, and logs cannot access the vault. Reversal is a separately authenticated admin workflow, not a standard profile/search capability. Implementation is pending; the old Phase 5 code is superseded and must not be debugged into compliance.
+- **v1.5 — superseded.** The former irreversible generic-marker redaction/whole-unit-deletion contract is retained only as historical context. Its `[REDACTED ...]` markers, name-derived `person_id`, cascading person deletion, locator revocation, and “zero surviving identifier” success criteria are not part of v1.6.
 - **v1.4 — previous frozen architecture.** Replaced the Google/Gemini provider choice with an organizer-provided GPT service. The API key, base URL, reasoning model, and embedding model remain environment placeholders until the organizers supply the exact contract. The provider-neutral offline ingestion path remains mandatory.
 - **v1.3 — earlier frozen architecture.** Audited architecture contract covering the Phase 0 checkpoint, GitHub workflow, stable source-locator manifest, canonical-source rebuild invariant, embedding resilience, citation-context invariant, Skeptic counter-retrieval behavior, deletion cleanup, and mandatory Phase 1 review gate.
 - **2026-09-19 implementation checkpoint — no architecture version change.** Recorded the implemented Phase 1 Evidence Locker, verified offline ingestion/test counts, known identity-discovery false positives, missing real embeddings, and the decision to stop before Phase 2.
@@ -220,31 +232,31 @@ Rules:
 
 # 0.5 TEST ISOLATION AND DESTRUCTIVE-TEST SAFETY
 
-Phase 5 deletion has not been implemented yet, but tests that exercise ingestion rebuild, contaminated-data cleanup, or (later) purge behavior are inherently destructive to whatever database/source they run against. This section is the binding contract for those tests, so that development work can never permanently sanitize the repository's own canonical source, a runtime database intended for judges, or an already-prepared demo instance.
+The new Phase 5 pseudonymisation operation and tests are inherently destructive to the identity-bearing source/database they run against. This section is the binding contract for those tests, so development work can never permanently rewrite the repository's own canonical source, a runtime database intended for judges, or an already-prepared demo instance.
 
 Three distinct concepts:
 
-1. **Development fixture/reference** — the pristine, untouched hackathon archive kept outside `data/source/` and outside application-owned persistence (gitignored). It exists only to be copied from when creating an isolated development/test environment. It must never become a runtime fallback after deletion, and normal ingestion/rebuild must never read it directly (see section 7's canonical-source boundary).
+1. **Development fixture/reference** — the pristine, untouched hackathon archive kept outside `data/source/` and outside application-owned persistence (gitignored). It exists only to be copied from when creating an isolated development/test environment. It must never become a runtime fallback after pseudonymisation, and normal ingestion/rebuild must never read it directly (see section 7's canonical-source boundary).
 2. **Test instance** — a temporary copy of the required canonical source, created fresh per test in a location the test framework owns (e.g. pytest `tmp_path`), with its own temporary database, artifacts directory, and cache directory. Destructive tests may modify only this temporary instance.
-3. **Judge/demo instance** — the repository's real `data/source/`, real runtime database (`data/app.db`), and their real artifacts/cache directories, initialized from a clean canonical source copy. A judge-requested deletion against this instance is intentionally permanent.
+3. **Judge/demo instance** — the repository's real `data/source/`, real runtime database (`data/app.db`), vault, and their real artifacts/cache directories, initialized from a clean canonical source copy. A judge-requested pseudonymisation against this instance is intentionally persistent and reversible only through the authenticated admin workflow.
 
-**Binding test rule.** Every test that modifies source content, deletes a person, or simulates purge/rebuild must:
+**Binding test rule.** Every test that modifies source content, pseudonymises a person, exercises vault reversal, or simulates rebuild must:
 
 1. create a temporary directory using the test framework,
 2. copy only the required source fixture into it,
 3. configure `SOURCE_DATA_DIR`, `DATABASE_PATH`, artifact paths, and cache paths so they point inside that temporary directory,
 4. ingest into its temporary database,
-5. perform destructive work only against that temporary source and database,
-6. verify database/source/index/artifact cleanup,
-7. rebuild only from the temporary sanitized source,
-8. verify the person is not resurrected,
+5. perform privacy work only against that temporary source, database, and vault,
+6. verify public database/source/index/artifact cleanup and relationship/profile preservation,
+7. rebuild only from the temporary alias-bearing source,
+8. verify the original identity is not resurrected and the subject is not lost,
 9. discard the temporary instance afterward.
 
-A destructive test must never write to `<repository>/data/source/`, `<repository>/data/app.db`, or `<repository>/data/keeper.db`.
+A destructive/privacy test must never write to `<repository>/data/source/`, `<repository>/data/app.db`, `<repository>/data/keeper.db`, or a real vault.
 
-Existing read-only integration tests may inspect the canonical corpus directly if they never modify it and use an isolated/in-memory database; there is no need to copy the full archive for a purely read-only test. `backend/tests/conftest.py`'s `isolated_instance` fixture provides a ready-made temporary on-disk instance (source directory, database, artifacts directory, and cache directory, all under `tmp_path`) for destructive tests that need real on-disk behavior — for example, the eventual Phase 5 WAL/VACUUM purge tests (section 18.4.1) — rather than the in-memory `conn` fixture used for pure logic tests.
+Existing read-only integration tests may inspect the canonical corpus directly if they never modify it and use an isolated/in-memory database; there is no need to copy the full archive for a purely read-only test. `backend/tests/conftest.py`'s `isolated_instance` fixture provides a ready-made temporary on-disk instance (source directory, database, artifacts directory, cache directory, and vault, all under `tmp_path`) for privacy tests that need real on-disk behavior, rather than the in-memory `conn` fixture used for pure logic tests.
 
-This section does not implement Phase 5 deletion. It only fixes the isolation contract destructive tests must follow once that phase begins.
+This section does not implement the v1.6 operation. It fixes the isolation contract pseudonymisation and reversal tests must follow once implementation begins.
 
 # 1. PRODUCT MISSION
 
@@ -339,31 +351,30 @@ When evidence conflicts:
 3. do not silently average contradictions,
 4. distinguish stale/superseded from false/unverified.
 
-## 2.4 Deletion
+## 2.4 Robust pseudonymisation
 
-Judge-confirmed requirement (Architecture v1.5): a deletion request permanently removes or irreversibly anonymizes the requested person's personal data from every application-owned storage surface, while preserving non-personal organizational evidence wherever reasonably possible. An Evidence Unit is deleted in full only when it cannot be adequately anonymized without leaving the person reasonably identifiable. See section 18 (especially 18.6) for the full relation-symmetric policy and escalation sequence. This is the project's own judge-confirmed deletion/anonymization requirement, not a claim of universal legal or GDPR compliance.
+Architecture v1.6 replaces the rejected deletion/generic-redaction design with judge-required pseudonymisation. The operation must preserve organizational evidence and the participant's complete attributable history while removing the original identity from ordinary application surfaces.
 
-Do not implement deletion/anonymization as:
+Every participant has this public identity contract:
 
-- prompt filtering,
-- blacklist,
-- query-time hiding,
-- `is_deleted = TRUE`,
-- UI-only masking,
-- a reversible pseudonym,
-- retaining the original identifier in canonical source, database text, metadata, FTS, cached receipts, artifacts, or any other application-owned storage,
-- assuming a name-only text replacement is necessarily sufficient (identifying metadata and structure must be handled too — section 18.7/18.8).
+```yaml
+subject_id: random internal UUID
+display_alias: Participant Q7M4-N8
+privacy_state: ACTIVE | PSEUDONYMISED
+```
 
-Required, where applicable:
+Rules:
 
-- sanitize the application-owned canonical source (not only `evidence_units.raw_text` — section 18.1.1 lists the fuller structural scope),
-- remove direct and tracked identifiers,
-- remove identifying structured metadata (headers, speaker/sender fields, attendee lists, signatures),
-- regenerate or invalidate derived representations (FTS, embeddings, cached Cases, timeline events, Project Pulse findings, other persisted artifacts),
-- preserve organizational facts that no longer identify the person,
-- escalate from targeted span redaction to broader redaction and finally whole-unit deletion only as required (section 18.6).
+- `subject_id` is generated with a cryptographically secure random UUID and contains no name-derived material. It is the stable relational key everywhere; do not use a slugified name as an ID.
+- `display_alias` is generated independently with a cryptographically secure random generator, is unique, stable across rebuilds, and is never derived from a name, hash, employee number, title, or sequence. Collision handling retries generation; it never increments a predictable counter.
+- Pseudonymisation rewrites the application-owned canonical source and all public derived representations to the participant's own alias, including speaker/sender fields, email headers, attendee lists, signatures, inline mentions, and identifying structured metadata.
+- Records remain personal data after pseudonymisation. Do not describe this as irreversible anonymisation or universal legal/GDPR compliance.
+- The participant row and every `evidence_people` relationship survive. Do not cascade-delete a person to make the operation appear complete.
+- Keep `pseudonymised_at`, operation ID, and verification result in the public audit record, but never store the original name in that audit record.
+- Generic labels such as `[REDACTED PERSON]`, `[REDACTED SPEAKER]`, and `[REDACTED SENDER]` are retired for participant pseudonymisation. They destroy person-level linkage and cannot satisfy the profile requirement. Corpus-native anonymous labels such as `Me`, `Them`, and `Guest 1` remain distinct and are not converted into people.
+- Affected Cases, receipts, timeline events, FTS rows, embeddings, caches, and Pulse findings are invalidated or rebuilt from the alias-bearing surviving evidence. Affected conclusions are recalculated.
 
-Affected conclusions must be recalculated from surviving evidence.
+The original identity is not searchable through normal APIs. It exists only in the encrypted, isolated reversal vault described in section 18.0.3, and only the explicit authenticated admin reversal workflow may read it.
 
 ## 2.5 Initiative
 
@@ -479,6 +490,8 @@ GPT_MODEL=
 GPT_EMBEDDING_MODEL=
 DATABASE_PATH=./data/app.db
 SOURCE_DATA_DIR=./data/source
+PSEUDONYM_VAULT_PATH=./data/private-vault/vault.db.enc
+PSEUDONYM_VAULT_KEY=
 ```
 
 `.env.example` is a committed, secret-free template and must remain tracked. Real credentials belong only in the gitignored root `.env`.
@@ -508,6 +521,7 @@ relex-keeper/
 ├── data/
 │   ├── source/                  # canonical imported source under app control
 │   ├── app.db                   # runtime DB, gitignored
+│   ├── private-vault/            # encrypted reversal vault, gitignored and isolated
 │   ├── artifacts/               # derived runtime artifacts, gitignored
 │   └── cache/                   # disposable cache, gitignored
 │
@@ -562,7 +576,9 @@ relex-keeper/
 │   │   │   └── evolution.py
 │   │   │
 │   │   ├── privacy/
-│   │   │   ├── purge.py
+│   │   │   ├── pseudonymise.py
+│   │   │   ├── profile.py
+│   │   │   ├── vault.py
 │   │   │   ├── dependencies.py
 │   │   │   └── verify.py
 │   │   │
@@ -691,13 +707,13 @@ Preferred boundaries:
 - email thread → one individual email/message,
 - report → one bullet point, short sub-paragraph, or the smallest coherent factual section.
 
-**Deletion-radius rule:** Evidence Units should be as small as practical without destroying meaning, for both targeted redaction precision and to minimize collateral loss on the whole-unit-deletion fallback (section 18.6). This is especially important for reports. Do not store an entire multi-bullet engineering/status section as one Evidence Unit if the bullets can stand independently.
+**Profile/history rule:** Evidence Units should be as small as practical without destroying meaning. Fine boundaries make every participant's full history and contribution quotes inspectable, allow precise alias substitution, and keep citation provenance intact. Do not store an entire multi-bullet engineering/status section as one Evidence Unit if the bullets can stand independently.
 
 Long units may be split, but they must retain the same source relationship, parent document, sequence, and neighbor relationships.
 
 Do not default to blind fixed-token chunking.
 
-The reason for this granularity is privacy as well as retrieval quality: deleting one person should not unnecessarily erase unrelated facts that happened to share a large coarse chunk.
+The reason for this granularity is profile fidelity as well as retrieval quality: pseudonymising one person must not lose unrelated facts that happened to share a large coarse chunk.
 
 ## 7.2 Required tables
 
@@ -727,24 +743,45 @@ CREATE TABLE evidence_units (
 );
 
 CREATE TABLE people (
-    person_id TEXT PRIMARY KEY,
-    canonical_name TEXT NOT NULL UNIQUE
+    subject_id TEXT PRIMARY KEY, -- cryptographically random UUID; never a name slug
+    display_alias TEXT NOT NULL UNIQUE,
+    privacy_state TEXT NOT NULL CHECK (privacy_state IN ('ACTIVE', 'PSEUDONYMISED')),
+    display_name TEXT,           -- populated only while ACTIVE
+    profile_metadata_json TEXT,  -- active metadata; no original PII after pseudonymisation
+    pseudonymised_at TEXT,
+    pseudonymisation_operation_id TEXT,
+    verification_result_json TEXT
 );
 
 CREATE TABLE person_aliases (
     alias_id TEXT PRIMARY KEY,
-    person_id TEXT NOT NULL REFERENCES people(person_id) ON DELETE CASCADE,
+    subject_id TEXT NOT NULL REFERENCES people(subject_id) ON DELETE RESTRICT,
     alias TEXT NOT NULL,
-    alias_type TEXT NOT NULL,
-    UNIQUE(person_id, alias)
+    alias_type TEXT NOT NULL,    -- FULL_NAME | EMAIL | REVIEWED | DISPLAY_ALIAS
+    UNIQUE(subject_id, alias)
 );
 
 CREATE TABLE evidence_people (
     evidence_id TEXT NOT NULL REFERENCES evidence_units(evidence_id) ON DELETE CASCADE,
-    person_id TEXT NOT NULL REFERENCES people(person_id) ON DELETE CASCADE,
+    subject_id TEXT NOT NULL REFERENCES people(subject_id) ON DELETE RESTRICT,
     relation TEXT NOT NULL, -- AUTHOR | SPEAKER | MENTIONED
-    PRIMARY KEY (evidence_id, person_id, relation)
+    PRIMARY KEY (evidence_id, subject_id, relation)
 );
+
+CREATE TABLE privacy_operations (
+    operation_id TEXT PRIMARY KEY,
+    subject_id TEXT NOT NULL REFERENCES people(subject_id) ON DELETE RESTRICT,
+    from_state TEXT NOT NULL,
+    to_state TEXT NOT NULL,
+    display_alias TEXT NOT NULL,
+    pseudonymised_at TEXT,
+    verification_result_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+-- The original identity is deliberately NOT in the main SQLite schema. It is
+-- stored as encrypted ciphertext in the separate vault described in section
+-- 18.3 and is inaccessible to ordinary repositories, FTS, embeddings, and logs.
 
 CREATE TABLE evidence_embeddings (
     evidence_id TEXT PRIMARY KEY REFERENCES evidence_units(evidence_id) ON DELETE CASCADE,
@@ -851,21 +888,21 @@ If exact source locators are not naturally present, assign them once during cano
 
 Do not regenerate locators by compacting surviving units after deletion.
 
-A unit that survives deletion because it was adequately anonymized keeps its existing Evidence ID; only the identifying content changes, never the locator. A unit that is deleted in full must have its locator **revoked**, not removed — see section 18.8 for the tombstone mechanism and the reason a plain `DELETE FROM source_locators` row is unsafe.
+A unit that is pseudonymised keeps its existing Evidence ID and locator; only the identifying content and public participant fields change. Pseudonymisation must not delete the unit or revoke its locator, because the complete history and clickable profile depend on those stable references.
 
 ---
 
 
 ## Canonical source boundary for this hackathon
 
-`data/source/` is KEEPER's **application-owned canonical working source** for ingestion, rebuild, and deletion behavior.
+`data/source/` is KEEPER's **application-owned canonical working source** for ingestion, rebuild, and pseudonymisation behavior.
 
 The untouched challenge extraction outside `data/source/` is a **development fixture/reference input**, not application memory.
 
 Rules:
 
 - runtime ingestion and rebuild commands must read from `data/source/`,
-- deletion must sanitize the relevant content in `data/source/`,
+- pseudonymisation must rewrite the relevant content in `data/source/` to the stable per-person alias,
 - a normal KEEPER rebuild must never silently re-import from the untouched fixture,
 - the untouched fixture must remain gitignored and outside application persistence,
 - tests may use isolated fixture copies, but production/runtime code must not use the untouched archive as a fallback source.
@@ -873,13 +910,13 @@ Rules:
 This distinction is required so:
 
 ```text
-purge person
+ pseudonymise person
 → verify
 → rebuild
 → verify again
 ```
 
-cannot resurrect deleted evidence.
+cannot resurrect the original identity or lose the participant's evidence graph.
 
 # 8. INGESTION RULES
 
@@ -1441,9 +1478,112 @@ Precompute Pulse findings. Do not run expensive full-archive audit on every page
 
 ---
 
-# 18. PERSONAL DATA DELETION AND ANONYMIZATION
+# 18. PERSONAL DATA PSEUDONYMISATION, PROFILES, AND REVERSAL
 
-Deletion is a core scoring requirement.
+## 18.0 Architecture v1.6 pseudonymisation contract — normative
+
+The operation is robust pseudonymisation, not generic deletion or irreversible anonymisation. This subsection is the implementation contract. The v1.5 material after the divider below is historical only and must not be implemented.
+
+### 18.0.1 Identity state and identifiers
+
+Every participant has a durable public row:
+
+```yaml
+subject_id: random internal UUID
+display_alias: Participant Q7M4-N8
+privacy_state: ACTIVE | PSEUDONYMISED
+```
+
+- `subject_id` is generated with a cryptographically secure random UUID and contains no name-derived material. It is the relational key for profiles, evidence relationships, cases, and API routes.
+- `display_alias` is generated independently with cryptographically secure randomness, is unique and stable, and is never derived from a name, name hash, initials, employee number, job title, or predictable sequence. Collision handling retries generation.
+- `Participant Q7M4-N8` is an example display format, not a derivation algorithm.
+- `ACTIVE` profiles may expose the real name and allowed metadata. On pseudonymisation, the public row loses the original name and direct identifiers, changes to `PSEUDONYMISED`, and retains only the stable alias plus non-identifying metadata needed for organizational context.
+- The participant row is never deleted. `evidence_people` rows are never cascade-deleted. Pseudonymisation preserves every Evidence Unit, Evidence ID, locator, relation (`AUTHOR`, `SPEAKER`, `MENTIONED`), and complete profile history.
+- Pseudonymised records remain personal data. Do not claim irreversible anonymisation, cryptographic erasure, or universal legal/GDPR compliance.
+
+### 18.0.2 Universal clickable profile
+
+Every participant is a clickable profile target from speaker/sender labels, mentions, citations, timeline nodes, and the people list.
+
+- An active profile shows the real name and permitted metadata.
+- A pseudonymised profile shows only `display_alias` and non-PII status/count fields. It must not reveal the original name, email, employee ID, title, or vault state details.
+- Both states show the participant's entire history: all linked chat logs, emails, meeting transcripts, source metadata, and the exact contribution/quote for every Evidence Unit in which the subject is an author, speaker, or mentioned participant.
+- History is hydrated from the public relational graph and sanitized evidence rows. It never requires a vault lookup and never reconstructs identity from search results.
+- The alias must remain distinct per participant so the profile graph does not collapse different people into one generic label.
+
+### 18.0.3 Isolated reversal vault
+
+The original identity mapping is a separate security boundary, not a normal table in `data/app.db`.
+
+- Store `subject_id -> encrypted original identity bundle` in a separate encrypted vault database/file owned only by a dedicated vault repository. Do not put a vault table in `data/app.db`; a normal SQLite connection must have no path to the vault. The bundle may contain the original name, original email/aliases, and the metadata required for an explicit reversal.
+- Encrypt the bundle with authenticated encryption. The key is supplied through a dedicated secret/key-management boundary and is never stored beside the main database, source archive, FTS index, embeddings, cache, or logs. Store only ciphertext, nonce/IV, key version, subject ID, and vault timestamps.
+- Ordinary repositories and endpoints must not open, attach, join, search, export, embed, cache, or log vault plaintext. There must be no fallback query that tries to resolve a pseudonym through the vault.
+- The public `privacy_operations` audit record contains only operation ID, subject ID, display alias, from/to state, pseudonymised timestamp, counts/status, and verification result. It never contains the original name or email.
+- A normal anonymous profile, global search, evidence API, case API, or reasoning trace must be unable to look up the original identity. Only the separately authenticated and authorized “Reverse Pseudonymisation” admin workflow may decrypt the vault record.
+
+### 18.0.4 Alias-bearing canonical source and derived data
+
+Reuse the existing role-aware redaction coverage, but replace every target-specific generic marker with that participant's stable `display_alias`.
+
+The application-owned canonical source must rewrite the target in all applicable locations: transcript speaker lines, email/report sender headers, sender addresses, recipients, attendee lists, signatures, subject/meeting context, inline mentions, handles, employee/operator identifiers, and other direct identifying metadata. Preserve the surrounding organizational facts and exact contribution text wherever possible. Do not delete a whole Evidence Unit merely because it contains the target; the target's history and quote must remain inspectable under the alias.
+
+The rewritten source is still application-owned personal data. FTS, embeddings, caches, receipts, Cases, timeline events, Radar/Pulse findings, and exported artifacts must be regenerated or invalidated from the alias-bearing source. Old text and old embeddings must not survive the operation.
+
+Generic `[REDACTED PERSON]`, `[REDACTED SPEAKER]`, and `[REDACTED SENDER]` markers are retired for participants. Native anonymous labels such as `Me`, `Them`, and `Guest 1` remain anonymous source labels and must not be conflated with pseudonymised subjects.
+
+### 18.0.5 Staged pseudonymisation sequence
+
+```text
+authenticate request and acquire exclusive privacy/read-write gate
+    ↓
+resolve ACTIVE subject_id and compute affected files/evidence/dependencies
+    ↓
+generate or load stable display_alias; write encrypted vault record
+    ↓
+durably write a crash-resumable plan containing IDs, paths, alias, and counts only
+    ↓
+atomically rewrite canonical source and structural metadata to the alias
+    ↓
+transactionally update public people/profile rows and scrub original aliases
+    ↓
+preserve evidence_people and Evidence IDs; invalidate Cases/findings/FTS/embeddings
+    ↓
+checkpoint/VACUUM/clear owned caches and regenerate public derived data
+    ↓
+verify zero original identifiers on every public application surface
+    ↓
+record PSEUDONYMISED, pseudonymised_at, operation ID, and verification result
+    ↓
+remove the temporary plan and release the gate only after verification passes
+```
+
+The plan may contain `subject_id`, Evidence IDs, document IDs, source locators, replacement alias, paths, and counts. It must never contain the original name, original email, unsanitized source text, or a reversible alias-to-name mapping. A crash leaves the application privacy-locked; recovery resumes by recorded state and never guesses.
+
+### 18.0.6 Verification and rebuild invariants
+
+Verification must scan the canonical source, public database text/metadata, FTS, caches, Cases/receipts, timeline/Radar/Pulse artifacts, operation plans, and logs for original names, emails, tracked aliases, and unsanitized direct identifiers. It must also verify that:
+
+- the public subject row is `PSEUDONYMISED` with the expected stable alias;
+- no public alias table contains the original identifiers;
+- the original identity exists only as encrypted vault ciphertext;
+- every pre-operation `evidence_people` relationship remains present;
+- every linked Evidence Unit remains profile-readable with the alias and exact sanitized quote;
+- old embeddings and stale derived artifacts are gone, and new representations were built from alias-bearing text;
+- a full rebuild from `data/source/` cannot resurrect the original identity or lose the participant graph.
+
+Do not report success if any check fails. This is application-level pseudonymisation verification, not a mathematical proof against unknown external copies.
+
+### 18.0.7 Explicit reversal workflow
+
+“Reverse Pseudonymisation” is a separately authenticated, role-gated admin operation. It is not exposed through standard profile/search/evidence APIs and is never available merely because a caller knows `subject_id` or `display_alias`.
+
+The workflow decrypts the vault record only inside the dedicated vault service, authorizes the request, atomically rewrites the public canonical source and derived representations back to the active identity, restores active profile metadata, records an ID/status-only audit event, and verifies completion. It must not print the original name to ordinary logs or leave plaintext in the operation plan. Re-pseudonymisation reuses the stored stable alias unless an explicit, separately audited rotation is required.
+
+---
+
+## 18.99 Historical v1.5 material — non-binding; do not implement
+
+The following old sections describe generic irreversible markers, name-derived IDs, locator revocation, and whole-unit deletion. They are preserved only so earlier review documents remain understandable. Architecture v1.6 above supersedes every requirement below. The old `app/privacy/` implementation is to be replaced, not incrementally debugged into this contract.
 
 ## 18.1 Deletion target expansion
 
@@ -1874,9 +2014,15 @@ Primary “wow” feature.
 
 Clickable timeline nodes open evidence.
 
-## D. Privacy Console
+## D. Universal Participant Profiles and Privacy Console
 
-Select a person, preview affected counts, execute deletion, display progress, verify purge, and show post-deletion recalculation.
+Every participant is clickable from a speaker, sender, mention, citation, timeline node, or privacy list. The profile pop-up must show:
+
+- ACTIVE participant: real name and allowed metadata;
+- PSEUDONYMISED participant: `display_alias` and no original name, email, employee ID, title, or other PII;
+- everyone: the complete DB-hydrated history of chat logs, emails, meeting transcripts, and the participant's specific contributions/quotes linked to their Evidence Units.
+
+The Privacy Console previews and runs pseudonymisation, displays the stable alias and verification result, preserves the relationship graph, and shows post-operation recalculation. Reversal is not a normal profile action; it is an authenticated admin workflow backed by the isolated vault.
 
 ## E. Project Pulse
 
@@ -1897,7 +2043,9 @@ GET  /api/evidence/{evidence_id}
 
 GET  /api/privacy/people
 POST /api/privacy/preview
-POST /api/privacy/purge
+POST /api/privacy/pseudonymise
+GET  /api/people/{subject_id}
+GET  /api/people/{subject_id}/history
 
 GET  /api/health
 ```
@@ -1912,7 +2060,7 @@ GET /api/pulse
 
 `GET /api/evidence/{evidence_id}` returns exact DB-hydrated source metadata/text.
 
-Deletion endpoint returns counts and verification state, not deleted personal content.
+The pseudonymisation endpoint returns counts, `subject_id`, `display_alias`, state, operation ID, and verification result — never the original identity. Profile/history endpoints are DB-hydrated and must not access the reversal vault. A separate admin-only reverse endpoint is outside the standard API surface and requires explicit authorization.
 
 ---
 
@@ -1982,9 +2130,11 @@ At minimum:
 - validator rejecting nonexistent IDs,
 - validator hydrating DB metadata,
 - risk rules,
-- deletion dependency lookup,
-- deletion verifier,
-- rebuild-after-delete does not resurrect deleted data,
+- pseudonymisation target/alias generation and collision handling,
+- isolated vault access control and ciphertext-only storage,
+- profile history and contribution-quote hydration,
+- pseudonymisation dependency lookup and verifier,
+- rebuild-after-pseudonymisation does not resurrect original identifiers,
 - SQLite WAL/journal cleanup behavior when the configured journal mode uses auxiliary files.
 
 ## Integration tests
@@ -1996,36 +2146,29 @@ At minimum:
 - Skeptic can find an indirect replacement/reversal expressed with different vocabulary,
 - query → receipt → UI schema,
 - context-dependent citation renders neighbor context,
-- delete person → query again,
-- evidence deletion invalidates Cases,
-- deleted evidence cannot be retrieved,
-- delete person → full rebuild → deleted evidence remains absent,
-- deletion verification covers DB auxiliary/cache artifacts owned by the app.
+- pseudonymise person → query again,
+- pseudonymisation invalidates dependent Cases/findings for recalculation,
+- alias-bearing evidence remains retrievable through the subject profile,
+- pseudonymise person → full rebuild → original identity remains absent and the profile graph remains present,
+- pseudonymisation verification covers DB auxiliary/cache/vault artifacts owned by the app.
 
-## Privacy/anonymization tests (required once Phase 5 is implemented; none exist yet)
+## Privacy/pseudonymisation tests (required for Architecture v1.6)
 
-Phase 5's end-to-end operation has not been implemented, so the following end-to-end coverage does not exist yet. Limited groundwork tests already cover reserved markers and locator revocation; this list is the required future coverage once redaction/deletion code lands, reflecting the Architecture v1.5 policy in section 18:
+The old Phase 5 tests are not the acceptance contract. The replacement must prove:
 
-- authored evidence is preserved (redacted, not deleted) after adequate anonymization,
-- mentioned-only evidence is preserved where possible, including the other participant's own attribution and unrelated content in the same unit,
-- irreducibly identifying evidence is removed (whole-unit deletion) only when redaction cannot adequately anonymize it,
-- direct identifiers are gone from canonical source and every storage surface after the operation,
-- structural headers/chrome (From/Von/Från, Attendees, Subject/Meeting, signatures, speaker-marker lines) are sanitized, not only unit body text,
-- reserved redaction markers never become people, aliases, or mention-detection matches,
-- a marker-bearing file remains parseable after rebuild, without silently dropping or merging the redacted unit,
-- surviving Evidence IDs remain stable across the operation and a subsequent rebuild,
-- all constituent locators of a merged transcript unit are handled, not only the first/exposed one,
-- a revoked locator is never reassigned, and a collision with a revoked natural locator fails loudly,
-- the privacy-planning replay resolver never mutates the manifest (no new `source_locators` rows are created during planning),
-- report multiline/sub-line source spans (plain paragraph, inline header status, combined low-bullet-count units) are correctly located and sanitized,
-- an interrupted operation recovers correctly from every recorded state,
-- an orphan `PLANNING`-state lock with no plan and no mutation is cleared safely,
-- a `FINALIZING`-state recovery with the plan already removed is treated as expected, not as corruption,
-- normal query/ingestion is blocked while a privacy operation is active, and resumes only after it completes or is safely resolved,
-- stale FTS rows and old embeddings for touched evidence are gone, and no old embedding survives for changed or deleted text,
-- a full rebuild after the operation does not resurrect the target,
-- an ambiguous alias is not over-redacted (unrelated people sharing an ambiguous first name keep their evidence intact),
-- every destructive test in this list uses only a temporary source copy and a temporary database (section 0.5) — never the repository's real `data/source/` or `data/app.db`.
+- every subject gets a random UUID `subject_id` and independently cryptorandom, unique, stable `display_alias`;
+- aliases are distinct across at least five structurally different targets and never use names, hashes, initials, employee IDs, titles, or sequences;
+- the public row transitions to `PSEUDONYMISED` with `pseudonymised_at`, operation ID, and verification result, while the main audit record contains no original name;
+- canonical source redaction covers speaker fields, email/report headers, sender addresses, recipients, attendees, signatures, context, inline text, handles, and identifiers, replacing them with the target-specific alias;
+- two anonymised people remain distinguishable in source text, retrieval, relationships, and profiles;
+- all `evidence_people` relationships, Evidence IDs, locators, Evidence Units, exact contribution quotes, and full profile history survive;
+- FTS, embeddings, Cases, receipts, timelines, Radar/Pulse findings, caches, and logs contain no original identifiers or stale pre-pseudonymisation representations;
+- the vault stores only authenticated ciphertext and is unreachable from standard repositories, search, embedding, profile, evidence, Case, and log paths;
+- a normal UI/API request cannot recover an original name from `subject_id` or `display_alias`;
+- only the separately authenticated admin reversal workflow can decrypt and reverse the operation, and its audit record still omits the original name;
+- interrupted operations recover safely, remain locked on failure, and never guess from a partial plan;
+- a full rebuild from the sanitized canonical source cannot resurrect the original identity or lose the subject's history;
+- every destructive/pseudonymising test uses only a temporary source copy and database (section 0.5), never the repository's real `data/source/`, `data/app.db`, or vault.
 
 ## Evaluation tests
 
@@ -2173,31 +2316,29 @@ Exit:
 - decision/agreement/current-state questions force deep checking,
 - Skeptic introduces actual newly retrieved counterevidence when available.
 
-## Phase 5 — Deletion and irreversible anonymization (target ~5h)
+## Phase 5 — Robust pseudonymisation and universal profiles (target ~8h)
 
 Tasks:
 
-- deletion preview / dependency discovery,
-- targeted canonical-source redaction (section 18.1, 18.1.1),
-- reserved-marker handling (section 18.7),
-- whole-unit deletion as the fallback when redaction is inadequate (section 18.6),
-- stable-ID preservation for anonymized survivors (section 18.8),
-- locator revocation for fully deleted units, including merged-transcript constituents (section 18.8),
-- source/DB/FTS/embedding invalidation (section 18.4),
-- physical SQLite cleanup (section 18.4.1),
-- recovery-safe staged operation state (sections 18.10–18.11),
-- verification (section 18.5),
-- affected Case invalidation/recalculation.
+- random subject IDs and stable cryptorandom display aliases,
+- public `ACTIVE`/`PSEUDONYMISED` profile state and preserved subject graph,
+- alias-bearing canonical-source rewriting for all structural and inline identifiers,
+- isolated encrypted reversal vault with no standard-query access,
+- universal clickable profiles with complete history and contribution quotes,
+- source/DB/FTS/embedding/cache/artifact invalidation and rebuild,
+- recovery-safe staged operation state and reader/writer privacy gate,
+- verification with no original identity in public surfaces or audit records,
+- separately authenticated admin reversal and post-operation recalculation.
 
 Exit:
 
-- adequately anonymized organizational evidence remains retrievable,
-- sanitized survivors retain stable Evidence IDs,
-- reserved markers never become people or aliases,
-- fully deleted evidence is absent and revoked locators are never reassigned,
-- all tracked identifiers disappear from permanent application-owned storage,
-- a full rebuild cannot restore the target,
-- affected conclusions no longer retain deleted attribution,
+- alias-bearing organizational evidence remains retrievable,
+- every participant has a clickable profile with complete history and contribution quotes,
+- subject relationships and stable Evidence IDs survive pseudonymisation,
+- the public store contains no original target identifiers,
+- the vault is ciphertext-only to standard application paths,
+- a full rebuild cannot restore the original identity or lose the target graph,
+- only the admin reversal workflow can restore an identity,
 - operation recovery and verification succeed.
 
 None of this is implemented yet (section 0.1).
@@ -2378,10 +2519,10 @@ KEEPER MVP is done when all of the following are true:
 6. Every displayed citation is hydrated from the DB.
 7. Fabricated evidence IDs cannot render.
 8. Decision Evolution displays only evidence-backed events.
-9. A person's personal data can be permanently removed or irreversibly anonymized across application-owned raw/normalized/search/derived storage, preserving non-personal organizational evidence wherever reasonably possible, with whole-unit deletion as the fallback when adequate anonymization is not possible.
+9. A participant can be pseudonymised with a random `subject_id`, stable cryptorandom `display_alias`, `PSEUDONYMISED` state, operation/timestamp/verification audit fields, and no original identity in public application surfaces.
 10. Dependent Cases/artifacts are invalidated.
-11. Post-deletion verification returns zero surviving matches for all tracked identifiers, deleted evidence IDs, and known dependent artifacts.
-12. Affected Case is recomputed from surviving evidence.
+11. Post-operation verification proves that original identifiers are absent from public source/database/search/derived/log surfaces, the vault contains only encrypted mapping data, and the participant's relationships/history remain intact.
+12. Affected Case is recomputed from surviving alias-bearing evidence, and every participant profile can open its complete history.
 13. Judges can ask unseen questions through the UI.
 14. The live demo works without editing code.
 15. The core is tested before optional Project Pulse work begins.
@@ -2401,7 +2542,7 @@ When choosing between two approaches, prefer the one that:
 - makes provenance explicit,
 - can fail safely,
 - can be tested deterministically,
-- can be fully deleted/rebuilt,
+- can be fully pseudonymised/rebuilt,
 - can be explained to judges in one sentence.
 
 Never turn a tentative AI interpretation into permanent truth.
@@ -2414,13 +2555,13 @@ Never let “newer” automatically mean “true.”
 
 Never hardcode named decision authorities.
 
-Never report deletion success until verification passes for all tracked identifiers, deleted evidence IDs, and known dependent artifacts.
+Never report pseudonymisation success until public-surface verification, vault verification, relationship preservation, and known dependent-artifact checks pass.
 
 Never let coarse Evidence Units create avoidable deletion collateral damage.
 
 Never show a context-dependent conversational citation without nearby context.
 
-Never treat alias discovery as complete until corpus-wide candidate discovery and post-delete verification both pass.
+Never treat identity discovery as complete until corpus-wide candidate discovery and post-pseudonymisation verification both pass.
 
 Never let the Skeptic rely only on literal negation; it must search for replacements, later state, and implementation evidence.
 
@@ -2430,4 +2571,4 @@ The differentiator is not the number of agents or databases.
 
 The differentiator is:
 
-> **Evidence → adversarial interpretation when needed → verified receipt → visible decision evolution → true memory deletion.**
+> **Evidence → adversarial interpretation when needed → verified receipt → visible decision evolution → preserved history with controlled identity.**

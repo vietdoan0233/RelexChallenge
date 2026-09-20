@@ -244,6 +244,14 @@ def load_reviewed_identities(source_dir: Path) -> list[ReviewedIdentity]:
 def seed_and_discover(
     conn: sqlite3.Connection, documents: list[ParsedDocument], source_dir: Path
 ) -> PeopleReport:
+    """Structural names are resolved against the persistent people table
+    (Architecture v1.6, CLAUDE.md 18.0), not recreated from scratch: a name
+    that already matches an existing FULL_NAME alias reuses that subject_id,
+    and a name that already *is* someone's display_alias -- the trace a
+    pseudonymisation rewrite leaves behind, e.g. "Participant Q7M4-N8" in a
+    speaker position -- is recognized as that existing subject and is never
+    treated as a new person or given a new FULL_NAME alias of itself. Only a
+    name matching neither mints a new subject_id/display_alias."""
     structural_names: set[str] = set()
     email_by_name: dict[str, str] = {}
 
@@ -265,6 +273,8 @@ def seed_and_discover(
     # Free-text candidates are collected for the report only. Matching a
     # reviewed name is noted as "reviewed", not "confirmed via free text":
     # the manifest, not the regex, is what actually authorized the person.
+    # A known display_alias is excluded here too: it is somebody's existing
+    # identity, not a free-text candidate for a new one.
     candidate_names: set[str] = set()
     for doc in documents:
         for unit in doc.units:
@@ -276,6 +286,8 @@ def seed_and_discover(
                     continue
                 if not _looks_like_a_name(match):
                     continue
+                if repository.is_known_display_alias(conn, match):
+                    continue
                 candidate_names.add(match)
 
     report = PeopleReport(
@@ -284,15 +296,26 @@ def seed_and_discover(
     )
 
     for name in sorted(structural_names):
-        person_id = repository.get_or_create_person(conn, name)
-        repository.add_alias(conn, person_id, name, AliasType.FULL_NAME.value)
+        if repository.is_known_display_alias(conn, name):
+            # This *is* an existing subject's own alias (most likely the
+            # rewritten trace of a pseudonymised speaker/sender); resolving
+            # it to that subject happens later via evidence_people linking
+            # (app/ingestion/service.py), never here -- adding it as a new
+            # FULL_NAME alias of itself would pollute person_aliases with a
+            # duplicate of the very alias that is supposed to be their only
+            # public identifier.
+            continue
+        subject_id = repository.get_or_create_subject(conn, name)
+        repository.add_alias(conn, subject_id, name, AliasType.FULL_NAME.value)
         email = email_by_name.get(name)
         if email:
-            repository.add_alias(conn, person_id, email, AliasType.EMAIL.value)
+            repository.add_alias(conn, subject_id, email, AliasType.EMAIL.value)
 
     for entry in reviewed:
-        person_id = repository.get_or_create_person(conn, entry.canonical_name)
-        repository.add_alias(conn, person_id, entry.canonical_name, AliasType.FULL_NAME.value)
+        if repository.is_known_display_alias(conn, entry.canonical_name):
+            continue
+        subject_id = repository.get_or_create_subject(conn, entry.canonical_name)
+        repository.add_alias(conn, subject_id, entry.canonical_name, AliasType.FULL_NAME.value)
 
     unresolved, reviewed_short = _apply_reviewed_short_aliases(conn, reviewed)
     report.unresolved_alias_candidates = unresolved
@@ -308,6 +331,11 @@ def _looks_like_a_name(candidate: str) -> bool:
     return len({w.lower() for w in words}) == len(words)
 
 
+_SHORT_ALIAS_TYPES = tuple(
+    t.value for t in AliasType if t not in (AliasType.FULL_NAME, AliasType.EMAIL)
+)
+
+
 def _apply_reviewed_short_aliases(
     conn: sqlite3.Connection, reviewed: list[ReviewedIdentity]
 ) -> tuple[list[str], list[str]]:
@@ -318,22 +346,41 @@ def _apply_reviewed_short_aliases(
     uniqueness and independent usage are signals a reviewer can use to
     decide whether to add a manifest entry, not proof of identity by
     themselves. Everything not covered by a reviewed entry is reported as
-    unresolved."""
+    unresolved.
+
+    person_aliases is persistent under Architecture v1.6 (CLAUDE.md 18.0),
+    not dropped and rebuilt every ingest, so simply INSERTing from the
+    current manifest is not enough on its own: a short-form alias a
+    reviewer later removes from the manifest would otherwise never be
+    un-promoted. These alias *types* are added exclusively through this
+    function (structural discovery only ever adds FULL_NAME/EMAIL), so
+    every row of these types is safe to fully recompute from the current
+    manifest each run -- unlike subject_id/display_alias, nothing requires
+    a short-form alias row itself to survive a rebuild unchanged."""
+    placeholders = ",".join("?" * len(_SHORT_ALIAS_TYPES))
+    conn.execute(
+        f"DELETE FROM person_aliases WHERE alias_type IN ({placeholders})", _SHORT_ALIAS_TYPES
+    )
+
     people_rows = repository.all_people(conn)
-    full_name_by_person = {row["person_id"]: row["canonical_name"] for row in people_rows}
-    person_id_by_name = {name: person_id for person_id, name in full_name_by_person.items()}
+    full_name_by_subject = {
+        row["subject_id"]: row["display_name"] for row in people_rows if row["display_name"]
+    }
+    subject_id_by_name = {name: subject_id for subject_id, name in full_name_by_subject.items()}
 
     promoted_aliases: set[str] = set()
     reviewed_short: list[str] = []
     for entry in reviewed:
-        person_id = person_id_by_name.get(entry.canonical_name)
-        if person_id is None:
+        subject_id = subject_id_by_name.get(entry.canonical_name)
+        if subject_id is None:
             # seed_and_discover always creates a person for every manifest
-            # entry before this runs; this should be unreachable outside
-            # of a direct unit-test calling this helper in isolation.
+            # entry before this runs, unless the entry's canonical_name is
+            # itself a known display_alias (already someone's identity, not
+            # a name to promote); otherwise unreachable outside of a direct
+            # unit-test calling this helper in isolation.
             continue
         for verified in entry.verified_aliases:
-            repository.add_alias(conn, person_id, verified.alias, verified.alias_type)
+            repository.add_alias(conn, subject_id, verified.alias, verified.alias_type)
             promoted_aliases.add(verified.alias)
             if verified.alias_type != AliasType.EMAIL.value:
                 reviewed_short.append(
@@ -341,8 +388,8 @@ def _apply_reviewed_short_aliases(
                 )
 
     candidates: set[str] = set()
-    for canonical_name in full_name_by_person.values():
-        parts = canonical_name.split()
+    for display_name in full_name_by_subject.values():
+        parts = display_name.split()
         if len(parts) < 2:
             continue
         candidates.add(parts[0])
@@ -383,56 +430,71 @@ def _observed_independently(candidate: str, full_name: str, all_text: str) -> bo
 
 
 def _unique_short_name_owners(people_rows: list[sqlite3.Row]) -> dict[str, str]:
-    """First/last/initials derived from each confirmed person's canonical
+    """First/last/initials derived from each confirmed person's display
     name, keeping a token only when it resolves to exactly one person.
 
     This is deliberately separate from person_aliases: MENTIONED-detection
-    recall and deletion-relevant alias promotion are different concerns
-    with different risk profiles. CLAUDE.md requires that "a confirmed
-    person explicitly named inside their text may still receive a
-    MENTIONED relationship" -- in practice that is very often just a
-    first name ("Kwame told me...") -- but person_aliases specifically
-    drives future deletion target resolution (CLAUDE.md 18.1), so only a
-    human-reviewed manifest entry may add a short form there. A token is
-    still never guessed here when it is ambiguous between two confirmed
-    people (e.g. "Nadia"), matching the same caution applied to alias
-    promotion."""
+    recall and identity-alias promotion are different concerns with
+    different risk profiles. CLAUDE.md requires that "a confirmed person
+    explicitly named inside their text may still receive a MENTIONED
+    relationship" -- in practice that is very often just a first name
+    ("Kwame told me...") -- but person_aliases specifically drives future
+    pseudonymisation target resolution (CLAUDE.md 18.1's identifier-scope
+    spirit), so only a human-reviewed manifest entry may add a short form
+    there. A token is still never guessed here when it is ambiguous between
+    two confirmed people (e.g. "Nadia"), matching the same caution applied
+    to alias promotion. A person with no display_name (PSEUDONYMISED) has
+    nothing to derive a short form from and is skipped."""
     owners: dict[str, set[str]] = {}
     for row in people_rows:
-        parts = row["canonical_name"].split()
+        if not row["display_name"]:
+            continue
+        parts = row["display_name"].split()
         if len(parts) < 2:
             continue
         for token in (parts[0], parts[-1], "".join(p[0] for p in parts).upper()):
-            owners.setdefault(token, set()).add(row["person_id"])
+            owners.setdefault(token, set()).add(row["subject_id"])
     return {token: next(iter(ids)) for token, ids in owners.items() if len(ids) == 1}
 
 
 def link_mentions(
     conn: sqlite3.Connection, evidence_id: str, raw_text: str, exclude: set[str]
 ) -> int:
-    """Tag every known person whose alias appears in raw_text as
-    MENTIONED, except those already linked with a stronger relation
-    (AUTHOR/SPEAKER) on this same unit. Also recognizes an unambiguous
-    plain first-name/last-name/initials reference to a confirmed person
-    even when that short form was never promoted to person_aliases (see
-    _unique_short_name_owners)."""
+    """Tag every known subject whose alias appears in raw_text as MENTIONED,
+    except those already linked with a stronger relation (AUTHOR/SPEAKER) on
+    this same unit. Matches both person_aliases rows (an ACTIVE person's
+    name/email/reviewed short forms) and every subject's own display_alias:
+    the latter is what re-establishes a MENTIONED link to a PSEUDONYMISED
+    subject after their source text was rewritten to say their alias
+    instead of their name -- without it, a rebuild after pseudonymisation
+    would silently lose every MENTIONED-only relationship. Also recognizes
+    an unambiguous plain first-name/last-name/initials reference to a
+    confirmed ACTIVE person even when that short form was never promoted to
+    person_aliases (see _unique_short_name_owners)."""
     linked = 0
     seen_people: set[str] = set()
-    for row in repository.all_aliases(conn):
-        person_id, alias = row["person_id"], row["alias"]
-        if person_id in exclude or person_id in seen_people:
+
+    candidates: list[tuple[str, str]] = [
+        (row["subject_id"], row["alias"]) for row in repository.all_aliases(conn)
+    ]
+    candidates.extend(
+        (row["subject_id"], row["display_alias"]) for row in repository.all_people(conn)
+    )
+
+    for subject_id, alias in candidates:
+        if subject_id in exclude or subject_id in seen_people:
             continue
         if re.search(r"\b" + re.escape(alias) + r"\b", raw_text):
-            repository.link_evidence_person(conn, evidence_id, person_id, PersonRelation.MENTIONED)
-            seen_people.add(person_id)
+            repository.link_evidence_person(conn, evidence_id, subject_id, PersonRelation.MENTIONED)
+            seen_people.add(subject_id)
             linked += 1
 
-    for token, person_id in _unique_short_name_owners(repository.all_people(conn)).items():
-        if person_id in exclude or person_id in seen_people:
+    for token, subject_id in _unique_short_name_owners(repository.all_people(conn)).items():
+        if subject_id in exclude or subject_id in seen_people:
             continue
         if re.search(r"\b" + re.escape(token) + r"\b", raw_text):
-            repository.link_evidence_person(conn, evidence_id, person_id, PersonRelation.MENTIONED)
-            seen_people.add(person_id)
+            repository.link_evidence_person(conn, evidence_id, subject_id, PersonRelation.MENTIONED)
+            seen_people.add(subject_id)
             linked += 1
 
     return linked

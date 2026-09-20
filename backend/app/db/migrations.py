@@ -2,23 +2,20 @@ import sqlite3
 
 from app.db.connection import apply_schema
 
-# Tables ingestion fully regenerates from data/source/ (plus the reviewed
-# identity manifest, for people/person_aliases, and source_locators, for
-# evidence_units) on every run. Dropping them before re-ingesting is what
-# makes rebuild idempotent instead of accumulating duplicates -- and, for
-# people/person_aliases specifically, what stops a stale false identity
-# from a earlier, looser extraction pass from surviving forever just
-# because INSERT OR IGNORE never removes anything. Identity is derived
-# fresh each run from two sanitizable inputs (data/source/ and
-# data/source/reviewed_identities.json), so dropping and rebuilding it is
-# safe: a deleted person's traces are already gone from both inputs by
-# the time a rebuild runs.
+# Tables ingestion fully regenerates from data/source/ on every run.
+# Dropping them before re-ingesting is what makes rebuild idempotent
+# instead of accumulating duplicates. people/person_aliases are
+# deliberately NOT in this list (Architecture v1.6, CLAUDE.md 18.0): a
+# subject's subject_id and display_alias must survive a rebuild, so
+# identity is now persistent state that ingestion matches against and
+# updates in place (app/ingestion/people.py), not a name-derived value
+# recomputed fresh every run. evidence_people stays rebuildable: it is a
+# pure join of the now-stable subject_id against the already-stable
+# evidence_id, so recomputing it every run is still safe.
 _REBUILDABLE_TABLES = [
     "evidence_fts",
     "evidence_embeddings",
     "evidence_people",
-    "person_aliases",
-    "people",
     "evidence_units",
     "documents",
 ]
@@ -26,6 +23,7 @@ _REBUILDABLE_TABLES = [
 
 def initialize(conn: sqlite3.Connection) -> None:
     _ensure_fts_indexes_context(conn)
+    _ensure_subject_identity_schema(conn)
     apply_schema(conn)
     _ensure_source_locators_revoked_at_column(conn)
     # An index built before the indexed text changed is rebuilt from the units.
@@ -110,6 +108,39 @@ def _ensure_source_locators_revoked_at_column(conn: sqlite3.Connection) -> None:
     if "starts_group" not in columns:
         conn.execute("ALTER TABLE source_locators ADD COLUMN starts_group INTEGER")
     conn.commit()
+
+
+def _ensure_subject_identity_schema(conn: sqlite3.Connection) -> None:
+    """One-time migration off the retired v1.5 name-derived identity schema
+    (people.person_id/canonical_name) onto the v1.6 subject model
+    (people.subject_id/display_alias -- CLAUDE.md 18.0). `CREATE TABLE IF
+    NOT EXISTS` cannot change an existing table's columns, so a database
+    created before this migration needs an explicit, guarded reset.
+
+    people/person_aliases/evidence_people are safe to drop here even though
+    they are otherwise persistent (see _REBUILDABLE_TABLES's comment)
+    specifically because there is no reversible translation from a
+    name-derived person_id to a random subject_id -- carrying old rows
+    forward would either fabricate a subject_id from the very name-derived
+    material v1.6 exists to eliminate, or leave a mixed schema where some
+    records use the old identity and some the new one, which AGENTS.md/
+    CLAUDE.md 18.0 explicitly rules out. Every one of these rows is, by the
+    same rebuildable-identity contract that used to reset them every
+    ingest, fully re-derivable from data/source/ plus the reviewed identity
+    manifest: the next ingestion run repopulates them under fresh, random
+    subject_ids, and every ingest after that preserves those.
+    """
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(people)")}
+    if not columns or "subject_id" in columns:
+        return
+    conn.commit()  # PRAGMA foreign_keys is a no-op inside a transaction
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        for table in ("evidence_people", "person_aliases", "people"):
+            conn.execute(f"DROP TABLE IF EXISTS {table}")
+        conn.commit()
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
 
 
 def reset_rebuildable_tables(conn: sqlite3.Connection) -> None:

@@ -3,13 +3,19 @@
 
 # Runtime database and generated artifacts (data/source/ IS tracked; this is
 # not). Wildcarded rather than named after one default filename, since
-# DATABASE_PATH is configurable.
+# DATABASE_PATH/PSEUDONYM_VAULT_PATH are configurable.
 data/*.db
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 data/artifacts/
 data/cache/
+data/privacy_ops/
+
+# Architecture v1.6 isolated reversal vault (CLAUDE.md 18.0.3): the most
+# sensitive directory in the app -- it must never be committed, regardless
+# of PSEUDONYM_VAULT_PATH's configured filename.
+data/private-vault/
 
 # Python
 __pycache__/

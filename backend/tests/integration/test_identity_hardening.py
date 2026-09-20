@@ -54,34 +54,67 @@ def test_repeated_ingestion_produces_identical_identity_rows(tmp_path, conn):
     _write_corpus(source)
 
     ingest(conn, source, embedding_provider=None)
-    people_after_first = {row["canonical_name"] for row in repository.all_people(conn)}
-    aliases_after_first = {(row["person_id"], row["alias"]) for row in repository.all_aliases(conn)}
-
-    ingest(conn, source, embedding_provider=None)
-    people_after_second = {row["canonical_name"] for row in repository.all_people(conn)}
-    aliases_after_second = {
-        (row["person_id"], row["alias"]) for row in repository.all_aliases(conn)
+    people_after_first = {
+        row["subject_id"]: row["display_name"] for row in repository.all_people(conn)
+    }
+    aliases_after_first = {
+        (row["subject_id"], row["alias"]) for row in repository.all_aliases(conn)
     }
 
+    ingest(conn, source, embedding_provider=None)
+    people_after_second = {
+        row["subject_id"]: row["display_name"] for row in repository.all_people(conn)
+    }
+    aliases_after_second = {
+        (row["subject_id"], row["alias"]) for row in repository.all_aliases(conn)
+    }
+
+    # Architecture v1.6: identity is persistent (CLAUDE.md 18.0), so this is
+    # no longer just "the same names come back" -- it is the *same*
+    # subject_id for each of them, proving a rebuild never mints a second
+    # identity for someone already known.
     assert people_after_first == people_after_second
     assert aliases_after_first == aliases_after_second
 
 
-def test_contaminated_identity_rows_are_removed_on_rebuild(tmp_path, conn):
+def test_contaminated_identity_rows_are_pruned_on_rebuild(tmp_path, conn):
+    """Architecture v1.6 replaces the old fully-rebuildable people table
+    (which self-healed by being dropped every run) with a persistent one
+    that must instead prune away exactly the rows nothing in the current
+    source/manifest resolves to (repository.prune_orphaned_active_people,
+    called from ingest()) -- restoring the same self-healing guarantee
+    without weakening subject_id stability for anyone genuinely still
+    present.
+
+    The stray name below is deliberately synthetic and absent from
+    _TRANSCRIPT/_EMAIL: a name that happens to also appear verbatim in real
+    corpus text (e.g. this module's own "Risk Fresh Phase" false-positive
+    fixture) would legitimately earn a MENTIONED relation from the mention
+    scan and *should* survive -- that is a different, correctly-working
+    code path (app/ingestion/people.py's _unique_short_name_owners), not
+    the orphan case this test isolates. The realistic version of this
+    failure mode is a person whose name was subsequently removed from
+    data/source/ entirely, or a stray direct-DB insert (an earlier,
+    looser extraction pass) that never corresponds to anything in the
+    current corpus at all."""
     source = tmp_path / "source"
     _write_corpus(source)
 
-    # Simulate the exact failure mode this hardening pass fixes: a false
-    # identity left over from an earlier, looser extraction pass.
-    repository.get_or_create_person(conn, "Risk Fresh Phase")
-    repository.add_alias(conn, "risk-fresh-phase", "Bakery", "FIRST_NAME")
+    stray_subject_id = repository.get_or_create_subject(conn, "Zzyx Orphaned Contamination")
+    repository.add_alias(conn, stray_subject_id, "Zzyx Orphaned Contamination", "FULL_NAME")
+    repository.add_alias(conn, stray_subject_id, "Zzyxvariant", "NICKNAME")
     conn.commit()
-    assert repository.find_person_id_by_canonical_name(conn, "Risk Fresh Phase") is not None
+    assert (
+        repository.find_subject_id_by_structural_name(conn, "Zzyx Orphaned Contamination")
+        is not None
+    )
 
     ingest(conn, source, embedding_provider=None)
 
-    assert repository.find_person_id_by_canonical_name(conn, "Risk Fresh Phase") is None
-    assert repository.find_person_ids_by_alias(conn, "Bakery") == []
+    assert (
+        repository.find_subject_id_by_structural_name(conn, "Zzyx Orphaned Contamination") is None
+    )
+    assert repository.find_subject_ids_by_alias(conn, "Zzyxvariant") == []
 
 
 def test_report_counts_match_actual_sql_counts(tmp_path, conn):
@@ -103,9 +136,9 @@ def test_reviewed_manifest_person_survives_rebuild_alongside_structural_people(t
 
     ingest(conn, source, embedding_provider=None)
 
-    assert repository.find_person_id_by_canonical_name(conn, "Tobias Ekström") is not None
-    assert repository.find_person_id_by_canonical_name(conn, "Marco Rossi") is not None
-    assert repository.find_person_id_by_canonical_name(conn, "Risk Fresh Phase") is None
+    assert repository.find_subject_id_by_structural_name(conn, "Tobias Ekström") is not None
+    assert repository.find_subject_id_by_structural_name(conn, "Marco Rossi") is not None
+    assert repository.find_subject_id_by_structural_name(conn, "Risk Fresh Phase") is None
 
 
 def test_malformed_manifest_fails_before_destructive_reset(tmp_path, conn):
@@ -133,9 +166,9 @@ def test_malformed_manifest_fails_before_destructive_reset(tmp_path, conn):
 
 
 def test_source_locators_persist_across_identity_rebuild(tmp_path, conn):
-    """people/person_aliases are now rebuildable, but source_locators must
-    still be the one table that stays persistent -- this is what keeps
-    Evidence IDs stable across the same rebuild that regenerates identity."""
+    """source_locators, like people/person_aliases (Architecture v1.6,
+    CLAUDE.md 18.0), is persistent across rebuild -- this is what keeps
+    Evidence IDs stable across the same rebuild that re-links identity."""
     source = tmp_path / "source"
     _write_corpus(source)
 

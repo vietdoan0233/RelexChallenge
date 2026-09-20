@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 
-// A tiny hash router: three pages do not justify a routing dependency, and a
-// hash URL keeps a Case link shareable without any server configuration.
+// A tiny hash router: a handful of pages do not justify a routing
+// dependency, and a hash URL keeps a Case/profile link shareable without
+// any server configuration.
 export type Route =
   | { page: 'ask'; prefill?: string }
   | { page: 'case'; caseId: string }
   | { page: 'privacy' }
   | { page: 'radar' }
   | { page: 'evidence' }
+  | { page: 'person'; subjectId: string }
 
 function parse(hash: string): Route {
   const [path, query = ''] = hash.replace(/^#/, '').split('?')
@@ -16,6 +18,7 @@ function parse(hash: string): Route {
   if (parts[0] === 'privacy') return { page: 'privacy' }
   if (parts[0] === 'radar') return { page: 'radar' }
   if (parts[0] === 'add-evidence') return { page: 'evidence' }
+  if (parts[0] === 'people' && parts[1]) return { page: 'person', subjectId: parts[1] }
   return { page: 'ask', prefill: new URLSearchParams(query).get('q') ?? undefined }
 }
 
@@ -38,5 +41,8 @@ export const go = {
   },
   privacy: () => {
     window.location.hash = '#/privacy'
+  },
+  person: (subjectId: string) => {
+    window.location.hash = `#/people/${subjectId}`
   },
 }

@@ -27,18 +27,20 @@ class EvidenceUnit(BaseModel):
 
 
 class Person(BaseModel):
-    person_id: str
-    canonical_name: str
+    subject_id: str
+    display_alias: str
+    privacy_state: str = "ACTIVE"
+    display_name: str | None = None
 
 
 class PersonAlias(BaseModel):
     alias_id: str
-    person_id: str
+    subject_id: str
     alias: str
     alias_type: str
 
 
 class EvidencePersonLink(BaseModel):
     evidence_id: str
-    person_id: str
+    subject_id: str
     relation: PersonRelation

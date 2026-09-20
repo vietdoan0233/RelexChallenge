@@ -23,12 +23,22 @@ class EvidenceRecord:
     thread_context: str | None
     raw_text: str
     is_truncated: bool
+    # The AUTHOR/SPEAKER subject for this unit, if the speaker/sender text
+    # resolved to a known participant -- None for an anonymous label ("Me",
+    # "Them", a Teams guest) or free text that never resolved to anyone. Lets
+    # the UI make a speaker/sender/citation clickable to that subject's
+    # universal profile (CLAUDE.md 19.D) without a second round trip.
+    subject_id: str | None
 
 
 _HYDRATE_SQL = """
     SELECT e.evidence_id, e.document_id, d.filename, d.document_type,
            d.title AS document_title, e.unit_index, e.speaker_sender, e.event_date,
-           e.timestamp_text, e.thread_context, e.raw_text, e.is_truncated
+           e.timestamp_text, e.thread_context, e.raw_text, e.is_truncated,
+           (SELECT ep.subject_id FROM evidence_people ep
+            WHERE ep.evidence_id = e.evidence_id AND ep.relation IN ('AUTHOR', 'SPEAKER')
+            ORDER BY CASE ep.relation WHEN 'AUTHOR' THEN 0 ELSE 1 END
+            LIMIT 1) AS subject_id
     FROM evidence_units e JOIN documents d ON d.document_id = e.document_id
 """
 
@@ -51,6 +61,7 @@ def _to_record(row: sqlite3.Row) -> EvidenceRecord:
         thread_context=row["thread_context"],
         raw_text=row["raw_text"],
         is_truncated=bool(row["is_truncated"]),
+        subject_id=row["subject_id"],
     )
 
 

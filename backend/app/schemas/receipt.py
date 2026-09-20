@@ -109,6 +109,10 @@ class Citation(BaseModel):
     thread_context: str | None
     raw_text: str
     is_truncated: bool
+    # The AUTHOR/SPEAKER subject for this unit, or None for an anonymous
+    # label / unresolved free text. Lets the UI link speaker_sender to that
+    # participant's universal profile (CLAUDE.md 19.D) without a lookup.
+    subject_id: str | None = None
 
     @classmethod
     def from_record(cls, record: EvidenceRecord) -> "Citation":
@@ -124,6 +128,7 @@ class Citation(BaseModel):
             thread_context=record.thread_context,
             raw_text=record.raw_text,
             is_truncated=record.is_truncated,
+            subject_id=record.subject_id,
         )
 
 

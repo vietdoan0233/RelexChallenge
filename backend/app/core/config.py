@@ -33,6 +33,30 @@ class Settings(BaseSettings):
     database_path: str = "./data/app.db"
     source_data_dir: str = "./data/source"
 
+    # Architecture v1.6 (AGENTS.md/CLAUDE.md 18.0.3): the reversal vault is a
+    # separate encrypted file, never a table inside database_path, so a plain
+    # SQLite connection to the main database has no path to it at all.
+    pseudonym_vault_path: str = "./data/private-vault/vault.db.enc"
+    pseudonym_vault_key: str = ""
+
+    # Gates POST /api/privacy/pseudonymise and the admin reversal endpoint.
+    # Empty means "not configured" -- both endpoints fail closed (401) rather
+    # than treating a missing token as "no auth required".
+    privacy_admin_token: str = ""
+
+    # The known clean-archive baseline for this challenge's 45-document
+    # corpus (AGENTS.md/CLAUDE.md checkpoint, confirmed by the 2026-09-19
+    # audit; pseudonymisation/reversal never change these counts, since
+    # neither ever adds/removes an Evidence Unit). /api/readiness compares
+    # the live counts against these exactly, rather than merely "non-zero",
+    # so a partially-ingested or silently drifted archive is reported
+    # not-ready. Configurable (not a bare literal in main.py) so a test can
+    # point them at a smaller synthetic fixture's real counts instead.
+    expected_document_count: int = 45
+    expected_evidence_unit_count: int = 2534
+    expected_fts_row_count: int = 2534
+    expected_embedding_row_count: int = 2534
+
     @property
     def app_name_display(self) -> str:
         return self.app_name or _DEFAULT_APP_NAME
@@ -40,6 +64,10 @@ class Settings(BaseSettings):
     @property
     def database_path_resolved(self) -> Path:
         return _resolve(self.database_path)
+
+    @property
+    def pseudonym_vault_path_resolved(self) -> Path:
+        return _resolve(self.pseudonym_vault_path)
 
     @property
     def privacy_ops_dir_resolved(self) -> Path:

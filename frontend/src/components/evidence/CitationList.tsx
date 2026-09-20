@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Citation } from '../../types/api'
 import { formatDate } from '../../lib'
 import { IconChevronDown, IconFile, IconMail, IconMic } from '../icons'
+import { PersonLink } from '../PersonLink'
 
 export function DocIcon({ type, size = 16 }: { type: string; size?: number }) {
   if (type === 'TRANSCRIPT') return <IconMic size={size} />
@@ -38,7 +39,11 @@ export function SourceChip({
         </span>
         <span className="text-ink-2">{c.document_title ?? c.document_id}</span>
         <span>· {formatDate(c.event_date)}</span>
-        {c.speaker_sender && <span>· {c.speaker_sender}</span>}
+        {c.speaker_sender && (
+          <span>
+            · <PersonLink subjectId={c.subject_id} name={c.speaker_sender} />
+          </span>
+        )}
       </span>
       <span className="mt-1.5 line-clamp-3 block text-sm leading-relaxed text-ink">{c.raw_text}</span>
       <span className="mt-1 flex items-center justify-between text-xs font-bold text-brand-ink">
@@ -59,17 +64,19 @@ export function SourceRow({ citation: c, onOpen, note }: { citation: Citation; o
       className="group flex w-full cursor-pointer items-start gap-2 rounded-md py-[6px] text-left transition-colors duration-200 hover:bg-surface-2"
     >
       <span className="mt-0.5 shrink-0 text-ink-3">
-        <DocIcon type={c.document_type} size={14} />
+        <DocIcon type={c.document_type} size={15} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[10px] font-bold leading-[13px] text-ink">{c.document_title ?? c.filename}</span>
         {note ? (
           <span className="line-clamp-2 block text-[9px] leading-[11px] text-ink-3" title={note}>{note}</span>
         ) : (
-          <span className="block truncate text-[9px] leading-[12px] text-ink-3">{c.speaker_sender ?? c.filename}</span>
+          <span className="block truncate text-[9px] leading-[12px] text-ink-3">
+            {c.speaker_sender ? <PersonLink subjectId={c.subject_id} name={c.speaker_sender} /> : c.filename}
+          </span>
         )}
       </span>
-      <span className="shrink-0 whitespace-nowrap text-[9px] text-ink-3">{formatDate(c.event_date)}</span>
+      <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-ink-3">{formatDate(c.event_date)}</span>
     </button>
   )
 }

@@ -72,7 +72,7 @@ def test_named_transcript_speaker_is_a_confirmed_person(conn, tmp_path):
         )
     ]
     people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_id_by_canonical_name(conn, "Marco Rossi") is not None
+    assert repository.find_subject_id_by_structural_name(conn, "Marco Rossi") is not None
 
 
 def test_email_sender_is_confirmed_and_address_linked(conn, tmp_path):
@@ -87,10 +87,10 @@ def test_email_sender_is_confirmed_and_address_linked(conn, tmp_path):
         )
     ]
     people.seed_and_discover(conn, docs, tmp_path)
-    person_id = repository.find_person_id_by_canonical_name(conn, "Ana Duarte")
-    assert person_id is not None
+    subject_id = repository.find_subject_id_by_structural_name(conn, "Ana Duarte")
+    assert subject_id is not None
     aliases = {
-        row["alias"] for row in repository.all_aliases(conn) if row["person_id"] == person_id
+        row["alias"] for row in repository.all_aliases(conn) if row["subject_id"] == subject_id
     }
     assert "Ana Duarte" in aliases
     assert "ana@example.com" in aliases
@@ -110,8 +110,8 @@ def test_anonymous_me_and_them_never_become_people(conn, tmp_path):
         )
     ]
     people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_id_by_canonical_name(conn, "Me") is None
-    assert repository.find_person_id_by_canonical_name(conn, "Them") is None
+    assert repository.find_subject_id_by_structural_name(conn, "Me") is None
+    assert repository.find_subject_id_by_structural_name(conn, "Them") is None
 
 
 def test_unknown_speaker_label_never_becomes_a_person(conn, tmp_path):
@@ -121,7 +121,7 @@ def test_unknown_speaker_label_never_becomes_a_person(conn, tmp_path):
         )
     ]
     people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_id_by_canonical_name(conn, "Unknown Speaker") is None
+    assert repository.find_subject_id_by_structural_name(conn, "Unknown Speaker") is None
 
 
 # ------------------------------------------------- reserved redaction markers
@@ -137,7 +137,7 @@ def test_every_reserved_marker_is_excluded_from_structural_person_discovery(conn
         )
     ]
     people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_id_by_canonical_name(conn, marker) is None
+    assert repository.find_subject_id_by_structural_name(conn, marker) is None
 
 
 @pytest.mark.parametrize("marker", ["[REDACTED PERSON]", "[REDACTED SPEAKER]", "[REDACTED SENDER]"])
@@ -171,7 +171,7 @@ def test_redacted_person_marker_inline_is_only_text_not_a_person_or_mention(conn
     text = "[REDACTED PERSON] told me the extraction succeeded."
     docs = [_doc("TRANSCRIPT", [ParsedUnit(raw_text=text, speaker_sender="Me")])]
     report = people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_id_by_canonical_name(conn, "[REDACTED PERSON]") is None
+    assert repository.find_subject_id_by_structural_name(conn, "[REDACTED PERSON]") is None
     assert "[REDACTED PERSON]" not in report.rejected_candidates
     assert "[REDACTED PERSON]" not in report.unresolved_alias_candidates
 
@@ -199,7 +199,7 @@ def test_confirmed_person_named_inside_anonymous_text_can_be_mentioned(conn, tmp
         ),
     ]
     people.seed_and_discover(conn, docs, tmp_path)
-    kwame_id = repository.find_person_id_by_canonical_name(conn, "Kwame Boateng")
+    kwame_id = repository.find_subject_id_by_structural_name(conn, "Kwame Boateng")
     assert kwame_id is not None
 
     _seed_evidence_unit(
@@ -211,7 +211,7 @@ def test_confirmed_person_named_inside_anonymous_text_can_be_mentioned(conn, tmp
     assert linked == 1
     rows = repository.evidence_people_for(conn, "EV-1")
     assert (kwame_id, PersonRelation.MENTIONED.value) in [
-        (r["person_id"], r["relation"]) for r in rows
+        (r["subject_id"], r["relation"]) for r in rows
     ]
 
 
@@ -230,7 +230,7 @@ def test_arbitrary_capitalized_span_never_becomes_a_person(conn, tmp_path):
         )
     ]
     report = people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_id_by_canonical_name(conn, "Risk Fresh Phase") is None
+    assert repository.find_subject_id_by_structural_name(conn, "Risk Fresh Phase") is None
     assert "Risk Fresh Phase" in report.rejected_candidates
 
 
@@ -262,7 +262,7 @@ def test_known_false_positive_phrases_are_never_stored_as_people_or_aliases(conn
         "Chief Financial Officer",
     }
     for name in rejected_names:
-        assert repository.find_person_id_by_canonical_name(conn, name) is None, name
+        assert repository.find_subject_id_by_structural_name(conn, name) is None, name
     all_aliases = {row["alias"] for row in repository.all_aliases(conn)}
     assert not (rejected_names & all_aliases)
     assert "Bakery" not in all_aliases
@@ -285,7 +285,7 @@ def test_text_only_mention_is_rejected_without_a_reviewed_manifest_entry(conn, t
         )
     ]
     report = people.seed_and_discover(conn, docs, tmp_path)  # no manifest file in tmp_path
-    assert repository.find_person_id_by_canonical_name(conn, "Tobias Ekström") is None
+    assert repository.find_subject_id_by_structural_name(conn, "Tobias Ekström") is None
     assert "Tobias Ekström" in report.rejected_candidates
 
 
@@ -307,7 +307,7 @@ def test_reviewed_manifest_entry_becomes_a_confirmed_person(conn, tmp_path):
         )
     ]
     report = people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_id_by_canonical_name(conn, "Tobias Ekström") is not None
+    assert repository.find_subject_id_by_structural_name(conn, "Tobias Ekström") is not None
     assert "Tobias Ekström" in report.reviewed_text_only
 
 
@@ -332,17 +332,17 @@ def test_nadia_haddad_and_nadia_oberg_are_separate_confirmed_people(conn, tmp_pa
     ]
     report = people.seed_and_discover(conn, docs, tmp_path)
 
-    haddad_id = repository.find_person_id_by_canonical_name(conn, "Nadia Haddad")
-    oberg_id = repository.find_person_id_by_canonical_name(conn, "Nadia Öberg")
+    haddad_id = repository.find_subject_id_by_structural_name(conn, "Nadia Haddad")
+    oberg_id = repository.find_subject_id_by_structural_name(conn, "Nadia Öberg")
     assert haddad_id is not None
     assert oberg_id is not None
     assert haddad_id != oberg_id
 
     # "Not Nadia Öberg" must never itself become a person, and a bare
     # "Nadia" must remain unresolved between the two.
-    assert repository.find_person_id_by_canonical_name(conn, "Not Nadia Öberg") is None
+    assert repository.find_subject_id_by_structural_name(conn, "Not Nadia Öberg") is None
     assert "Nadia" in report.unresolved_alias_candidates
-    assert repository.find_person_ids_by_alias(conn, "Nadia") == []
+    assert repository.find_subject_ids_by_alias(conn, "Nadia") == []
 
 
 # -------------------------------------------------------- alias promotion
@@ -363,7 +363,7 @@ def test_unique_first_name_inside_its_own_full_name_is_not_promoted(conn, tmp_pa
         )
     ]
     report = people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_ids_by_alias(conn, "Ahmed") == []
+    assert repository.find_subject_ids_by_alias(conn, "Ahmed") == []
     assert "Ahmed" in report.unresolved_alias_candidates
 
 
@@ -374,7 +374,7 @@ def test_unique_last_name_inside_its_own_full_name_is_not_promoted(conn, tmp_pat
         _doc("EMAIL", [ParsedUnit(raw_text="Hello from the team.", speaker_sender="Marco Rossi")])
     ]
     report = people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_ids_by_alias(conn, "Rossi") == []
+    assert repository.find_subject_ids_by_alias(conn, "Rossi") == []
     assert "Rossi" in report.unresolved_alias_candidates
 
 
@@ -393,7 +393,7 @@ def test_independently_observed_short_token_is_not_auto_promoted_without_review(
         )
     ]
     report = people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_ids_by_alias(conn, "Rossi") == []
+    assert repository.find_subject_ids_by_alias(conn, "Rossi") == []
     assert "Rossi" in report.unresolved_alias_candidates
 
 
@@ -422,12 +422,12 @@ def test_reviewed_short_alias_with_evidence_is_accepted(conn, tmp_path):
     ]
     report = people.seed_and_discover(conn, docs, tmp_path)
 
-    rossi_id = repository.find_person_id_by_canonical_name(conn, "Marco Rossi")
-    assert repository.find_person_ids_by_alias(conn, "Rossi") == [rossi_id]
+    rossi_id = repository.find_subject_id_by_structural_name(conn, "Marco Rossi")
+    assert repository.find_subject_ids_by_alias(conn, "Rossi") == [rossi_id]
     alias_types = {
         row["alias_type"]
         for row in repository.all_aliases(conn)
-        if row["person_id"] == rossi_id and row["alias"] == "Rossi"
+        if row["subject_id"] == rossi_id and row["alias"] == "Rossi"
     }
     assert alias_types == {"LAST_NAME"}
     assert "Rossi" not in report.unresolved_alias_candidates
@@ -450,7 +450,7 @@ def test_ambiguous_alias_stays_unresolved_even_if_independently_observed(conn, t
         ),
     ]
     report = people.seed_and_discover(conn, docs, tmp_path)
-    assert repository.find_person_ids_by_alias(conn, "Rossi") == []
+    assert repository.find_subject_ids_by_alias(conn, "Rossi") == []
     assert "Rossi" in report.unresolved_alias_candidates
 
 
@@ -476,8 +476,8 @@ def test_unique_first_name_mention_is_recognized_without_being_a_stored_alias(co
         ),
     ]
     people.seed_and_discover(conn, docs, tmp_path)
-    kwame_id = repository.find_person_id_by_canonical_name(conn, "Kwame Boateng")
-    assert repository.find_person_ids_by_alias(conn, "Kwame") == []
+    kwame_id = repository.find_subject_id_by_structural_name(conn, "Kwame Boateng")
+    assert repository.find_subject_ids_by_alias(conn, "Kwame") == []
 
     _seed_evidence_unit(
         conn, "EV-2", "Kwame told me the extraction succeeded.", document_id="doc-anon"
@@ -488,7 +488,7 @@ def test_unique_first_name_mention_is_recognized_without_being_a_stored_alias(co
     assert linked == 1
     rows = repository.evidence_people_for(conn, "EV-2")
     assert (kwame_id, PersonRelation.MENTIONED.value) in [
-        (r["person_id"], r["relation"]) for r in rows
+        (r["subject_id"], r["relation"]) for r in rows
     ]
 
 
@@ -519,7 +519,7 @@ def test_ambiguous_first_name_is_not_guessed_for_mentions(conn, tmp_path):
 def test_speaker_is_excluded_from_their_own_mentioned_links(conn, tmp_path):
     docs = [_doc("EMAIL", [ParsedUnit(raw_text="Ana Duarte here.", speaker_sender="Ana Duarte")])]
     people.seed_and_discover(conn, docs, tmp_path)
-    ana_id = repository.find_person_id_by_canonical_name(conn, "Ana Duarte")
+    ana_id = repository.find_subject_id_by_structural_name(conn, "Ana Duarte")
     _seed_evidence_unit(conn, "EV-doc1-m0", "Ana Duarte here.")
     linked = people.link_mentions(conn, "EV-doc1-m0", "Ana Duarte here.", exclude={ana_id})
     assert linked == 0

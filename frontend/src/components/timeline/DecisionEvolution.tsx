@@ -1,6 +1,7 @@
 import type { ReceiptTimelineEvent, Stance } from '../../types/api'
 import { formatDate } from '../../lib'
 import { IconCheck } from '../icons'
+import { PersonLink } from '../PersonLink'
 
 const pretty = (v: Stance) => v.replaceAll('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase())
 
@@ -38,6 +39,12 @@ export function DecisionEvolution({
             <div className="mt-0.5 pr-1">
               <time className="block text-[9px] leading-[13px] text-ink-3">
                 {formatDate(event.event_date)} · {pretty(event.state)}
+                {first?.speaker_sender && (
+                  <>
+                    {' '}
+                    · <PersonLink subjectId={first.subject_id} name={first.speaker_sender} />
+                  </>
+                )}
               </time>
               <button
                 type="button"
@@ -59,6 +66,12 @@ export function DecisionEvolution({
                       className="cursor-pointer rounded-full border border-line px-1.5 text-[8.5px] font-semibold text-brand-ink transition-colors duration-200 hover:border-brand hover:bg-brand-soft"
                     >
                       Source {i + 2}
+                      {c.speaker_sender && (
+                        <>
+                          {' '}
+                          · <PersonLink subjectId={c.subject_id} name={c.speaker_sender} />
+                        </>
+                      )}
                     </button>
                   ))}
                 </span>

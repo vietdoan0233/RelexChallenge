@@ -61,22 +61,22 @@ def test_every_evidence_unit_is_inspectable_by_its_evidence_id(conn):
 
 
 def test_kwame_boateng_is_a_known_person_with_evidence_links(conn):
-    # The practice questions use Kwame Boateng as the deletion test
-    # subject (P7); Phase 5 depends on him being resolvable now.
+    # The practice questions use Kwame Boateng as the deletion/pseudonymisation
+    # test subject (P7); Architecture v1.6 depends on him being resolvable now.
     ingest(conn, _SOURCE_DIR, embedding_provider=None)
-    person_id = repository.find_person_id_by_canonical_name(conn, "Kwame Boateng")
-    assert person_id is not None
+    subject_id = repository.find_subject_id_by_structural_name(conn, "Kwame Boateng")
+    assert subject_id is not None
     rows = conn.execute(
-        "SELECT COUNT(*) AS n FROM evidence_people WHERE person_id = ?", (person_id,)
+        "SELECT COUNT(*) AS n FROM evidence_people WHERE subject_id = ?", (subject_id,)
     ).fetchone()
     assert rows["n"] > 0
 
 
 def test_nadia_ambiguity_is_preserved_in_the_real_archive(conn):
     ingest(conn, _SOURCE_DIR, embedding_provider=None)
-    haddad_id = repository.find_person_id_by_canonical_name(conn, "Nadia Haddad")
+    haddad_id = repository.find_subject_id_by_structural_name(conn, "Nadia Haddad")
     assert haddad_id is not None
-    matches = repository.find_person_ids_by_alias(conn, "Nadia")
+    matches = repository.find_subject_ids_by_alias(conn, "Nadia")
     assert matches == [], "a bare first name shared by two real people must stay unresolved"
 
 
@@ -103,7 +103,7 @@ def test_real_archive_never_stores_known_false_positive_identities(conn):
         "Chief Financial Officer",
     }
     for name in rejected_names:
-        assert repository.find_person_id_by_canonical_name(conn, name) is None, name
+        assert repository.find_subject_id_by_structural_name(conn, name) is None, name
     all_aliases = {row["alias"] for row in repository.all_aliases(conn)}
     assert not (rejected_names & all_aliases)
     assert report.people_count == repository.people_row_count(conn)
@@ -113,17 +113,21 @@ def test_real_archive_never_stores_known_false_positive_identities(conn):
 def test_real_archive_reviewed_text_only_people_are_confirmed(conn):
     ingest(conn, _SOURCE_DIR, embedding_provider=None)
     for name in ("Tobias Ekström", "Nadia Öberg", "Nils Ackermann"):
-        assert repository.find_person_id_by_canonical_name(conn, name) is not None, name
+        assert repository.find_subject_id_by_structural_name(conn, name) is not None, name
 
 
 def test_real_archive_repeated_ingestion_is_idempotent(conn):
+    # Architecture v1.6: identity is now persistent (CLAUDE.md 18.0), so a
+    # second ingest must resolve every structural name back to the *same*
+    # subject_id -- not merely to the same set of display names -- and must
+    # not mint a second identity for anyone already known.
     first = ingest(conn, _SOURCE_DIR, embedding_provider=None)
-    people_first = {row["canonical_name"] for row in repository.all_people(conn)}
-    aliases_first = {(row["person_id"], row["alias"]) for row in repository.all_aliases(conn)}
+    people_first = {row["subject_id"]: row["display_name"] for row in repository.all_people(conn)}
+    aliases_first = {(row["subject_id"], row["alias"]) for row in repository.all_aliases(conn)}
 
     second = ingest(conn, _SOURCE_DIR, embedding_provider=None)
-    people_second = {row["canonical_name"] for row in repository.all_people(conn)}
-    aliases_second = {(row["person_id"], row["alias"]) for row in repository.all_aliases(conn)}
+    people_second = {row["subject_id"]: row["display_name"] for row in repository.all_people(conn)}
+    aliases_second = {(row["subject_id"], row["alias"]) for row in repository.all_aliases(conn)}
 
     assert people_first == people_second
     assert aliases_first == aliases_second

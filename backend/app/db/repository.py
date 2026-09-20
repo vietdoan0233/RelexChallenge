@@ -1,6 +1,8 @@
 import hashlib
 import re
+import secrets
 import sqlite3
+import uuid
 
 from app.core.enums import PersonRelation
 from app.schemas.evidence import Document, EvidenceUnit
@@ -130,44 +132,135 @@ def embedding_row_count(conn: sqlite3.Connection) -> int:
 
 
 # ------------------------------------------------------------------- people
+#
+# Architecture v1.6 (CLAUDE.md 18.0): subject_id is a cryptographically
+# random UUID and display_alias is generated independently, just as
+# randomly -- neither is ever derived from a name, so there is no
+# get_or_create-by-slugify shortcut left. Resolving a structural name to a
+# subject_id means matching it against what is already known (an existing
+# FULL_NAME alias, or an existing display_alias when the name found in the
+# source *is* someone's own alias -- see find_subject_id_by_structural_name)
+# and only minting a new subject when nothing matches.
+
+# No 0/O/1/I: this alphabet is for a human-facing label that a judge or
+# reviewer may need to read aloud or type back, not for security entropy
+# (the code is public by design -- it is the *replacement* for a name, not
+# a secret). Collision handling in generate_unique_display_alias retries
+# with a fresh random draw; it never falls back to a counter or any other
+# predictable sequence.
+_ALIAS_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
-def get_or_create_person(conn: sqlite3.Connection, canonical_name: str) -> str:
-    person_id = slugify(canonical_name)
-    conn.execute(
-        "INSERT OR IGNORE INTO people (person_id, canonical_name) VALUES (?, ?)",
-        (person_id, canonical_name),
-    )
-    return person_id
+def generate_subject_id() -> str:
+    """A cryptographically secure random UUID (uuid4 draws from os.urandom)
+    containing no name-derived material."""
+    return str(uuid.uuid4())
 
 
-def find_person_id_by_canonical_name(conn: sqlite3.Connection, canonical_name: str) -> str | None:
+def _random_alias_code(length: int) -> str:
+    return "".join(secrets.choice(_ALIAS_ALPHABET) for _ in range(length))
+
+
+def generate_display_alias() -> str:
+    """`Participant Q7M4-N8`-shaped label. The literal format is a display
+    convention, not a derivation algorithm -- nothing about a given
+    person's name, email, or subject_id feeds into it."""
+    return f"Participant {_random_alias_code(4)}-{_random_alias_code(2)}"
+
+
+def generate_unique_display_alias(conn: sqlite3.Connection, max_attempts: int = 50) -> str:
+    for _ in range(max_attempts):
+        candidate = generate_display_alias()
+        exists = conn.execute(
+            "SELECT 1 FROM people WHERE display_alias = ?", (candidate,)
+        ).fetchone()
+        if exists is None:
+            return candidate
+    # Astronomically unlikely at this alphabet size (32^6 codes) and a
+    # 45-document corpus's worth of people; fail loudly rather than ever
+    # falling back to a predictable/incrementing suffix.
+    raise RuntimeError("could not generate a unique display alias")
+
+
+def find_subject_id_by_structural_name(conn: sqlite3.Connection, name: str) -> str | None:
+    """Resolve a speaker/sender/attendee string found in the source to an
+    existing subject, checking both of the two ways that string can
+    legitimately already belong to someone:
+
+    1. it is an ACTIVE person's canonical full name (a FULL_NAME alias), or
+    2. it is a PSEUDONYMISED person's own display_alias -- the literal text
+       their name was rewritten to, which is exactly what a later ingest of
+       the rewritten source will find in that speaker/sender position.
+
+    Returns None only when neither is true, i.e. this is a genuinely new
+    person. Never matches on a bare short-form alias (first name, initials,
+    ...); those are handled separately by the reviewed-manifest mention path.
+    """
+    row = conn.execute("SELECT subject_id FROM people WHERE display_alias = ?", (name,)).fetchone()
+    if row is not None:
+        return row["subject_id"]
     row = conn.execute(
-        "SELECT person_id FROM people WHERE canonical_name = ?", (canonical_name,)
+        "SELECT subject_id FROM person_aliases WHERE alias = ? AND alias_type = 'FULL_NAME'",
+        (name,),
     ).fetchone()
-    return row["person_id"] if row else None
+    return row["subject_id"] if row else None
 
 
-def add_alias(conn: sqlite3.Connection, person_id: str, alias: str, alias_type: str) -> None:
-    alias_id = f"AL-{slugify(person_id + '-' + alias)}"
+def get_or_create_subject(conn: sqlite3.Connection, display_name: str) -> str:
+    """Idempotent across ingestion runs: the same structural name always
+    resolves to the same subject_id (see find_subject_id_by_structural_name),
+    so a rebuild can never mint a second identity for someone already known.
+    Only inserts the people row itself -- callers add the FULL_NAME alias
+    (see app/ingestion/people.py), so a caller that already knows this is a
+    known display_alias can skip that step entirely."""
+    existing = find_subject_id_by_structural_name(conn, display_name)
+    if existing is not None:
+        return existing
+    subject_id = generate_subject_id()
+    display_alias = generate_unique_display_alias(conn)
     conn.execute(
-        "INSERT OR IGNORE INTO person_aliases (alias_id, person_id, alias, alias_type) "
-        "VALUES (?, ?, ?, ?)",
-        (alias_id, person_id, alias, alias_type),
+        "INSERT INTO people (subject_id, display_alias, privacy_state, display_name) "
+        "VALUES (?, ?, 'ACTIVE', ?)",
+        (subject_id, display_alias, display_name),
+    )
+    return subject_id
+
+
+def is_known_display_alias(conn: sqlite3.Connection, name: str) -> bool:
+    """True when `name` is already someone's display_alias -- i.e. this is
+    not a new person to discover, it is the alias-rewritten trace of an
+    already-pseudonymised one (CLAUDE.md 18.0: 'never treat Participant
+    Q7M4-N8 as a new real person')."""
+    return (
+        conn.execute("SELECT 1 FROM people WHERE display_alias = ?", (name,)).fetchone() is not None
     )
 
 
-def find_person_ids_by_alias(conn: sqlite3.Connection, alias: str) -> list[str]:
+def add_alias(conn: sqlite3.Connection, subject_id: str, alias: str, alias_type: str) -> None:
+    alias_id = f"AL-{uuid.uuid4().hex}"
+    conn.execute(
+        "INSERT OR IGNORE INTO person_aliases (alias_id, subject_id, alias, alias_type) "
+        "VALUES (?, ?, ?, ?)",
+        (alias_id, subject_id, alias, alias_type),
+    )
+
+
+def find_subject_ids_by_alias(conn: sqlite3.Connection, alias: str) -> list[str]:
     rows = conn.execute(
-        "SELECT DISTINCT person_id FROM person_aliases WHERE alias = ?", (alias,)
+        "SELECT DISTINCT subject_id FROM person_aliases WHERE alias = ?", (alias,)
     ).fetchall()
-    return [row["person_id"] for row in rows]
+    return [row["subject_id"] for row in rows]
 
 
 def all_people(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT person_id, canonical_name FROM people ORDER BY canonical_name"
+        "SELECT subject_id, display_alias, privacy_state, display_name FROM people "
+        "ORDER BY COALESCE(display_name, display_alias)"
     ).fetchall()
+
+
+def get_person(conn: sqlite3.Connection, subject_id: str) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM people WHERE subject_id = ?", (subject_id,)).fetchone()
 
 
 def people_row_count(conn: sqlite3.Connection) -> int:
@@ -187,23 +280,68 @@ def relation_counts(conn: sqlite3.Connection) -> dict[str, int]:
 
 def all_aliases(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT alias_id, person_id, alias, alias_type FROM person_aliases "
-        "ORDER BY person_id, alias"
+        "SELECT alias_id, subject_id, alias, alias_type FROM person_aliases "
+        "ORDER BY subject_id, alias"
     ).fetchall()
 
 
+def prune_orphaned_active_people(conn: sqlite3.Connection) -> int:
+    """After evidence_people is fully rebuilt for a run, remove any ACTIVE
+    person left with zero evidence_people rows: either stale contamination
+    from an earlier, looser extraction pass, or a name that no longer
+    appears in data/source/ at all. This restores the self-healing property
+    the old fully-rebuildable people table used to give for free, without
+    weakening identity stability for anyone actually still present: a
+    PSEUDONYMISED subject is never a candidate here regardless of its
+    current evidence count (CLAUDE.md 18.0.1: the participant row is never
+    deleted), and an ACTIVE person genuinely still in the corpus always has
+    at least one surviving evidence_people row. Returns the number removed.
+    Must run after evidence_people is repopulated, never before."""
+    conn.execute(
+        "DELETE FROM person_aliases WHERE subject_id IN ("
+        "  SELECT p.subject_id FROM people p"
+        "  LEFT JOIN evidence_people ep ON ep.subject_id = p.subject_id"
+        "  WHERE p.privacy_state = 'ACTIVE' AND ep.evidence_id IS NULL"
+        ")"
+    )
+    cursor = conn.execute(
+        "DELETE FROM people WHERE privacy_state = 'ACTIVE' AND subject_id NOT IN "
+        "(SELECT DISTINCT subject_id FROM evidence_people)"
+    )
+    return cursor.rowcount
+
+
 def link_evidence_person(
-    conn: sqlite3.Connection, evidence_id: str, person_id: str, relation: PersonRelation
+    conn: sqlite3.Connection, evidence_id: str, subject_id: str, relation: PersonRelation
 ) -> None:
     conn.execute(
-        "INSERT OR IGNORE INTO evidence_people (evidence_id, person_id, relation) VALUES (?, ?, ?)",
-        (evidence_id, person_id, relation.value),
+        "INSERT OR IGNORE INTO evidence_people (evidence_id, subject_id, relation) "
+        "VALUES (?, ?, ?)",
+        (evidence_id, subject_id, relation.value),
     )
 
 
 def evidence_people_for(conn: sqlite3.Connection, evidence_id: str) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT person_id, relation FROM evidence_people WHERE evidence_id = ?", (evidence_id,)
+        "SELECT subject_id, relation FROM evidence_people WHERE evidence_id = ?", (evidence_id,)
+    ).fetchall()
+
+
+def evidence_for_subject(conn: sqlite3.Connection, subject_id: str) -> list[sqlite3.Row]:
+    """Every Evidence Unit (plus its document/thread metadata) in which this
+    subject is an AUTHOR, SPEAKER, or MENTIONED participant -- the DB-hydrated
+    source of a participant's full clickable history (CLAUDE.md 18.0.2).
+    Never touches the vault."""
+    return conn.execute(
+        "SELECT e.evidence_id, e.document_id, e.unit_index, e.speaker_sender, e.event_date, "
+        "       e.timestamp_text, e.thread_context, e.raw_text, e.is_truncated, ep.relation, "
+        "       d.filename, d.document_type, d.title AS document_title "
+        "FROM evidence_people ep "
+        "JOIN evidence_units e ON e.evidence_id = ep.evidence_id "
+        "JOIN documents d ON d.document_id = e.document_id "
+        "WHERE ep.subject_id = ? "
+        "ORDER BY e.event_date, e.document_id, e.unit_index",
+        (subject_id,),
     ).fetchall()
 
 

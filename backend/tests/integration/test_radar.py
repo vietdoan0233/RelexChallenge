@@ -411,8 +411,10 @@ def test_api_serves_precomputed_findings_and_404s(world, tmp_path, monkeypatch, 
 # ------------------------------------------------------------- deletion
 
 
-def test_deleting_a_person_invalidates_their_findings_and_linked_cases(tmp_path):
-    from test_privacy_purge import Instance
+def test_pseudonymising_a_person_invalidates_their_findings_and_linked_cases(tmp_path):
+    from test_pseudonymisation import Instance
+
+    from app.privacy import pseudonymise
 
     inst = Instance(tmp_path)
     try:
@@ -432,12 +434,11 @@ def test_deleting_a_person_invalidates_their_findings_and_linked_cases(tmp_path)
             inst.conn.execute("INSERT INTO finding_evidence VALUES (?, ?)", (f"RC-{label}", ids[0]))
         inst.conn.commit()
 
-        preview = __import__("app.privacy.service", fromlist=["x"]).preview(
-            inst.conn, inst.source, "kwame-boateng"
-        )
+        subject_id = inst.subject_id_for("Kwame Boateng")
+        preview = pseudonymise.preview(inst.conn, inst.source, subject_id)
         assert preview.findings_to_invalidate == 1
 
-        result = inst.purge()
+        result = inst.pseudonymise(subject_id)
         assert result.findings_invalidated == 1
         findings = {r[0] for r in inst.conn.execute("SELECT finding_id FROM pulse_findings")}
         cases = {r[0] for r in inst.conn.execute("SELECT case_id FROM cases")}
@@ -449,7 +450,7 @@ def test_deleting_a_person_invalidates_their_findings_and_linked_cases(tmp_path)
 def test_a_finding_whose_prose_names_the_person_is_invalidated_even_if_it_cites_nothing_changed(
     tmp_path,
 ):
-    from test_privacy_purge import Instance
+    from test_pseudonymisation import Instance
 
     inst = Instance(tmp_path)
     try:
@@ -458,7 +459,7 @@ def test_a_finding_whose_prose_names_the_person_is_invalidated_even_if_it_cites_
             "'Kwame Boateng idea', 's', 'STILL_BLOCKED', '{}', 't')"
         )
         inst.conn.commit()
-        inst.purge()
+        inst.pseudonymise()
         assert inst.conn.execute("SELECT COUNT(*) FROM pulse_findings").fetchone()[0] == 0
     finally:
         inst.conn.close()

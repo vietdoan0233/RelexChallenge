@@ -3,8 +3,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 
 from app.db import migrations
+from app.privacy.gate import gate
 
 
 @pytest.fixture
@@ -17,20 +19,33 @@ def conn():
     connection.close()
 
 
+@pytest.fixture(autouse=True)
+def _reset_privacy_gate():
+    """The reader/writer gate (app/privacy/gate.py) is one process-wide
+    object; a test that fails partway through holding the write lease would
+    otherwise wedge every later test in the same process."""
+    yield
+    gate.reset_for_tests()
+
+
 @dataclass
 class IsolatedInstance:
     """A temporary, on-disk instance -- source dir, database, artifacts
-    dir, cache dir -- for tests that need real on-disk behavior (WAL/
-    VACUUM purge tests) rather than the in-memory `conn` fixture used for
-    pure logic tests. See CLAUDE.md/AGENTS.md section 0.5: any test that
-    modifies source content, deletes a person, or simulates purge/rebuild
-    must use an instance shaped like this one and must never touch the
-    repository's own data/source/, data/app.db, or data/keeper.db."""
+    dir, cache dir, and an encrypted reversal vault -- for tests that need
+    real on-disk behavior (WAL/VACUUM, pseudonymisation, admin reversal)
+    rather than the in-memory `conn` fixture used for pure logic tests. See
+    CLAUDE.md/AGENTS.md section 0.5: any test that modifies source content,
+    pseudonymises a subject, or simulates rebuild must use an instance
+    shaped like this one and must never touch the repository's own
+    data/source/, data/app.db, or data/private-vault/."""
 
     source_dir: Path
     db_path: Path
     artifacts_dir: Path
     cache_dir: Path
+    ops_dir: Path
+    vault_path: Path
+    vault_key: str
     conn: sqlite3.Connection
 
 
@@ -54,6 +69,9 @@ def isolated_instance(tmp_path):
         db_path=db_path,
         artifacts_dir=artifacts_dir,
         cache_dir=cache_dir,
+        ops_dir=tmp_path / "privacy_ops",
+        vault_path=tmp_path / "private-vault" / "vault.db.enc",
+        vault_key=Fernet.generate_key().decode(),
         conn=connection,
     )
     connection.close()

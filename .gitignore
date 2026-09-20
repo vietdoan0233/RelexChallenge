@@ -45,3 +45,4 @@ Thumbs.db
 # Challenge reference materials, not part of the application
 /*.pptx
 /parse_pptx.ps1
+.vercel

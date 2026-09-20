@@ -40,9 +40,13 @@ class Settings(BaseSettings):
     pseudonym_vault_key: str = ""
 
     # Gates POST /api/privacy/pseudonymise and the admin reversal endpoint.
-    # Empty means "not configured" -- both endpoints fail closed (401) rather
-    # than treating a missing token as "no auth required".
-    privacy_admin_token: str = ""
+    # Prototype decision (owner-approved): every instance accepts the shared demo
+    # token unless PRIVACY_ADMIN_TOKEN overrides it in .env or the environment, so
+    # any fresh clone works for the team. That value is public (it is in the
+    # README): set your own before exposing an instance to anyone you do not
+    # trust. Setting the variable to an EMPTY value still fails both endpoints
+    # closed (401) rather than treating a missing token as "no auth required".
+    privacy_admin_token: str = "demo-admin-token"
 
     # The known clean-archive baseline for this challenge's 45-document
     # corpus (AGENTS.md/CLAUDE.md checkpoint, confirmed by the 2026-09-19

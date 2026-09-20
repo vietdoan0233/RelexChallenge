@@ -40,3 +40,41 @@ def test_settings_recognizes_complete_embedding_configuration() -> None:
 
     assert settings.has_complete_embedding_configuration is True
     assert settings.missing_embedding_configuration_fields == ()
+
+
+def test_the_shared_demo_admin_token_is_the_default_when_unset(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.delenv("PRIVACY_ADMIN_TOKEN", raising=False)
+
+    assert Settings(_env_file=None).privacy_admin_token == "demo-admin-token"
+
+
+def test_an_explicit_admin_token_overrides_the_default(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.setenv("PRIVACY_ADMIN_TOKEN", "my-own-token")
+
+    assert Settings(_env_file=None).privacy_admin_token == "my-own-token"
+
+
+def test_an_explicitly_empty_admin_token_still_fails_closed(monkeypatch):
+    """The default only applies when the variable is absent: setting it empty is a
+    deliberate 'no admin access' and must never fall back to the shared token."""
+    from fastapi import HTTPException
+
+    from app.api import deps
+    from app.core import config
+
+    monkeypatch.setenv("PRIVACY_ADMIN_TOKEN", "")
+    config.get_settings.cache_clear()
+    try:
+        for header in (None, "Bearer demo-admin-token", "Bearer "):
+            try:
+                deps.require_admin(header)
+            except HTTPException as exc:
+                assert exc.status_code == 401
+            else:
+                raise AssertionError(f"empty token must reject {header!r}")
+    finally:
+        config.get_settings.cache_clear()
